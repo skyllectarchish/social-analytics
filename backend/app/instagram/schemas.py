@@ -85,3 +85,109 @@ class CallbackResponse(BaseModel):
 
     success: bool
     profile: InstagramProfile
+
+
+# --- Insights schemas ---
+
+class InsightDataPoint(BaseModel):
+    """A single time-series data point (e.g., reach=224 on 2025-01-15)."""
+
+    end_time: str
+    value: int
+
+
+class MetricTimeSeries(BaseModel):
+    """A named metric with its time-series values."""
+
+    metric_name: str
+    data: list[InsightDataPoint]
+
+
+class OverviewResponse(BaseModel):
+    """Response for GET /api/instagram/insights/overview."""
+
+    views: MetricTimeSeries
+    reach: MetricTimeSeries
+    follows_and_unfollows: MetricTimeSeries
+    total_interactions: MetricTimeSeries
+    accounts_engaged: MetricTimeSeries
+
+
+class DemographicBreakdown(BaseModel):
+    """A single demographic dimension value (e.g., city=Mumbai, value=120)."""
+
+    dimension_value: str
+    value: int
+
+
+class DemographicResponse(BaseModel):
+    """Response for GET /api/instagram/insights/demographics."""
+
+    metric_name: str
+    breakdown: str  # "age", "gender", "city", or "country"
+    data: list[DemographicBreakdown]
+
+
+class MediaInsightItem(BaseModel):
+    """A single metric for a media item (e.g., saved=42)."""
+
+    metric_name: str
+    value: float
+
+
+class MediaInsightsResponse(BaseModel):
+    """Response for GET /api/instagram/insights/media/{media_id}."""
+
+    ig_media_id: str
+    insights: list[MediaInsightItem]
+
+
+class SyncResponse(BaseModel):
+    """Response for POST /api/instagram/insights/sync."""
+
+    success: bool
+    account_metrics_synced: int
+    media_insights_synced: int
+    demographics_synced: bool
+    message: str = ""
+
+
+class TopPost(BaseModel):
+    """A top-performing media post."""
+
+    ig_media_id: str
+    media_type: str
+    permalink: str
+    caption: str
+    views: int
+    interactions: int
+
+
+class DashboardSummary(BaseModel):
+    """Pre-computed summary for the dashboard hero cards."""
+
+    period_days: int
+    total_views: int
+    total_reach: int
+    total_interactions: int
+    total_accounts_engaged: int
+    net_follower_growth: int
+    top_posts: list[TopPost]
+
+
+class StoryWithInsights(BaseModel):
+    """A single active story with its live insights."""
+
+    ig_media_id: str
+    media_type: str
+    media_url: str
+    thumbnail_url: str
+    permalink: str
+    timestamp: str
+    insights: list[MediaInsightItem]
+
+
+class StoriesResponse(BaseModel):
+    """Response for GET /api/instagram/stories."""
+
+    stories: list[StoryWithInsights]

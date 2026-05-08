@@ -38,3 +38,32 @@ DEFAULT_MEDIA_FETCH_LIMIT: int = 50
 USERNAME_MIN_LENGTH: int = 3
 USERNAME_MAX_LENGTH: int = 30
 PASSWORD_MIN_LENGTH: int = 8
+
+# --- Insights API Metrics ---
+
+# Account-level interaction metrics (GET /{ig-user-id}/insights)
+ACCOUNT_INTERACTION_METRICS: str = "views,reach,follows_and_unfollows,total_interactions,accounts_engaged"
+
+# Account-level demographic metrics (GET /{ig-user-id}/insights)
+ACCOUNT_DEMOGRAPHIC_METRICS: list[str] = [
+    "follower_demographics",
+    "engaged_audience_demographics",
+]
+
+# Per-media metrics — FEED posts (GET /{media-id}/insights)
+MEDIA_FEED_METRICS: str = "likes,comments,saved,shares,reach,views,total_interactions,profile_visits,reposts"
+
+# Per-media metrics — REELS (GET /{media-id}/insights)
+MEDIA_REELS_METRICS: str = (
+    "likes,comments,saved,shares,reach,views,total_interactions,"
+    "ig_reels_avg_watch_time,ig_reels_video_view_total_time,reposts"
+)
+
+# Per-media metrics — STORY (GET /{media-id}/insights)
+MEDIA_STORY_METRICS: str = "reach,views,shares,replies,navigation,reposts,total_interactions"
+
+# Insights sync defaults
+INSIGHTS_LOOKBACK_DAYS: int = 30
+
+# Stories
+STORY_FIELDS: str = "id,media_type,media_url,thumbnail_url,permalink,timestamp"

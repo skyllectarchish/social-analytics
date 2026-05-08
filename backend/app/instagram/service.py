@@ -4,6 +4,7 @@ All database operations are handled by app.repositories.instagram_repo.
 This module is responsible only for Meta/Instagram API communication.
 """
 
+import asyncio
 import logging
 import secrets
 from typing import Any
@@ -13,13 +14,19 @@ import httpx
 
 from ..config import settings
 from ..constants import (
+    ACCOUNT_DEMOGRAPHIC_METRICS,
+    ACCOUNT_INTERACTION_METRICS,
     DEFAULT_MEDIA_FETCH_LIMIT,
     GRAPH_BASE_URL,
     HTTP_TIMEOUT_SECONDS,
     INSTAGRAM_MEDIA_FIELDS,
     INSTAGRAM_PROFILE_FIELDS,
+    MEDIA_FEED_METRICS,
+    MEDIA_REELS_METRICS,
+    MEDIA_STORY_METRICS,
     OAUTH_DIALOG_URL,
     REQUIRED_INSTAGRAM_SCOPES,
+    STORY_FIELDS,
 )
 from ..exceptions import InstagramAPIError, OAuthError
 
@@ -209,3 +216,216 @@ async def fetch_media(
 
     logger.info("Fetched %d media items for ig_user %s", len(media_items), ig_user_id)
     return media_items
+
+
+async def fetch_media_insights_batch(
+    media_items: list[tuple[str, str]],
+    token: str,
+    max_retries: int = 3,
+) -> dict[str, list[dict[str, Any]]]:
+    """Fetch insights for multiple media items with rate-limit handling.
+
+    Args:
+        media_items: List of (ig_media_id, media_type) tuples.
+
+    Returns:
+        {ig_media_id: [insight_data, ...]}
+    """
+    results: dict[str, list[dict[str, Any]]] = {}
+
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+        for media_id, media_type in media_items:
+            if media_type in ("VIDEO", "REEL"):
+                metrics = MEDIA_REELS_METRICS
+            elif media_type == "STORY":
+                metrics = MEDIA_STORY_METRICS
+            else:
+                # IMAGE, CAROUSEL_ALBUM, and any other types use feed metrics
+                metrics = MEDIA_FEED_METRICS
+
+            for attempt in range(max_retries):
+                try:
+                    resp = await client.get(
+                        f"{GRAPH_BASE_URL}/{media_id}/insights",
+                        params={"metric": metrics, "access_token": token},
+                    )
+                    resp.raise_for_status()
+                    results[media_id] = resp.json().get("data", [])
+                    await asyncio.sleep(0.5)
+                    break
+                except httpx.HTTPStatusError as exc:
+                    if exc.response.status_code == 429:
+                        retry_after = int(exc.response.headers.get("Retry-After", 60))
+                        logger.warning(
+                            "Rate limited on %s (attempt %d). Sleeping %ds...",
+                            media_id, attempt + 1, retry_after,
+                        )
+                        await asyncio.sleep(retry_after)
+                    else:
+                        logger.error(
+                            "Failed insights for %s (HTTP %d): %s",
+                            media_id, exc.response.status_code, exc.response.text,
+                        )
+                        break
+                except httpx.HTTPError as exc:
+                    logger.error("Failed insights for %s: %s", media_id, exc)
+                    break
+
+    logger.info("Batch fetched insights for %d/%d media items", len(results), len(media_items))
+    return results
+
+
+async def fetch_active_stories(ig_user_id: str, token: str) -> list[dict[str, Any]]:
+    """Fetch currently active stories for an Instagram user (live, expires after 24h).
+
+    Raises:
+        InstagramAPIError: If the API call fails.
+    """
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+        try:
+            resp = await client.get(
+                f"{GRAPH_BASE_URL}/{ig_user_id}/stories",
+                params={"fields": STORY_FIELDS, "access_token": token},
+            )
+            resp.raise_for_status()
+            return resp.json().get("data", [])
+        except httpx.HTTPStatusError as exc:
+            logger.error("Failed to fetch stories: %s", exc.response.text)
+            raise InstagramAPIError("Failed to fetch active stories")
+        except httpx.HTTPError as exc:
+            logger.error("Failed to fetch stories: %s", exc)
+            raise InstagramAPIError("Failed to fetch active stories")
+
+
+async def fetch_account_insights(
+    ig_user_id: str,
+    token: str,
+    since: int,
+    until: int,
+) -> list[dict[str, Any]]:
+    """Fetch daily time-series account insights from the Graph API.
+
+    Args:
+        since: UNIX timestamp for the start of the range.
+        until: UNIX timestamp for the end of the range.
+
+    Returns:
+        Raw `data` array from Meta's response (one entry per metric).
+
+    Raises:
+        InstagramAPIError: If the API call fails.
+    """
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+        try:
+            resp = await client.get(
+                f"{GRAPH_BASE_URL}/{ig_user_id}/insights",
+                params={
+                    "metric": ACCOUNT_INTERACTION_METRICS,
+                    "period": "day",
+                    "metric_type": "time_series",
+                    "since": since,
+                    "until": until,
+                    "access_token": token,
+                },
+            )
+            resp.raise_for_status()
+            return resp.json().get("data", [])
+        except httpx.HTTPStatusError as exc:
+            logger.error("Failed to fetch account insights: %s", exc.response.text)
+            raise InstagramAPIError("Failed to fetch account insights")
+        except httpx.HTTPError as exc:
+            logger.error("Failed to fetch account insights: %s", exc)
+            raise InstagramAPIError("Failed to fetch account insights")
+
+
+async def fetch_demographics(
+    ig_user_id: str,
+    token: str,
+    metric_name: str,
+    breakdown: str,
+) -> dict[str, Any]:
+    """Fetch demographic breakdown data from the Graph API.
+
+    Args:
+        metric_name: "follower_demographics" or "engaged_audience_demographics".
+        breakdown: "age", "gender", "city", or "country".
+
+    Returns:
+        The `total_value` dict from Meta's response, or {} on empty.
+
+    Raises:
+        InstagramAPIError: If the API call fails.
+    """
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+        try:
+            resp = await client.get(
+                f"{GRAPH_BASE_URL}/{ig_user_id}/insights",
+                params={
+                    "metric": metric_name,
+                    "period": "lifetime",
+                    "timeframe": "this_month",
+                    "metric_type": "total_value",
+                    "breakdown": breakdown,
+                    "access_token": token,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json().get("data", [])
+            if data:
+                return data[0].get("total_value", {})
+            return {}
+        except httpx.HTTPStatusError as exc:
+            logger.error(
+                "Failed to fetch demographics (%s/%s): %s",
+                metric_name, breakdown, exc.response.text,
+            )
+            raise InstagramAPIError(
+                f"Failed to fetch demographics for {metric_name}/{breakdown}"
+            )
+        except httpx.HTTPError as exc:
+            logger.error("Failed to fetch demographics (%s/%s): %s", metric_name, breakdown, exc)
+            raise InstagramAPIError(
+                f"Failed to fetch demographics for {metric_name}/{breakdown}"
+            )
+
+
+async def fetch_media_insights(
+    media_id: str,
+    token: str,
+    media_type: str,
+) -> list[dict[str, Any]]:
+    """Fetch per-media insights from the Graph API.
+
+    Args:
+        media_type: "REEL", "STORY", or any other value (treated as feed post).
+
+    Returns:
+        Raw `data` array from Meta's response.
+
+    Raises:
+        InstagramAPIError: If the API call fails.
+    """
+    if media_type in ("VIDEO", "REEL"):
+        metrics = MEDIA_REELS_METRICS
+    elif media_type == "STORY":
+        metrics = MEDIA_STORY_METRICS
+    else:
+        # IMAGE, CAROUSEL_ALBUM, and any other types use feed metrics
+        metrics = MEDIA_FEED_METRICS
+
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+        try:
+            resp = await client.get(
+                f"{GRAPH_BASE_URL}/{media_id}/insights",
+                params={"metric": metrics, "access_token": token},
+            )
+            resp.raise_for_status()
+            return resp.json().get("data", [])
+        except httpx.HTTPStatusError as exc:
+            logger.error(
+                "Failed to fetch media insights for %s: %s", media_id, exc.response.text
+            )
+            raise InstagramAPIError(f"Failed to fetch media insights for {media_id}")
+        except httpx.HTTPError as exc:
+            logger.error("Failed to fetch media insights for %s: %s", media_id, exc)
+            raise InstagramAPIError(f"Failed to fetch media insights for {media_id}")

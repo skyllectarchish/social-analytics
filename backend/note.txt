@@ -1,0 +1,87 @@
+When a content creator authenticates your app via the Instagram Graph API, you gain access to a very specific set of endpoints. The data you can extract is divided into four main categories: Profile Data, Audience Demographics, Account-Level Analytics, and Post-Level Analytics.
+
+Here is exactly what you can extract to build your dashboard:
+
+1. Audience Demographics (The "Who")
+These metrics help creators understand their follower base. Note: For privacy reasons, Meta only returns demographic data if the creator has over 100 followers.  
+
+Age & Gender: A breakdown of followers' age ranges (e.g., 18-24, 25-34) and gender.  
+
+Geographic Location: The top cities and countries where the creator's followers reside.  
+
+Follower Online Activity: Data showing which days of the week and hours of the day their followers are most actively online.  
+
+2. Account-Level Analytics (The "Overall Reach")
+These metrics track the overall performance of the creator's profile over a specific period (daily, weekly, or 28-day windows).  
+
+Impressions: The total number of times the creator's content (posts, stories, reels) was displayed on user screens.  
+
+Reach: The total number of unique accounts that viewed the creator's content.  
+
+Follower Growth: You can track the net new followers per day to build growth trend charts over time.  
+
+(Important Note for 2026: Meta recently deprecated several older profile metrics in Graph API v21+, including profile_views and website_clicks. You should build your dashboard around Impressions and Reach instead).  
+
+3. Media & Post-Level Analytics (The "Content Performance")
+You can fetch granular data for individual Feed Posts, Reels, and Carousels.  
+
+Public Metrics: like_count and comments_count.
+
+Private Insights:
+
+Saved: How many users bookmarked the post.
+
+Shares: How many times the post was shared.  
+
+Post Reach & Impressions: Unique views vs. total views for that specific post.
+
+Video Metrics (Reels): Total plays, watch time, and average watch time.
+
+4. Story Analytics (The "Ephemeral Content")
+Stories have their own specific set of metrics. Because stories disappear after 24 hours, you must fetch these metrics before they expire or use Webhooks to capture them automatically.  
++1
+
+Interaction Metrics: replies and shares.
+
+Navigation Metrics: taps_forward (skipping to the next story), taps_back (rewatching), and exits (swiping away from stories entirely).
+
+5. Basic Profile Info
+The foundational data you need to populate the creator's user card on your dashboard:
+
+username, name, and biography.
+
+profile_picture_url.
+
+Current snapshot of followers_count, follows_count, and media_count.
+
+If you were to combine these data points, would your dashboard simply display these numbers as graphs, or do you plan to have an AI orchestration layer analyze this data to give the creator actionable advice (like "Your audience is mostly online at 8 PM, schedule your next Reel then")?
+
+
+-------------------
+
+
+ADVANCED METRICX
+
+
+You are absolutely correct. The Instagram app has a built-in "Insights" tab that displays these numbers. If a creator just wants a quick, casual glance at how many views a Reel received yesterday, the native app is perfectly fine.
+
+However, from a system architecture and professional marketing perspective, the native dashboard has severe limitations. Building a custom solution solves several critical problems that professional creators and agencies face:
+
+**1. The 90-Day Data Cliff (Historical Retention)**
+The native Instagram app only stores detailed insights for 90 days. If a creator wants to run year-over-year comparisons or track long-term audience growth patterns, it is impossible to do so natively. By pulling the data via the Graph API and storing it in your own optimized database, you bypass Meta's retention limits entirely, offering users unlimited historical tracking.
+
+**2. AI-Driven Orchestration vs. Passive Reporting**
+The native app is a passive tool; it shows graphs but doesn't explain *why* things are happening. A custom architecture allows you to route the raw JSON metrics from the Graph API through an orchestration layer. By feeding those time-series metrics into an agentic workflow—perhaps utilizing LangChain and an API like Gemini Pro—you can transform the dashboard into an active advisor. Instead of just showing a line chart, the system can automatically synthesize the data and generate plain-text strategies: *"Your save-rate on Carousels is 3x higher than your Reels. Shift your top-of-funnel strategy to Carousels this week to maximize reach."*
+
+**3. Cross-Platform Aggregation**
+Professional creators rarely exist solely on Instagram. They are managing YouTube channels, TikToks, and newsletters. Native insights trap the data in a silo. A custom dashboard allows you to aggregate data from multiple platforms into a single pane of glass, providing a holistic view of the creator's entire digital footprint.
+
+**4. Advanced Calculated Metrics**
+The native dashboard displays surface-level metrics. A custom engine allows you to compute complex, custom KPIs. For example, the current Instagram algorithm heavily prioritizes "Saves" and "Sends" (DM shares) over basic "Likes." Your backend can automatically calculate a custom "Audience Intent Score" by weighting DMs 5x higher than likes, providing a much more accurate picture of content vitality than Instagram's default view.
+
+**5. Agency and Multi-Account Management**
+If a social media manager handles 10 different creators, checking native analytics requires manually logging in and out of 10 different accounts on a mobile device. An OAuth-based web dashboard allows them to monitor all 10 accounts simultaneously on one screen.
+
+Essentially, you aren't building this just to replicate what Instagram shows on a phone. You are building an ingestion and processing pipeline to extract raw data, retain it permanently, and synthesize it into actionable intelligence.
+
+-------------------
