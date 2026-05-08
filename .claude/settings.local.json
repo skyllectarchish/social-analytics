@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(node -e \"const l = require\\('lucide-react'\\); console.log\\('Instagram:', !!l.Instagram, 'Twitter:', !!l.Twitter, 'Camera:', !!l.Camera\\);\")",
+      "Bash(node -e \"const l = require\\('lucide-react'\\); const want = ['Instagram','Twitter','Youtube','Linkedin','Github','TwitterX','SquareInstagram','Camera']; want.forEach\\(k => console.log\\(k, !!l[k]\\)\\); console.log\\('---'\\); console.log\\(Object.keys\\(l\\).filter\\(k => /insta|twit|tube|link|hub/i.test\\(k\\)\\).slice\\(0,30\\)\\);\")",
+      "Bash(node -e \"const l = require\\('lucide-react'\\); const want = ['Sparkles','Quote','Star','ChevronLeft','ChevronRight','Activity','ArrowRight','Heart','MessageCircle','Play','TrendingUp','Users','LineChart','Bookmark','Eye','Share2','Hash','MessageSquare','UserPlus','Music2','Compass','Rocket','UserCircle2','Brain','Handshake','Lightbulb','BarChart3','Menu','X','Clock','ArrowUpRight','Check','Sun','Moon']; want.forEach\\(k => { if \\(!l[k]\\) console.log\\('MISSING:', k\\); }\\); console.log\\('done'\\);\")",
+      "Bash(grep -qE \"ready in|error|Error\" \"C:\\\\\\\\Users\\\\\\\\Admin\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\claude\\\\\\\\C--Users-Admin-WebstormProjects-social-analytics\\\\\\\\66d1b2e3-fe94-4539-be47-0a83840c357d\\\\\\\\tasks\\\\\\\\bxx90x3me.output\")",
+      "Bash(grep -E \"h-4\\\\\\\\\\\\\\\\.5|h-4-5\" dist/assets/index-DfIplZV7.css)",
+      "Bash(node -e \"const m = require\\('framer-motion'\\); console.log\\('useInView:', typeof m.useInView, 'motion.div:', typeof m.motion.div, 'AnimatePresence:', typeof m.AnimatePresence\\);\")",
+      "Bash(grep -qE \"ready in|error|Error\" \"C:\\\\\\\\Users\\\\\\\\Admin\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\claude\\\\\\\\C--Users-Admin-WebstormProjects-social-analytics\\\\\\\\66d1b2e3-fe94-4539-be47-0a83840c357d\\\\\\\\tasks\\\\\\\\b5kzz37hu.output\")",
+      "Bash(sed -i 's/py-28 sm:py-36/py-20 sm:py-26/g' FeaturesSection.jsx)",
+      "Bash(sed -i 's/py-24 sm:py-32/py-16 sm:py-24/g' TrendingAudio.jsx PricingSection.jsx TipsSection.jsx TestimonialCarousel.jsx CTASection.jsx HowItWorks.jsx CommunityShowcase.jsx AnalyticsPreview.jsx)",
+      "Bash(sed -i 's/py-20 sm:py-28/py-14 sm:py-20/g' SocialProofSection.jsx)",
+      "Bash(sed -i 's/className=\"mt-16 grid/className=\"mt-12 grid/g' FeaturesSection.jsx PricingSection.jsx TrendingAudio.jsx TipsSection.jsx CommunityShowcase.jsx)",
+      "Bash(sed -i 's/className=\"relative mt-16/className=\"relative mt-12/g' AnalyticsPreview.jsx)",
+      "Bash(sed -i 's/bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-10 text-\\\\[#0a0e27\\\\]/bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-10 text-white/g' CTASection.jsx)",
+      "Bash(sed -i 's/text-\\\\[#0a0e27\\\\]\\\\/85 sm:text-lg/text-white\\\\/85 sm:text-lg/g' CTASection.jsx)",
+      "Bash(sed -i 's/uppercase tracking-\\\\[0.18em\\\\] text-\\\\[#0a0e27\\\\] backdrop-blur/uppercase tracking-[0.18em] text-white backdrop-blur/g' CTASection.jsx)",
+      "Bash(sed -i 's/border border-white\\\\/40 bg-white\\\\/10 px-6 py-3.5 text-sm font-semibold text-\\\\[#0a0e27\\\\] backdrop-blur/border border-white\\\\/40 bg-white\\\\/10 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur/g' CTASection.jsx)"
+    ]
+  }
+}
