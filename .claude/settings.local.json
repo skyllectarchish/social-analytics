@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\laragon\\\\www\\\\social-analytics\\\\backend\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(Get-ChildItem -Path \"C:\\\\laragon\\\\www\\\\social-analytics\\\\backend\\\\app\" -Depth 0 -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\laragon\\\\www\\\\social-analytics\\\\backend\\\\app\" | Where-Object { -not $_.PSIsContainer } | Select-Object Name)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\laragon\\\\www\\\\social-analytics\\\\backend\\\\app\" | Where-Object { $_.PSIsContainer } | Select-Object Name)",
+      "Bash(C:\\\\laragon\\\\www\\\\social-analytics\\\\venv\\\\Scripts\\\\python.exe *)",
+      "PowerShell(C:\\\\laragon\\\\www\\\\social-analytics\\\\venv\\\\Scripts\\\\python.exe -c \"import secrets; print\\(secrets.token_urlsafe\\(48\\)\\)\")",
+      "PowerShell(C:\\\\laragon\\\\www\\\\social-analytics\\\\venv\\\\Scripts\\\\pip.exe install -r C:\\\\laragon\\\\www\\\\social-analytics\\\\backend\\\\requirements.txt 2>&1 | Select-Object -Last 20)",
+      "Bash(Get-ChildItem *)",
+      "PowerShell(C:\\\\laragon\\\\www\\\\social-analytics\\\\venv\\\\Scripts\\\\pip.exe install \"bcrypt<4.0.0\" 2>&1 | Select-Object -Last 5)",
+      "PowerShell(C:\\\\laragon\\\\www\\\\social-analytics\\\\venv\\\\Scripts\\\\pip.exe install \"bcrypt<4.0.0\" 2>&1)",
+      "PowerShell(C:\\\\laragon\\\\www\\\\social-analytics\\\\venv\\\\Scripts\\\\python.exe -c \"import bcrypt; print\\(bcrypt.__version__\\); from passlib.context import CryptContext; ctx = CryptContext\\(schemes=['bcrypt']\\); h = ctx.hash\\('testpass'\\); print\\('passlib OK:', ctx.verify\\('testpass', h\\)\\)\" 2>&1)"
+    ]
+  }
+}

@@ -1,348 +1,519 @@
-# Instagram Analytics Dashboard — Implementation Plan
+# Plan 1 of 3 — Foundation & Security
 
-## Overview
+> **Execution order**: Plan 1 → Plan 2 → Plan 3. This plan must be completed first.
 
-Build an analytics dashboard for Instagram content creators that allows users to **register/login**, **connect their Instagram Business/Creator account** via the Meta OAuth flow, and **fetch + store profile & media data** in ClickHouse.
-
----
-
-## Tech Stack & Versions
-
-| Layer | Technology | Version |
-|---|---|---|
-| **Backend** | FastAPI | 0.136.x (latest) |
-| **Frontend** | React (Vite) | 19.x (latest) |
-| **PWA** | vite-plugin-pwa | latest |
-| **Styling** | Tailwind CSS | v4.2.x (CSS-first config) |
-| **Database** | ClickHouse Cloud | via `clickhouse-connect` |
-| **Migrations** | clickhouse-migrations | latest |
-| **Instagram API** | Instagram Graph API | **v25.0** (latest) |
-| **Auth** | JWT (python-jose + passlib[bcrypt]) | — |
-
----
-
-## User Review Required
-
-> [!IMPORTANT]
-> **ClickHouse Credentials Mapping** — You provided a `Key ID` and `Key Secret`. The plan assumes these map to ClickHouse Cloud API credentials where `Key ID` → username and `Key Secret` → password, connecting over HTTPS (port 8443). Please confirm your **ClickHouse Cloud hostname** (e.g., `abc123.clickhouse.cloud`) and the **database name** you want to use.
-
-> [!IMPORTANT]
-> **Meta App Credentials Required** — To use the Instagram Graph API, you need a **Meta (Facebook) App** registered at [developers.facebook.com](https://developers.facebook.com/). Please provide or create:
-> 1. **Facebook App ID**
-> 2. **Facebook App Secret**
-> 3. The Instagram account must be a **Business** or **Creator** account linked to a Facebook Page.
-
-> [!WARNING]
-> **Credentials in Code** — The provided ClickHouse credentials will be stored in a `.env` file (gitignored). They should **never** be committed to version control.
-
----
-
-## Open Questions
-
-> [!IMPORTANT]
-> 1. **ClickHouse Host**: What is your ClickHouse Cloud hostname? (e.g., `xxxx.clickhouse.cloud`)
-> 2. **Database Name**: What database name should be used? (e.g., `social_analytics`)
-> 3. **Meta App**: Do you already have a Meta Developer App created? If not, we'll include setup instructions.
-> 4. **Domain/Port**: What port should the frontend dev server run on? (default: `5173`). Backend? (default: `8000`).
-> 5. **Tailwind CSS Version**: You requested Tailwind — confirming you want **v4.x** (the latest major, CSS-first configuration). The plan proceeds with v4.
-
----
-
-## Project Structure
-
-```
-c:\laragon\www\social-analitic\
-├── backend/                          # FastAPI application
-│   ├── app/
-│   │   ├── __init__.py
-│   │   ├── main.py                   # FastAPI app entry point
-│   │   ├── config.py                 # Pydantic Settings (.env loader)
-│   │   ├── database.py               # ClickHouse client singleton
-│   │   ├── auth/
-│   │   │   ├── __init__.py
-│   │   │   ├── router.py             # /auth/register, /auth/login
-│   │   │   ├── schemas.py            # Pydantic models for auth
-│   │   │   ├── service.py            # Password hashing, JWT creation
-│   │   │   └── dependencies.py       # get_current_user dependency
-│   │   ├── instagram/
-│   │   │   ├── __init__.py
-│   │   │   ├── router.py             # /instagram/connect, /instagram/callback, /instagram/profile
-│   │   │   ├── schemas.py            # Pydantic models for IG data
-│   │   │   └── service.py            # Graph API client logic
-│   │   └── models/
-│   │       ├── __init__.py
-│   │       └── queries.py            # Raw SQL queries for ClickHouse
-│   ├── migrations/                   # clickhouse-migrations SQL files
-│   │   ├── 001_create_users.sql
-│   │   ├── 002_create_instagram_profiles.sql
-│   │   └── 003_create_instagram_media.sql
-│   ├── requirements.txt
-│   ├── .env                          # Environment variables (gitignored)
-│   └── .env.example                  # Template for env vars
-├── frontend/                         # React PWA (Vite)
-│   ├── public/
-│   │   ├── pwa-192x192.png
-│   │   ├── pwa-512x512.png
-│   │   └── favicon.svg
-│   ├── src/
-│   │   ├── main.jsx
-│   │   ├── App.jsx
-│   │   ├── index.css                 # Tailwind v4 entry (@import "tailwindcss")
-│   │   ├── api/
-│   │   │   └── client.js             # Axios/fetch wrapper with JWT interceptor
-│   │   ├── context/
-│   │   │   └── AuthContext.jsx        # React Context for auth state
-│   │   ├── pages/
-│   │   │   ├── LoginPage.jsx
-│   │   │   ├── RegisterPage.jsx
-│   │   │   ├── DashboardPage.jsx      # Main dashboard after IG connect
-│   │   │   ├── ConnectInstagramPage.jsx # Initiates Meta OAuth
-│   │   │   └── CallbackPage.jsx       # Handles OAuth redirect
-│   │   ├── components/
-│   │   │   ├── Layout.jsx
-│   │   │   ├── Navbar.jsx
-│   │   │   ├── ProfileCard.jsx        # Shows IG profile info
-│   │   │   ├── MediaGrid.jsx          # Grid of IG media posts
-│   │   │   ├── MediaCard.jsx          # Individual media card
-│   │   │   └── StatsOverview.jsx      # Followers, following, media count
-│   │   └── hooks/
-│   │       └── useAuth.js
-│   ├── vite.config.js
-│   ├── package.json
-│   └── index.html
-├── .gitignore
-└── README.md
-```
+This plan fixes the **foundation layer** — dependencies, configuration, security primitives, error handling infrastructure, logging, and the database module. Everything in Plans 2 and 3 depends on these being in place.
 
 ---
 
 ## Proposed Changes
 
-### Component 1: Database Layer (ClickHouse + Migrations)
+### Component 1: Dependencies — `requirements.txt`
 
-#### [NEW] [001_create_users.sql](file:///c:/laragon/www/social-analitic/backend/migrations/001_create_users.sql)
+#### [MODIFY] [requirements.txt](file:///c:/laragon/www/social-analytics/backend/requirements.txt)
 
-```sql
-CREATE TABLE IF NOT EXISTS users (
-    id UUID DEFAULT generateUUIDv4(),
-    email String,
-    username String,
-    hashed_password String,
-    is_active UInt8 DEFAULT 1,
-    created_at DateTime DEFAULT now(),
-    updated_at DateTime DEFAULT now()
-) ENGINE = ReplacingMergeTree(updated_at)
-ORDER BY (id)
-SETTINGS index_granularity = 8192;
+Add the missing `clickhouse-migrations` package and add `cryptography` for access token encryption:
 
--- Secondary index for email lookups
-ALTER TABLE users ADD INDEX idx_email (email) TYPE bloom_filter GRANULARITY 1;
+```diff
+ fastapi[standard]>=0.136.0
+ uvicorn[standard]>=0.34.0
+ python-jose[cryptography]>=3.3.0
+ passlib[bcrypt]>=1.7.4
+ pydantic[email]>=2.0
+ pydantic-settings>=2.0
+ clickhouse-connect>=0.8.0
++clickhouse-migrations>=0.4.0
++cryptography>=44.0.0
+ httpx>=0.28.0
+ python-multipart>=0.0.18
+ python-dotenv>=1.0.0
 ```
 
-#### [NEW] [002_create_instagram_profiles.sql](file:///c:/laragon/www/social-analitic/backend/migrations/002_create_instagram_profiles.sql)
-
-```sql
-CREATE TABLE IF NOT EXISTS instagram_profiles (
-    id UUID DEFAULT generateUUIDv4(),
-    user_id UUID,                          -- FK to users table
-    ig_user_id String,                     -- Instagram Graph API user ID
-    username String,
-    name String,
-    biography String,
-    profile_picture_url String,
-    followers_count UInt64 DEFAULT 0,
-    follows_count UInt64 DEFAULT 0,
-    media_count UInt64 DEFAULT 0,
-    access_token String,                   -- Long-lived access token (encrypted)
-    token_expires_at DateTime,
-    connected_at DateTime DEFAULT now(),
-    updated_at DateTime DEFAULT now()
-) ENGINE = ReplacingMergeTree(updated_at)
-ORDER BY (user_id, ig_user_id)
-SETTINGS index_granularity = 8192;
+After editing, run:
+```bash
+pip install -r requirements.txt
 ```
-
-#### [NEW] [003_create_instagram_media.sql](file:///c:/laragon/www/social-analitic/backend/migrations/003_create_instagram_media.sql)
-
-```sql
-CREATE TABLE IF NOT EXISTS instagram_media (
-    id UUID DEFAULT generateUUIDv4(),
-    ig_media_id String,                    -- Instagram media ID
-    ig_user_id String,                     -- Instagram user who owns it
-    user_id UUID,                          -- FK to users table
-    media_type String,                     -- IMAGE, VIDEO, CAROUSEL_ALBUM
-    media_url String,
-    thumbnail_url String DEFAULT '',
-    permalink String,
-    caption String DEFAULT '',
-    timestamp DateTime,
-    like_count UInt64 DEFAULT 0,
-    comments_count UInt64 DEFAULT 0,
-    fetched_at DateTime DEFAULT now()
-) ENGINE = ReplacingMergeTree(fetched_at)
-ORDER BY (user_id, ig_user_id, ig_media_id)
-SETTINGS index_granularity = 8192;
-```
-
-#### [NEW] [database.py](file:///c:/laragon/www/social-analitic/backend/app/database.py)
-
-- Initialize `clickhouse_connect.get_client()` with Cloud credentials from `.env`
-- Provide a reusable `get_client()` dependency for FastAPI routes
-- Connection params: `host`, `port=8443`, `username=KEY_ID`, `password=KEY_SECRET`, `secure=True`
 
 ---
 
-### Component 2: Backend — Authentication (FastAPI + JWT)
+### Component 2: Constants Module
 
-#### [NEW] [config.py](file:///c:/laragon/www/social-analitic/backend/app/config.py)
+#### [NEW] [constants.py](file:///c:/laragon/www/social-analytics/backend/app/constants.py)
 
-- Use `pydantic-settings` `BaseSettings` to load from `.env`:
-  - `CLICKHOUSE_HOST`, `CLICKHOUSE_PORT`, `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD`, `CLICKHOUSE_DATABASE`
-  - `JWT_SECRET_KEY`, `JWT_ALGORITHM=HS256`, `JWT_EXPIRATION_MINUTES=1440`
-  - `META_APP_ID`, `META_APP_SECRET`, `META_REDIRECT_URI`
-  - `FRONTEND_URL` (for CORS)
-
-#### [NEW] [auth/router.py](file:///c:/laragon/www/social-analitic/backend/app/auth/router.py)
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/auth/register` | POST | Register new user (email, username, password) |
-| `/api/auth/login` | POST | Login with email + password → returns JWT |
-| `/api/auth/me` | GET | Get current user profile (protected) |
-
-- Passwords hashed with `passlib[bcrypt]`
-- JWT tokens created with `python-jose` (HS256)
-- User stored in ClickHouse `users` table
-- Email uniqueness checked before registration
-
-#### [NEW] [auth/schemas.py](file:///c:/laragon/www/social-analitic/backend/app/auth/schemas.py)
+Centralise all magic numbers and repeated string literals:
 
 ```python
-class UserRegister(BaseModel):
-    email: EmailStr
-    username: str
-    password: str  # min 8 chars
+"""Application-wide constants."""
 
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
+# Token expiry
+DEFAULT_TOKEN_EXPIRY_SECONDS: int = 60 * 24 * 3600  # 60 days
 
-class UserResponse(BaseModel):
-    id: str
-    email: str
-    username: str
-    is_active: bool
+# Instagram Graph API
+GRAPH_API_VERSION: str = "v25.0"
+GRAPH_BASE_URL: str = f"https://graph.facebook.com/{GRAPH_API_VERSION}"
+OAUTH_DIALOG_URL: str = f"https://www.facebook.com/{GRAPH_API_VERSION}/dialog/oauth"
 
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
+REQUIRED_INSTAGRAM_SCOPES: list[str] = [
+    "instagram_basic",
+    "pages_show_list",
+    "pages_read_engagement",
+    "instagram_manage_insights",
+    "business_management",
+]
+
+INSTAGRAM_PROFILE_FIELDS: str = (
+    "username,name,biography,profile_picture_url,"
+    "followers_count,follows_count,media_count"
+)
+
+INSTAGRAM_MEDIA_FIELDS: str = (
+    "id,media_type,media_url,thumbnail_url,permalink,"
+    "caption,timestamp,like_count,comments_count"
+)
+
+# HTTP
+HTTP_TIMEOUT_SECONDS: int = 30
+
+# Pagination
+DEFAULT_PAGE_SIZE: int = 12
+MAX_PAGE_SIZE: int = 50
+DEFAULT_MEDIA_FETCH_LIMIT: int = 50
+
+# Validation
+USERNAME_MIN_LENGTH: int = 3
+USERNAME_MAX_LENGTH: int = 30
+PASSWORD_MIN_LENGTH: int = 8
 ```
-
-#### [NEW] [auth/dependencies.py](file:///c:/laragon/www/social-analitic/backend/app/auth/dependencies.py)
-
-- `get_current_user()` — extracts JWT from `Authorization: Bearer <token>`, decodes it, fetches user from ClickHouse
 
 ---
 
-### Component 3: Backend — Instagram Graph API Integration
+### Component 3: Custom Exception Hierarchy
 
-The Instagram Graph API integration follows Meta's standard OAuth 2.0 flow:
+#### [NEW] [exceptions.py](file:///c:/laragon/www/social-analytics/backend/app/exceptions.py)
 
-```mermaid
-sequenceDiagram
-    participant User as User (Browser)
-    participant FE as React Frontend
-    participant BE as FastAPI Backend
-    participant Meta as Meta OAuth Server
-    participant IG as Graph API (v25.0)
-    participant CH as ClickHouse
+Create typed exceptions so the app never raises bare `Exception` or generic `ValueError`:
 
-    User->>FE: Click "Connect Instagram"
-    FE->>BE: GET /api/instagram/connect
-    BE-->>FE: Redirect URL to Meta OAuth dialog
-    FE->>Meta: Redirect user to OAuth consent screen
-    Meta-->>User: User grants permissions
-    Meta->>FE: Redirect to callback with ?code=xxx
-    FE->>BE: GET /api/instagram/callback?code=xxx
-    BE->>Meta: Exchange code for short-lived token
-    Meta-->>BE: Short-lived access token
-    BE->>Meta: Exchange for long-lived token
-    Meta-->>BE: Long-lived access token (60 days)
-    BE->>IG: GET /me/accounts (find FB Page)
-    IG-->>BE: Page ID + page access token
-    BE->>IG: GET /{page_id}?fields=instagram_business_account
-    IG-->>BE: IG Business Account ID
-    BE->>IG: GET /{ig_user_id}?fields=username,name,...
-    IG-->>BE: Profile data
-    BE->>IG: GET /{ig_user_id}/media?fields=...
-    IG-->>BE: Media data (paginated)
-    BE->>CH: INSERT profile + media data
-    BE-->>FE: Success + profile summary
-    FE-->>User: Show dashboard with data
+```python
+"""Application exception hierarchy.
+
+All custom exceptions inherit from AppError so they can be caught
+in a single FastAPI exception handler.
+"""
+
+
+class AppError(Exception):
+    """Base exception for the application."""
+
+    def __init__(self, message: str = "An unexpected error occurred") -> None:
+        self.message = message
+        super().__init__(self.message)
+
+
+# --- Auth ---
+
+class AuthenticationError(AppError):
+    """Raised when credentials are invalid or token is expired/malformed."""
+
+    def __init__(self, message: str = "Invalid credentials") -> None:
+        super().__init__(message)
+
+
+class DuplicateEntityError(AppError):
+    """Raised when a unique-constraint violation occurs (e.g. duplicate email)."""
+
+    def __init__(self, entity: str = "Entity", field: str = "field") -> None:
+        super().__init__(f"{entity} with this {field} already exists")
+
+
+class AccountDisabledError(AppError):
+    """Raised when a deactivated user tries to authenticate."""
+
+    def __init__(self) -> None:
+        super().__init__("Account is disabled")
+
+
+# --- Instagram ---
+
+class InstagramNotConnectedError(AppError):
+    """Raised when no Instagram account is linked to the user."""
+
+    def __init__(self) -> None:
+        super().__init__("No Instagram account connected")
+
+
+class InstagramAPIError(AppError):
+    """Raised when an Instagram/Meta Graph API call fails."""
+
+    def __init__(self, message: str = "Instagram API request failed") -> None:
+        super().__init__(message)
+
+
+class OAuthError(AppError):
+    """Raised when the OAuth flow encounters an error."""
+
+    def __init__(self, message: str = "OAuth flow failed") -> None:
+        super().__init__(message)
+
+
+# --- Database ---
+
+class DatabaseError(AppError):
+    """Raised when a database operation fails."""
+
+    def __init__(self, message: str = "Database operation failed") -> None:
+        super().__init__(message)
+
+
+class EntityNotFoundError(AppError):
+    """Raised when a queried entity does not exist."""
+
+    def __init__(self, entity: str = "Entity") -> None:
+        super().__init__(f"{entity} not found")
 ```
-
-#### [NEW] [instagram/router.py](file:///c:/laragon/www/social-analitic/backend/app/instagram/router.py)
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/instagram/connect` | GET | Returns Meta OAuth URL for frontend redirect |
-| `/api/instagram/callback` | GET | Handles OAuth callback, exchanges code for token, fetches data |
-| `/api/instagram/profile` | GET | Returns stored IG profile for current user |
-| `/api/instagram/media` | GET | Returns stored IG media for current user (paginated) |
-| `/api/instagram/refresh` | POST | Re-fetches latest data from Graph API and updates ClickHouse |
-
-#### [NEW] [instagram/service.py](file:///c:/laragon/www/social-analitic/backend/app/instagram/service.py)
-
-Core functions:
-1. **`get_oauth_url()`** — Constructs Meta OAuth dialog URL with required scopes:
-   - `instagram_basic`, `pages_show_list`, `pages_read_engagement`, `instagram_manage_insights`
-2. **`exchange_code_for_token(code)`** — POST to `graph.facebook.com/v25.0/oauth/access_token`
-3. **`get_long_lived_token(short_token)`** — Exchange short-lived → long-lived (60 days)
-4. **`get_instagram_business_account(token)`** — Discover IG Business Account ID via `/me/accounts` → `instagram_business_account`
-5. **`fetch_profile(ig_user_id, token)`** — GET `/{ig_user_id}?fields=username,name,biography,profile_picture_url,followers_count,follows_count,media_count`
-6. **`fetch_media(ig_user_id, token)`** — GET `/{ig_user_id}/media?fields=id,media_type,media_url,thumbnail_url,permalink,caption,timestamp,like_count,comments_count` with pagination handling
-7. **`store_profile(user_id, profile_data)`** — INSERT/UPDATE into `instagram_profiles`
-8. **`store_media(user_id, media_list)`** — Batch INSERT into `instagram_media`
 
 ---
 
-### Component 4: Backend — Main App & Configuration
+### Component 4: Global Exception Handlers
 
-#### [NEW] [main.py](file:///c:/laragon/www/social-analitic/backend/app/main.py)
+#### [NEW] [exception_handlers.py](file:///c:/laragon/www/social-analytics/backend/app/exception_handlers.py)
 
-- Create FastAPI app with CORS middleware (allow frontend origin)
-- Include `auth.router` and `instagram.router`
-- Health check endpoint at `/api/health`
-- Startup event: verify ClickHouse connection
+Register handlers so custom exceptions automatically map to correct HTTP status codes. Routers should raise domain exceptions, **not** `HTTPException` directly:
 
-#### [NEW] [requirements.txt](file:///c:/laragon/www/social-analitic/backend/requirements.txt)
+```python
+"""FastAPI exception handlers — map domain exceptions to HTTP responses."""
 
+import logging
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+from .exceptions import (
+    AccountDisabledError,
+    AppError,
+    AuthenticationError,
+    DatabaseError,
+    DuplicateEntityError,
+    EntityNotFoundError,
+    InstagramAPIError,
+    InstagramNotConnectedError,
+    OAuthError,
+)
+
+logger = logging.getLogger(__name__)
+
+# Map exception types to HTTP status codes
+_STATUS_MAP: dict[type[AppError], int] = {
+    AuthenticationError: 401,
+    AccountDisabledError: 403,
+    DuplicateEntityError: 409,
+    EntityNotFoundError: 404,
+    InstagramNotConnectedError: 404,
+    OAuthError: 400,
+    InstagramAPIError: 502,
+    DatabaseError: 503,
+}
+
+
+def register_exception_handlers(app: FastAPI) -> None:
+    """Register all custom exception handlers on the FastAPI app."""
+
+    @app.exception_handler(AppError)
+    async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
+        status_code = _STATUS_MAP.get(type(exc), 500)
+
+        # Log server-side errors with full detail; client gets a generic message
+        if status_code >= 500:
+            logger.exception("Unhandled application error: %s", exc.message)
+            detail = "An internal error occurred"
+        else:
+            logger.warning("Client error [%d]: %s", status_code, exc.message)
+            detail = exc.message
+
+        return JSONResponse(
+            status_code=status_code,
+            content={"detail": detail},
+        )
 ```
-fastapi[standard]>=0.136.0
-uvicorn[standard]>=0.34.0
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
-pydantic[email]>=2.0
-pydantic-settings>=2.0
-clickhouse-connect>=0.8.0
-clickhouse-migrations>=0.4.0
-httpx>=0.28.0
-python-multipart>=0.0.18
-python-dotenv>=1.0.0
+
+---
+
+### Component 5: Structured Logging
+
+#### [NEW] [logging_config.py](file:///c:/laragon/www/social-analytics/backend/app/logging_config.py)
+
+```python
+"""Logging configuration — call setup_logging() once at app startup."""
+
+import logging
+import sys
+
+
+def setup_logging(level: str = "INFO") -> None:
+    """Configure structured logging for the application."""
+    log_format = (
+        "%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)d | %(message)s"
+    )
+
+    logging.basicConfig(
+        level=getattr(logging, level.upper(), logging.INFO),
+        format=log_format,
+        datefmt="%Y-%m-%d %H:%M:%S",
+        stream=sys.stdout,
+        force=True,
+    )
+
+    # Suppress noisy third-party loggers
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("clickhouse_connect").setLevel(logging.WARNING)
+    logging.getLogger("passlib").setLevel(logging.WARNING)
 ```
 
-#### [NEW] [.env.example](file:///c:/laragon/www/social-analitic/backend/.env.example)
+---
+
+### Component 6: Token Encryption Utility
+
+#### [NEW] [crypto.py](file:///c:/laragon/www/social-analytics/backend/app/crypto.py)
+
+Encrypt Instagram access tokens before storing them in ClickHouse. Uses Fernet symmetric encryption keyed from `JWT_SECRET_KEY`:
+
+```python
+"""Symmetric encryption for sensitive data (e.g. Instagram access tokens).
+
+Uses Fernet (AES-128-CBC + HMAC-SHA256) derived from JWT_SECRET_KEY.
+"""
+
+import base64
+import hashlib
+
+from cryptography.fernet import Fernet
+
+
+def _derive_key(secret: str) -> bytes:
+    """Derive a 32-byte Fernet key from an arbitrary-length secret."""
+    digest = hashlib.sha256(secret.encode()).digest()
+    return base64.urlsafe_b64encode(digest)
+
+
+def encrypt_token(plaintext: str, secret: str) -> str:
+    """Encrypt a plaintext string and return a Fernet-encoded ciphertext."""
+    f = Fernet(_derive_key(secret))
+    return f.encrypt(plaintext.encode()).decode()
+
+
+def decrypt_token(ciphertext: str, secret: str) -> str:
+    """Decrypt a Fernet-encoded ciphertext and return the plaintext string."""
+    f = Fernet(_derive_key(secret))
+    return f.decrypt(ciphertext.encode()).decode()
+```
+
+---
+
+### Component 7: Config Additions
+
+#### [MODIFY] [config.py](file:///c:/laragon/www/social-analytics/backend/app/config.py)
+
+Add a `LOG_LEVEL` setting and move `.env` path resolution to be relative to the backend root:
+
+```python
+from pathlib import Path
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Resolve .env relative to the backend/ directory (parent of app/)
+_ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=str(_ENV_PATH),
+        env_file_encoding="utf-8",
+    )
+
+    # ClickHouse
+    clickhouse_host: str
+    clickhouse_port: int = 8443
+    clickhouse_user: str
+    clickhouse_password: str
+    clickhouse_database: str = "social_analytics"
+
+    # JWT
+    jwt_secret_key: str
+    jwt_algorithm: str = "HS256"
+    jwt_expiration_minutes: int = 1440
+
+    # Meta / Instagram
+    meta_app_id: str
+    meta_app_secret: str
+    meta_redirect_uri: str
+
+    # App
+    frontend_url: str = "http://localhost:5173"
+    log_level: str = "INFO"
+
+
+settings = Settings()
+```
+
+---
+
+### Component 8: Database Module Refactor
+
+#### [MODIFY] [database.py](file:///c:/laragon/www/social-analytics/backend/app/database.py)
+
+Replace the global mutable singleton with a proper FastAPI-compatible pattern using `app.state`:
+
+```python
+"""ClickHouse client management.
+
+Provides get_client() as a FastAPI dependency and startup/shutdown
+lifecycle hooks.
+"""
+
+import logging
+
+import clickhouse_connect
+from clickhouse_connect.driver.client import Client
+
+from .config import settings
+
+logger = logging.getLogger(__name__)
+
+_client: Client | None = None
+
+
+def _create_client() -> Client:
+    """Create a new ClickHouse client from settings."""
+    return clickhouse_connect.get_client(
+        host=settings.clickhouse_host,
+        port=settings.clickhouse_port,
+        username=settings.clickhouse_user,
+        password=settings.clickhouse_password,
+        database=settings.clickhouse_database,
+        secure=True,
+    )
+
+
+def get_client() -> Client:
+    """Return the singleton ClickHouse client, creating it on first call.
+
+    Used as a FastAPI dependency:
+        client: Client = Depends(get_client)
+    """
+    global _client
+    if _client is None:
+        logger.info("Creating ClickHouse client → %s", settings.clickhouse_host)
+        _client = _create_client()
+    return _client
+
+
+def close_client() -> None:
+    """Close the ClickHouse client connection. Called at app shutdown."""
+    global _client
+    if _client is not None:
+        logger.info("Closing ClickHouse client")
+        _client.close()
+        _client = None
+
+
+def ping() -> bool:
+    """Return True if the ClickHouse server is reachable."""
+    try:
+        get_client().ping()
+        return True
+    except Exception:
+        logger.exception("ClickHouse ping failed")
+        return False
+```
+
+---
+
+### Component 9: Main App — Lifespan Migration
+
+#### [MODIFY] [main.py](file:///c:/laragon/www/social-analytics/backend/app/main.py)
+
+Replace deprecated `@app.on_event("startup")` with `lifespan`, register exception handlers, configure logging:
+
+```python
+"""FastAPI application entry point."""
+
+import logging
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from .auth.router import router as auth_router
+from .config import settings
+from .database import close_client, ping
+from .exception_handlers import register_exception_handlers
+from .instagram.router import router as instagram_router
+from .logging_config import setup_logging
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Application lifespan — startup and shutdown hooks."""
+    # --- Startup ---
+    setup_logging(settings.log_level)
+    logger.info("Starting Social Analytics API")
+    if not ping():
+        logger.error("ClickHouse connection failed on startup")
+    else:
+        logger.info("ClickHouse connection OK")
+    yield
+    # --- Shutdown ---
+    close_client()
+    logger.info("Social Analytics API shut down")
+
+
+app = FastAPI(
+    title="Social Analytics API",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.frontend_url],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+register_exception_handlers(app)
+
+app.include_router(auth_router)
+app.include_router(instagram_router)
+
+
+@app.get("/api/health")
+def health():
+    """Health check endpoint."""
+    db_ok = ping()
+    return {"status": "ok" if db_ok else "degraded", "database": db_ok}
+```
+
+---
+
+### Component 10: Environment Files
+
+#### [MODIFY] [.env.example](file:///c:/laragon/www/social-analytics/backend/.env.example)
+
+Remove any real credential hints and add the new `LOG_LEVEL` setting:
 
 ```env
 # ClickHouse Cloud
 CLICKHOUSE_HOST=your-host.clickhouse.cloud
 CLICKHOUSE_PORT=8443
-CLICKHOUSE_USER=kxV2b47XUYT566x6pXkZ
-CLICKHOUSE_PASSWORD=4b1docFTjiVukt0YOdykEvc1IRLI8DlDAb1ULWJOop
+CLICKHOUSE_USER=your-clickhouse-user
+CLICKHOUSE_PASSWORD=your-clickhouse-password
 CLICKHOUSE_DATABASE=social_analytics
 
-# JWT
-JWT_SECRET_KEY=your-super-secret-key-change-this
+# JWT — GENERATE a random 64-char key: python -c "import secrets; print(secrets.token_urlsafe(48))"
+JWT_SECRET_KEY=CHANGE-ME-generate-with-secrets-token-urlsafe
 JWT_ALGORITHM=HS256
 JWT_EXPIRATION_MINUTES=1440
 
@@ -353,159 +524,44 @@ META_REDIRECT_URI=http://localhost:5173/callback
 
 # Frontend
 FRONTEND_URL=http://localhost:5173
+
+# Logging
+LOG_LEVEL=INFO
 ```
 
----
+#### [MODIFY] [.env](file:///c:/laragon/www/social-analytics/backend/.env)
 
-### Component 5: Frontend — React PWA (Vite + Tailwind v4)
+Generate a real `JWT_SECRET_KEY`. Replace the placeholder line with:
 
-#### [NEW] Vite Project Initialization
+```env
+JWT_SECRET_KEY=<output of: python -c "import secrets; print(secrets.token_urlsafe(48))">
+```
+
+Run this command to generate the key:
 
 ```bash
-npm create vite@latest ./ -- --template react
-npm install
-npm install vite-plugin-pwa -D
-npm install react-router-dom axios
-npx @tailwindcss/cli init   # Tailwind v4 setup
+python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-#### [NEW] [vite.config.js](file:///c:/laragon/www/social-analitic/frontend/vite.config.js)
+Then paste the output as the value.
 
-- Configure `VitePWA` plugin with:
-  - `registerType: 'autoUpdate'`
-  - App manifest (name, icons, theme color, background color)
-  - Workbox runtime caching for API responses
-- Configure proxy to backend for development (`/api` → `http://localhost:8000`)
+---
 
-#### [NEW] [index.css](file:///c:/laragon/www/social-analitic/frontend/src/index.css)
+## Files Changed Summary
 
-```css
-@import "tailwindcss";
-
-/* Tailwind v4 CSS-first theme configuration */
-@theme {
-  --color-primary: oklch(0.65 0.25 275);        /* Vibrant purple-blue */
-  --color-primary-light: oklch(0.75 0.20 275);
-  --color-primary-dark: oklch(0.50 0.25 275);
-  --color-accent: oklch(0.75 0.20 330);          /* Pink accent */
-  --color-surface: oklch(0.15 0.02 275);         /* Dark surface */
-  --color-surface-elevated: oklch(0.20 0.02 275);
-  --color-text: oklch(0.95 0.01 275);
-  --color-text-muted: oklch(0.70 0.02 275);
-  --color-success: oklch(0.72 0.20 150);
-  --color-danger: oklch(0.65 0.25 25);
-
-  --font-sans: 'Inter', system-ui, sans-serif;
-
-  --radius-card: 1rem;
-  --shadow-glow: 0 0 30px oklch(0.65 0.25 275 / 0.15);
-}
-```
-
-#### [NEW] Page Components
-
-| Page | Route | Description |
+| File | Action | What |
 |---|---|---|
-| `LoginPage` | `/login` | Email + password form, JWT stored in httpOnly cookie or context |
-| `RegisterPage` | `/register` | Registration form (email, username, password) |
-| `ConnectInstagramPage` | `/connect` | "Connect Instagram" button → redirects to Meta OAuth |
-| `CallbackPage` | `/callback` | Receives OAuth `?code=`, sends to backend, redirects to dashboard |
-| `DashboardPage` | `/dashboard` | Shows profile card, stats, media grid |
+| `requirements.txt` | MODIFY | Add `clickhouse-migrations`, `cryptography` |
+| `app/constants.py` | NEW | Magic numbers → named constants |
+| `app/exceptions.py` | NEW | Custom exception hierarchy |
+| `app/exception_handlers.py` | NEW | Map exceptions → HTTP status codes |
+| `app/logging_config.py` | NEW | Structured logging setup |
+| `app/crypto.py` | NEW | Fernet encryption for access tokens |
+| `app/config.py` | MODIFY | Add `log_level`, fix `.env` path resolution |
+| `app/database.py` | MODIFY | Add logging, `close_client()`, docstrings |
+| `app/main.py` | MODIFY | Lifespan, exception handlers, logging |
+| `.env.example` | MODIFY | Sanitise, add `LOG_LEVEL` |
+| `.env` | MODIFY | Generate real `JWT_SECRET_KEY` |
 
-#### [NEW] UI Components (Premium Design)
-
-- **`Layout.jsx`** — Dark-mode shell with glassmorphism sidebar/navbar
-- **`Navbar.jsx`** — Top nav with user avatar, gradient accent border
-- **`ProfileCard.jsx`** — Instagram profile picture, name, bio with frosted glass background
-- **`StatsOverview.jsx`** — Animated counter cards for followers, following, posts with gradient backgrounds
-- **`MediaGrid.jsx`** — Responsive masonry/grid of Instagram posts with hover effects
-- **`MediaCard.jsx`** — Individual media card with image, caption preview, like/comment counts, subtle scale animation on hover
-
-#### Design System
-
-- **Dark mode by default** with deep purple-black backgrounds
-- **Glassmorphism** cards with `backdrop-blur` and subtle borders
-- **Gradient accents** (purple → pink) for buttons and highlights
-- **Inter font** from Google Fonts
-- **Micro-animations**: hover scale, fade-in on mount, animated number counters
-- **Instagram-inspired** gradient accents on the profile card border
-
----
-
-### Component 6: PWA Configuration
-
-#### [NEW] PWA Manifest & Service Worker
-
-- **App Name**: "Social Analytics"
-- **Short Name**: "SocialAI"
-- **Theme Color**: Deep purple (`#1a1025`)
-- **Icons**: Generated 192x192 and 512x512 PNG icons
-- **Offline Support**: Cache-first for static assets, network-first for API
-- **Installable**: Full PWA manifest for Add to Home Screen
-
----
-
-## Data Flow Summary
-
-```mermaid
-graph LR
-    A[User Registration] -->|email, password| B[FastAPI /auth/register]
-    B -->|hash + store| C[(ClickHouse: users)]
-    D[User Login] -->|email, password| E[FastAPI /auth/login]
-    E -->|verify + JWT| F[JWT Token]
-    F --> G[Connect Instagram]
-    G -->|OAuth redirect| H[Meta OAuth Dialog]
-    H -->|code| I[FastAPI /instagram/callback]
-    I -->|exchange code| J[Meta Token API]
-    J -->|long-lived token| I
-    I -->|fetch profile| K[Graph API v25.0]
-    K -->|profile + media JSON| I
-    I -->|batch insert| L[(ClickHouse: instagram_profiles + instagram_media)]
-    L --> M[Dashboard Display]
-```
-
----
-
-## Verification Plan
-
-### Automated Tests
-
-1. **Backend startup**: `uvicorn app.main:app --reload` — verify no import errors
-2. **ClickHouse connectivity**: Hit `/api/health` endpoint to confirm DB connection
-3. **Migration test**: Run `clickhouse-migrations` CLI against the Cloud instance
-4. **Auth flow**:
-   - `POST /api/auth/register` with test credentials → 201
-   - `POST /api/auth/login` with same credentials → 200 + JWT
-   - `GET /api/auth/me` with JWT header → 200 + user data
-5. **Instagram flow** (requires Meta App credentials):
-   - `GET /api/instagram/connect` → returns valid OAuth URL
-   - Complete OAuth in browser → callback stores data
-   - `GET /api/instagram/profile` → returns stored profile
-   - `GET /api/instagram/media` → returns stored media
-
-### Manual Verification
-
-1. **Frontend**: Open `http://localhost:5173` → verify dark-mode UI renders
-2. **PWA**: Build production → check Chrome DevTools > Application tab for service worker + manifest
-3. **OAuth**: Full end-to-end test with a real Instagram Business/Creator account
-4. **Responsive**: Test on mobile viewport sizes (375px, 768px, 1024px)
-
-### Browser Testing
-
-- Navigate through register → login → connect Instagram → dashboard flow
-- Verify all animations and transitions are smooth
-- Check PWA installability in Chrome
-
----
-
-## Execution Order
-
-1. **Phase 1**: Project scaffolding (directories, configs, `.env`, `.gitignore`)
-2. **Phase 2**: ClickHouse migrations (create tables)
-3. **Phase 3**: Backend auth module (register, login, JWT)
-4. **Phase 4**: Backend Instagram module (OAuth, token exchange, data fetch)
-5. **Phase 5**: Frontend scaffolding (Vite + React + Tailwind v4 + PWA)
-6. **Phase 6**: Frontend auth pages (login, register)
-7. **Phase 7**: Frontend Instagram connect + callback
-8. **Phase 8**: Frontend dashboard (profile card, stats, media grid)
-9. **Phase 9**: Polish, animations, responsive design, final testing
+> [!IMPORTANT]
+> **After completing Plan 1**, proceed to **Plan 2** (Domain Models & Data Layer).

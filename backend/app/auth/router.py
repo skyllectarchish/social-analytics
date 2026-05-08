@@ -1,61 +1,69 @@
-import uuid
-from datetime import datetime, timezone
+"""Auth routes — register, login, current user profile."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import logging
+
+from fastapi import APIRouter, Depends, status
 
 from ..database import get_client
-from ..models.queries import CHECK_EMAIL_EXISTS, GET_USER_BY_EMAIL
+from ..exceptions import AccountDisabledError, AuthenticationError, DuplicateEntityError
+from ..models.user import User
+from ..repositories import user_repo
 from .dependencies import get_current_user
 from .schemas import TokenResponse, UserLogin, UserRegister, UserResponse
 from .service import create_access_token, hash_password, verify_password
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(body: UserRegister):
+    """Register a new user and return a JWT."""
     client = get_client()
 
-    existing = client.query(CHECK_EMAIL_EXISTS, parameters={"email": body.email})
-    if existing.result_rows:
-        raise HTTPException(status_code=400, detail="Email already registered")
+    if user_repo.email_exists(client, body.email):
+        raise DuplicateEntityError("User", "email")
 
-    user_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-
-    client.insert(
-        "users",
-        [[user_id, body.email, body.username, hash_password(body.password), 1, now, now]],
-        column_names=["id", "email", "username", "hashed_password", "is_active", "created_at", "updated_at"],
+    user = user_repo.create(
+        client,
+        email=body.email,
+        username=body.username,
+        hashed_password=hash_password(body.password),
     )
 
-    token = create_access_token({"sub": user_id})
-    user = UserResponse(id=user_id, email=body.email, username=body.username, is_active=True)
-    return TokenResponse(access_token=token, user=user)
+    token = create_access_token({"sub": str(user.id)})
+    logger.info("User registered: %s", user.email)
+    return TokenResponse(
+        access_token=token,
+        user=UserResponse(**user.to_response_dict()),
+    )
 
 
 @router.post("/login", response_model=TokenResponse)
 def login(body: UserLogin):
+    """Authenticate with email + password and return a JWT."""
     client = get_client()
 
-    rows = client.query(GET_USER_BY_EMAIL, parameters={"email": body.email})
-    if not rows.result_rows:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+    user = user_repo.find_by_email(client, body.email)
+    if user is None:
+        raise AuthenticationError()
 
-    row = rows.result_rows[0]
-    user_id, email, username, hashed_pw, is_active = str(row[0]), row[1], row[2], row[3], bool(row[4])
+    if not verify_password(body.password, user.hashed_password):
+        raise AuthenticationError()
 
-    if not verify_password(body.password, hashed_pw):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not user.is_active:
+        raise AccountDisabledError()
 
-    if not is_active:
-        raise HTTPException(status_code=403, detail="Account disabled")
-
-    token = create_access_token({"sub": user_id})
-    user = UserResponse(id=user_id, email=email, username=username, is_active=is_active)
-    return TokenResponse(access_token=token, user=user)
+    token = create_access_token({"sub": str(user.id)})
+    logger.info("User logged in: %s", user.email)
+    return TokenResponse(
+        access_token=token,
+        user=UserResponse(**user.to_response_dict()),
+    )
 
 
 @router.get("/me", response_model=UserResponse)
-def me(current_user: dict = Depends(get_current_user)):
-    return UserResponse(**current_user)
+def me(current_user: User = Depends(get_current_user)):
+    """Return the current authenticated user's profile."""
+    return UserResponse(**current_user.to_response_dict())
