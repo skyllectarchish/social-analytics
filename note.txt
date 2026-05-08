@@ -1,0 +1,13 @@
+I want to create a analytic dashboard for Instagram content creator.
+I want to use Instagram Graph API. (use latest API version)
+I want to use FastAPI for backend. (use latest version of fastAPI)
+I want to use React for frontend. I want PWA App. (use latest version of react)
+I want to use Tailwind CSS for styling. (use latest version of tailwind)
+I want to use clickhouse for DB and for migrations i want to use clickhouse-migrations.
+
+at this time i just want simple login/register and then connect to instagram graph api. after login and user give permission, then fetch username, profile pic, name, followers, following, bio, media data from instagram graph api and store it in clickhouse.
+
+
+clickhouse credentials
+Key ID: kxV2b47XUYT566x6pXkZ
+Key Secret: 4b1docFTjiVukt0YOdykEvc1IRLI8DlDAb1ULWJOop

@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: oklch(0.65 0.25 275);
+  --color-primary-light: oklch(0.75 0.20 275);
+  --color-primary-dark: oklch(0.50 0.25 275);
+  --color-accent: oklch(0.75 0.20 330);
+  --color-surface: oklch(0.12 0.02 275);
+  --color-surface-elevated: oklch(0.18 0.02 275);
+  --color-surface-card: oklch(0.20 0.03 275);
+  --color-text: oklch(0.95 0.01 275);
+  --color-text-muted: oklch(0.65 0.02 275);
+  --color-success: oklch(0.72 0.20 150);
+  --color-danger: oklch(0.65 0.25 25);
+  --color-border: oklch(0.30 0.04 275);
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+
+  --radius-card: 1rem;
+  --shadow-glow: 0 0 40px oklch(0.65 0.25 275 / 0.15);
+  --shadow-card: 0 4px 24px oklch(0 0 0 / 0.4);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: oklch(0.12 0.02 275);
+  color: oklch(0.95 0.01 275);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: oklch(0.15 0.02 275);
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(0.35 0.05 275);
+  border-radius: 3px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease forwards;
+}
+
+.animate-count {
+  animation: countUp 0.5s ease forwards;
+}
