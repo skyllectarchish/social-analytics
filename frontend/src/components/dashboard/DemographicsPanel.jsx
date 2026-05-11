@@ -1,63 +1,67 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from "recharts";
 import { useDemographics } from "../../hooks/useInsights";
 import GenderDonut from "./GenderDonut";
 
 const BREAKDOWNS = ["age", "gender", "city", "country"];
 
 const BAR_GRADIENTS = [
-  "from-violet-400 to-purple-500",
-  "from-pink-400 to-rose-500",
-  "from-sky-400 to-blue-500",
-  "from-emerald-400 to-teal-500",
-  "from-amber-400 to-orange-500",
-  "from-fuchsia-400 to-violet-500",
-  "from-cyan-400 to-sky-500",
-  "from-rose-400 to-pink-500",
+  ["#7C3AED", "#6D28D9"],
+  ["#06B6D4", "#0891B2"],
+  ["#EC4899", "#DB2777"],
+  ["#10B981", "#059669"],
+  ["#F97316", "#EA580C"],
+  ["#8B5CF6", "#7C3AED"],
+  ["#14B8A6", "#0D9488"],
+  ["#F43F5E", "#E11D48"],
 ];
 
-function BarChart({ data }) {
-  const total = data.reduce((s, d) => s + d.value, 0) || 1;
-  const sorted = [...data].sort((a, b) => b.value - a.value).slice(0, 10);
-
+function GlassTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
   return (
-    <div className="space-y-3">
-      {sorted.map((d, i) => {
-        const pct = ((d.value / total) * 100).toFixed(1);
-        return (
-          <div key={d.dimension_value}>
-            <div className="flex items-center justify-between text-[11px] font-medium text-slate-700 mb-1">
-              <span className="truncate max-w-[60%]">{d.dimension_value}</span>
-              <span className="text-slate-500 tabular-nums">{pct}%</span>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-              <motion.div
-                initial={{ width: 0 }}
-                whileInView={{ width: `${pct}%` }}
-                viewport={{ once: true }}
-                transition={{ duration: 1.1, delay: 0.1 + i * 0.06, ease: [0.2, 0.8, 0.2, 1] }}
-                className={`h-full rounded-full bg-gradient-to-r ${BAR_GRADIENTS[i % BAR_GRADIENTS.length]}`}
-              />
-            </div>
-          </div>
-        );
-      })}
+    <div
+      style={{
+        background: "rgba(255,255,255,0.98)",
+        border: "1px solid rgba(0,0,0,0.08)",
+        borderRadius: 12,
+        padding: "10px 14px",
+        backdropFilter: "blur(24px)",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.10)",
+      }}
+    >
+      <p style={{ color: "#94A3B8", fontSize: 10, fontWeight: 700, marginBottom: 8, letterSpacing: "0.10em", textTransform: "uppercase" }}>
+        {label}
+      </p>
+      {payload.map((p) => (
+        <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: p.fill, boxShadow: `0 0 6px ${p.fill}88` }} />
+          <span style={{ color: "#64748B", fontSize: 12, flex: 1 }}>Count</span>
+          <span className="metric-value" style={{ color: "#0F172A", fontSize: 13 }}>
+            {p.value.toLocaleString()}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
 
 function SkeletonBars() {
   return (
-    <div className="space-y-3 animate-pulse">
-      {[70, 85, 45, 55, 30].map((w, i) => (
-        <div key={i}>
-          <div className="flex justify-between mb-1">
-            <div className="h-3 rounded bg-slate-200" style={{ width: `${w * 0.6}px` }} />
-            <div className="h-3 w-8 rounded bg-slate-200" />
-          </div>
-          <div className="h-1.5 rounded-full bg-slate-100">
-            <div className="h-full rounded-full bg-slate-200" style={{ width: `${w}%` }} />
-          </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingTop: 4 }}>
+      {[70, 50, 85, 40, 60, 35].map((w, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 44, height: 10, borderRadius: 4, background: "rgba(0,0,0,0.06)" }} />
+          <div style={{ height: 10, width: `${w}%`, borderRadius: 4, background: "rgba(0,0,0,0.06)" }} />
         </div>
       ))}
     </div>
@@ -70,45 +74,94 @@ export default function DemographicsPanel() {
 
   const { data, loading, error } = useDemographics(metric, breakdown);
 
+  const sorted = [...(data?.data ?? [])].sort((a, b) => b.value - a.value).slice(0, 8);
+  const chartData = sorted.map((d) => ({
+    name: d.dimension_value ?? "",
+    value: d.value,
+  }));
+
   return (
-    <div className="glass rounded-2xl p-5" style={{ boxShadow: "var(--shadow-soft)" }}>
+    <div
+      className="rounded-2xl p-5 d-card"
+      style={{ height: "100%" }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-          Demographics
+      <div className="flex items-center justify-between mb-5">
+        <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: "#94A3B8" }}>
+          Audience Demographics
         </p>
-        <div className="chip-soft flex items-center gap-1 rounded-lg p-0.5 text-[10px]">
-          {["follower_demographics", "engaged_audience_demographics"].map((m) => (
+
+        {/* Metric toggle */}
+        <div
+          style={{
+            display: "flex",
+            gap: 2,
+            background: "rgba(0,0,0,0.04)",
+            border: "1px solid rgba(0,0,0,0.07)",
+            borderRadius: 8,
+            padding: 2,
+          }}
+        >
+          {[
+            { val: "follower_demographics", label: "Followers" },
+            { val: "engaged_audience_demographics", label: "Engaged" },
+          ].map((m) => (
             <button
-              key={m}
-              onClick={() => setMetric(m)}
-              className={`px-2 py-1 rounded-md font-semibold transition-all ${
-                metric === m ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"
-              }`}
+              key={m.val}
+              onClick={() => setMetric(m.val)}
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                padding: "4px 10px",
+                borderRadius: 6,
+                border: "none",
+                cursor: "pointer",
+                transition: "all 0.15s",
+                background: metric === m.val ? "rgba(124,58,237,0.12)" : "transparent",
+                color: metric === m.val ? "#7C3AED" : "#64748B",
+              }}
             >
-              {m === "follower_demographics" ? "Followers" : "Engaged"}
+              {m.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Breakdown tabs */}
-      <div className="flex gap-1 mb-5">
+      {/* Animated breakdown tabs */}
+      <div style={{ position: "relative", display: "flex", gap: 4, marginBottom: 18, background: "rgba(0,0,0,0.05)", borderRadius: 10, padding: 3 }}>
         {BREAKDOWNS.map((b) => (
           <button
             key={b}
             onClick={() => setBreakdown(b)}
-            className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold capitalize transition-all ${
-              breakdown === b
-                ? "text-white"
-                : "text-slate-500 hover:text-[#0a0e27] hover:bg-slate-50"
-            }`}
-            style={
-              breakdown === b
-                ? { background: "linear-gradient(135deg, #8b5cf6, #ec4899)" }
-                : {}
-            }
+            style={{
+              flex: 1,
+              padding: "5px 0",
+              borderRadius: 7,
+              fontSize: 11,
+              fontWeight: 600,
+              textTransform: "capitalize",
+              cursor: "pointer",
+              border: "none",
+              background: "transparent",
+              color: breakdown === b ? "#fff" : "#64748B",
+              position: "relative",
+              zIndex: 1,
+              transition: "color 0.2s",
+            }}
           >
+            {breakdown === b && (
+              <motion.div
+                layoutId="breakdown-pill"
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  borderRadius: 7,
+                  background: "linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)",
+                  zIndex: -1,
+                }}
+                transition={{ type: "spring", damping: 22, stiffness: 320 }}
+              />
+            )}
             {b}
           </button>
         ))}
@@ -118,13 +171,71 @@ export default function DemographicsPanel() {
       {loading ? (
         <SkeletonBars />
       ) : error || !data?.data?.length ? (
-        <div className="py-6 text-center text-sm text-slate-400">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            height: 200,
+            fontSize: 13,
+            color: "#94A3B8",
+          }}
+        >
           {error || "No data — run a sync first."}
         </div>
-      ) : breakdown === "gender" ? (
-        <GenderDonut data={data.data} />
       ) : (
-        <BarChart data={data.data} />
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={`${breakdown}-${metric}`}
+            initial={{ opacity: 0, y: 10, filter: "blur(6px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            exit={{ opacity: 0, y: -6, filter: "blur(4px)" }}
+            transition={{ type: "spring", duration: 0.38, bounce: 0 }}
+          >
+            {breakdown === "gender" ? (
+              <GenderDonut data={data.data} />
+            ) : (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart
+                  data={chartData}
+                  layout="vertical"
+                  margin={{ top: 0, right: 8, left: 0, bottom: 0 }}
+                >
+                  <defs>
+                    {BAR_GRADIENTS.map(([start, end], i) => (
+                      <linearGradient key={i} id={`barGrad${i}`} x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor={start} stopOpacity={0.9} />
+                        <stop offset="100%" stopColor={end} stopOpacity={0.7} />
+                      </linearGradient>
+                    ))}
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 8" stroke="rgba(0,0,0,0.05)" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    tick={{ fill: "#94A3B8", fontSize: 10, fontFamily: "system-ui" }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}K` : String(v)}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    tick={{ fill: "#94A3B8", fontSize: 11, fontFamily: "system-ui" }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={60}
+                  />
+                  <Tooltip content={<GlassTooltip />} cursor={{ fill: "rgba(0,0,0,0.03)" }} />
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={14} animationDuration={800}>
+                    {chartData.map((_, i) => (
+                      <Cell key={i} fill={`url(#barGrad${i % BAR_GRADIENTS.length})`} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </motion.div>
+        </AnimatePresence>
       )}
     </div>
   );

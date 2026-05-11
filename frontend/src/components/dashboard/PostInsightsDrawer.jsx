@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import AnimatedCounter from "../landing/ui/AnimatedCounter";
 import { useMediaInsights } from "../../hooks/useInsights";
 
@@ -40,13 +40,6 @@ const METRIC_ICONS = {
 };
 
 const HIGHLIGHT_METRICS = ["likes", "comments", "shares", "saved", "reach"];
-const ICON_COLORS = {
-  likes: "text-rose-500",
-  comments: "text-violet-500",
-  shares: "text-sky-500",
-  saved: "text-amber-500",
-  reach: "text-teal-500",
-};
 
 function fmtSecs(seconds) {
   if (seconds >= 3600) return `${(seconds / 3600).toFixed(1)}h`;
@@ -54,15 +47,39 @@ function fmtSecs(seconds) {
   return `${seconds.toFixed(1)}s`;
 }
 
-function InsightMiniCard({ name, value, icon, colorClass }) {
+const ICON_COLOR_MAP = {
+  likes: "#f43f5e",
+  comments: "#8b5cf6",
+  shares: "#06b6d4",
+  saved: "#f59e0b",
+  reach: "#10b981",
+};
+
+function InsightMiniCard({ name, value, icon, index = 0 }) {
+  const color = ICON_COLOR_MAP[name] ?? "#64748b";
   return (
-    <div className="glass rounded-xl p-3 flex flex-col gap-1 items-center min-w-[72px]">
-      <span className={`${colorClass || "text-slate-500"}`}>{icon}</span>
-      <span className="font-display text-base font-semibold text-[#0a0e27]">
+    <motion.div
+      initial={{ opacity: 0, y: 14, filter: "blur(6px)" }}
+      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      transition={{ type: "spring", duration: 0.42, bounce: 0, delay: index * 0.055 }}
+      style={{
+        background: "rgba(0,0,0,0.04)",
+        border: "1px solid rgba(0,0,0,0.08)",
+        borderRadius: 12,
+        padding: "10px 12px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 4,
+        minWidth: 72,
+      }}
+    >
+      <span style={{ color }}>{icon}</span>
+      <span style={{ color: "#0F172A", fontSize: 16, fontWeight: 700 }}>
         <AnimatedCounter value={Math.round(value)} />
       </span>
-      <span className="text-[10px] text-slate-500 capitalize">{name}</span>
-    </div>
+      <span style={{ fontSize: 10, color: "#64748B", textTransform: "capitalize" }}>{name}</span>
+    </motion.div>
   );
 }
 
@@ -88,7 +105,7 @@ export default function PostInsightsDrawer({ media, onClose }) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="fixed inset-0 z-40"
-            style={{ background: "rgba(10,14,39,0.30)", backdropFilter: "blur(6px)" }}
+            style={{ background: "rgba(15,23,42,0.25)", backdropFilter: "blur(6px)" }}
             onClick={onClose}
           />
 
@@ -98,12 +115,22 @@ export default function PostInsightsDrawer({ media, onClose }) {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 32, stiffness: 380 }}
-            className="fixed bottom-0 left-0 right-0 z-50 glass-strong rounded-t-3xl overflow-y-auto"
-            style={{ maxHeight: "82vh", boxShadow: "var(--shadow-premium)" }}
+            className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl overflow-y-auto"
+            style={{
+              maxHeight: "82vh",
+              background: "rgba(255,255,255,0.98)",
+              backdropFilter: "blur(28px)",
+              WebkitBackdropFilter: "blur(28px)",
+              border: "1px solid rgba(0,0,0,0.08)",
+              borderBottom: "none",
+              boxShadow: "0 -16px 60px rgba(0,0,0,0.12), 0 -1px 0 rgba(0,0,0,0.06)",
+            }}
           >
+            {/* gradient top accent line */}
+            <div style={{ height: 2, background: "linear-gradient(90deg, #7C3AED 0%, #EC4899 50%, #F97316 100%)", borderRadius: "3px 3px 0 0" }} />
             {/* drag handle */}
             <div className="flex justify-center pt-3 pb-1">
-              <div className="w-10 h-1 rounded-full bg-slate-200" />
+              <div className="w-10 h-1 rounded-full" style={{ background: "rgba(0,0,0,0.12)" }} />
             </div>
 
             <div className="px-5 pb-8 pt-2 space-y-5">
@@ -114,21 +141,25 @@ export default function PostInsightsDrawer({ media, onClose }) {
                     src={imgSrc}
                     alt="Post"
                     className="w-16 h-16 rounded-xl object-cover shrink-0"
+                    style={{ border: "1px solid rgba(0,0,0,0.08)" }}
                   />
                 )}
                 <div className="flex-1 min-w-0">
                   {media.caption && (
-                    <p className="text-sm text-slate-700 line-clamp-2 mb-1">{media.caption}</p>
+                    <p style={{ fontSize: 13, color: "#475569", lineHeight: 1.5, marginBottom: 6, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                      {media.caption}
+                    </p>
                   )}
-                  <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-400">
+                  <div className="flex items-center gap-2 flex-wrap" style={{ fontSize: 11, color: "#475569" }}>
                     <span
-                      className={`rounded-full px-2 py-0.5 font-semibold text-[10px] ${
-                        media.media_type === "VIDEO"
-                          ? "bg-fuchsia-100 text-fuchsia-700"
-                          : media.media_type === "CAROUSEL_ALBUM"
-                          ? "bg-orange-100 text-orange-700"
-                          : "bg-sky-100 text-sky-700"
-                      }`}
+                      style={{
+                        padding: "2px 8px",
+                        borderRadius: 6,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        background: media.media_type === "VIDEO" ? "rgba(139,92,246,0.15)" : media.media_type === "CAROUSEL_ALBUM" ? "rgba(245,158,11,0.15)" : "rgba(6,182,212,0.15)",
+                        color: media.media_type === "VIDEO" ? "#c4b5fd" : media.media_type === "CAROUSEL_ALBUM" ? "#fcd34d" : "#67e8f9",
+                      }}
                     >
                       {media.media_type === "CAROUSEL_ALBUM" ? "CAROUSEL" : media.media_type}
                     </span>
@@ -140,7 +171,7 @@ export default function PostInsightsDrawer({ media, onClose }) {
                         href={media.permalink}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-violet-500 hover:underline flex items-center gap-0.5"
+                        style={{ color: "#8b5cf6", textDecoration: "none" }}
                       >
                         View on Instagram ↗
                       </a>
@@ -149,7 +180,8 @@ export default function PostInsightsDrawer({ media, onClose }) {
                 </div>
                 <button
                   onClick={onClose}
-                  className="shrink-0 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors"
+                  className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+                  style={{ background: "rgba(0,0,0,0.06)", color: "#64748B", border: "none", cursor: "pointer" }}
                 >
                   ✕
                 </button>
@@ -159,19 +191,19 @@ export default function PostInsightsDrawer({ media, onClose }) {
               {loading ? (
                 <div className="flex gap-3 overflow-x-auto pb-1">
                   {HIGHLIGHT_METRICS.map((m) => (
-                    <div key={m} className="animate-pulse glass rounded-xl p-3 min-w-[72px] h-20 bg-slate-100" />
+                    <div key={m} className="animate-pulse rounded-xl min-w-[72px] h-20" style={{ background: "rgba(0,0,0,0.05)" }} />
                   ))}
                 </div>
               ) : (
                 <div className="flex gap-3 overflow-x-auto pb-1">
-                  {HIGHLIGHT_METRICS.map((name) =>
+                  {HIGHLIGHT_METRICS.map((name, idx) =>
                     insightsMap[name] !== undefined ? (
                       <InsightMiniCard
                         key={name}
                         name={name}
                         value={insightsMap[name]}
                         icon={METRIC_ICONS[name]}
-                        colorClass={ICON_COLORS[name]}
+                        index={idx}
                       />
                     ) : null
                   )}
@@ -197,11 +229,19 @@ export default function PostInsightsDrawer({ media, onClose }) {
                   ]
                     .filter((m) => insightsMap[m.key] !== undefined)
                     .map((m) => (
-                      <div key={m.key} className="glass-subtle rounded-xl px-4 py-3">
-                        <p className="text-[10px] uppercase tracking-[0.15em] text-slate-500 mb-1">
+                      <div
+                        key={m.key}
+                        style={{
+                          background: "rgba(0,0,0,0.03)",
+                          border: "1px solid rgba(0,0,0,0.07)",
+                          borderRadius: 12,
+                          padding: "12px 14px",
+                        }}
+                      >
+                        <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.12em", color: "#94A3B8", marginBottom: 4 }}>
                           {m.label}
                         </p>
-                        <p className="font-display text-xl font-semibold text-[#0a0e27]">
+                        <p className="metric-value" style={{ fontSize: 20, color: "#F1F5F9" }}>
                           {m.fmt ? m.fmt(insightsMap[m.key]) : Math.round(insightsMap[m.key]).toLocaleString()}
                         </p>
                       </div>
@@ -210,7 +250,7 @@ export default function PostInsightsDrawer({ media, onClose }) {
               )}
 
               {!loading && Object.keys(insightsMap).length === 0 && (
-                <p className="text-sm text-center text-slate-400 py-4">
+                <p style={{ fontSize: 13, textAlign: "center", color: "#94A3B8", padding: "16px 0" }}>
                   No insights stored yet — run a sync to populate.
                 </p>
               )}

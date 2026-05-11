@@ -22,7 +22,7 @@ INSTAGRAM_PROFILE_FIELDS: str = (
 )
 
 INSTAGRAM_MEDIA_FIELDS: str = (
-    "id,media_type,media_url,thumbnail_url,permalink,"
+    "id,media_type,media_product_type,media_url,thumbnail_url,permalink,"
     "caption,timestamp,like_count,comments_count"
 )
 
@@ -42,7 +42,7 @@ PASSWORD_MIN_LENGTH: int = 8
 # --- Insights API Metrics ---
 
 # Account-level time-series metrics (metric_type=time_series)
-ACCOUNT_TIME_SERIES_METRICS: str = "reach,follows_and_unfollows,total_interactions,accounts_engaged"
+ACCOUNT_TIME_SERIES_METRICS: str = "reach"
 
 # Account-level total-value metrics (metric_type=total_value) — incompatible with time_series
 ACCOUNT_TOTAL_VALUE_METRICS: str = "views"

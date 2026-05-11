@@ -5,6 +5,7 @@ This module is responsible only for Meta/Instagram API communication.
 """
 
 import asyncio
+import json
 import logging
 import secrets
 from typing import Any
@@ -227,7 +228,7 @@ async def fetch_media_insights_batch(
     """Fetch insights for multiple media items with rate-limit handling.
 
     Args:
-        media_items: List of (ig_media_id, media_type) tuples.
+        media_items: List of (ig_media_id, media_product_type) tuples.
 
     Returns:
         {ig_media_id: [insight_data, ...]}
@@ -235,13 +236,12 @@ async def fetch_media_insights_batch(
     results: dict[str, list[dict[str, Any]]] = {}
 
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
-        for media_id, media_type in media_items:
-            if media_type in ("VIDEO", "REEL"):
+        for media_id, media_product_type in media_items:
+            if media_product_type == "REELS":
                 metrics = MEDIA_REELS_METRICS
-            elif media_type == "STORY":
+            elif media_product_type == "STORY":
                 metrics = MEDIA_STORY_METRICS
             else:
-                # IMAGE, CAROUSEL_ALBUM, and any other types use feed metrics
                 metrics = MEDIA_FEED_METRICS
 
             for attempt in range(max_retries):
@@ -262,6 +262,12 @@ async def fetch_media_insights_batch(
                             media_id, attempt + 1, retry_after,
                         )
                         await asyncio.sleep(retry_after)
+                    elif exc.response.status_code == 400 and metrics != MEDIA_FEED_METRICS:
+                        logger.warning(
+                            "400 for %s with metrics %r, retrying with feed metrics",
+                            media_id, metrics,
+                        )
+                        metrics = MEDIA_FEED_METRICS
                     else:
                         logger.error(
                             "Failed insights for %s (HTTP %d): %s",
@@ -359,6 +365,81 @@ async def fetch_account_insights(
         except httpx.HTTPError as exc:
             logger.warning("Failed to fetch account insights (total_value): %s", exc)
 
+        # Call 3: batch request for follows_and_unfollows + total_interactions (time series recreation)
+        try:
+            from datetime import datetime, timezone as _tz, timedelta
+            since_dt = datetime.fromtimestamp(since, tz=_tz.utc)
+            until_dt = datetime.fromtimestamp(until, tz=_tz.utc)
+
+            batch_requests = []
+            days_list = []
+            current_dt = since_dt
+
+            all_follows_values = []
+            all_total_interactions_values = []
+            all_accounts_engaged_values = []
+
+            while current_dt < until_dt:
+                next_dt = current_dt + timedelta(days=1)
+                if next_dt > until_dt:
+                    next_dt = until_dt
+
+                rel_url = f"{ig_user_id}/insights?metric=follows_and_unfollows,total_interactions,accounts_engaged&period=day&metric_type=total_value&since={int(current_dt.timestamp())}&until={int(next_dt.timestamp())}"
+                batch_requests.append({
+                    "method": "GET",
+                    "relative_url": rel_url
+                })
+                days_list.append(next_dt)
+                current_dt = next_dt
+
+                # Meta limits batches to 50 operations. Chunk if needed.
+                if len(batch_requests) == 50 or current_dt >= until_dt:
+                    batch_payload = {"access_token": token, "batch": json.dumps(batch_requests)}
+                    resp3 = await client.post(GRAPH_BASE_URL, data=batch_payload)
+                    resp3.raise_for_status()
+
+                    batch_responses = resp3.json()
+
+                    for i, batch_res in enumerate(batch_responses):
+                        if batch_res.get("code") == 200:
+                            body = json.loads(batch_res.get("body", "{}"))
+                            data = body.get("data", [])
+                            end_time_iso = days_list[i].strftime("%Y-%m-%dT%H:%M:%S+0000")
+                            for entry in data:
+                                total = entry.get("total_value", {}).get("value", 0)
+                                name = entry.get("name", "")
+                                if name == "follows_and_unfollows":
+                                    all_follows_values.append({"value": total, "end_time": end_time_iso})
+                                elif name == "total_interactions":
+                                    all_total_interactions_values.append({"value": total, "end_time": end_time_iso})
+                                elif name == "accounts_engaged":
+                                    all_accounts_engaged_values.append({"value": total, "end_time": end_time_iso})
+
+                    # Reset for next chunk
+                    batch_requests = []
+                    days_list = []
+
+            if all_follows_values:
+                results.append({
+                    "name": "follows_and_unfollows",
+                    "values": all_follows_values
+                })
+            if all_total_interactions_values:
+                results.append({
+                    "name": "total_interactions",
+                    "values": all_total_interactions_values
+                })
+            if all_accounts_engaged_values:
+                results.append({
+                    "name": "accounts_engaged",
+                    "values": all_accounts_engaged_values
+                })
+
+        except httpx.HTTPStatusError as exc:
+            logger.warning("Failed to fetch account insights (batch follows_and_unfollows): %s", exc.response.text)
+        except httpx.HTTPError as exc:
+            logger.warning("Failed to fetch account insights (batch follows_and_unfollows): %s", exc)
+
         return results
 
 
@@ -399,9 +480,20 @@ async def fetch_demographics(
                 return data[0].get("total_value", {})
             return {}
         except httpx.HTTPStatusError as exc:
+            body = exc.response.text
+            try:
+                err = exc.response.json().get("error", {})
+            except Exception:
+                err = {}
+            if err.get("code") == 3006 or "not enough users" in body.lower():
+                logger.info(
+                    "Demographics (%s/%s) skipped: not enough users",
+                    metric_name, breakdown,
+                )
+                return {}
             logger.error(
                 "Failed to fetch demographics (%s/%s): %s",
-                metric_name, breakdown, exc.response.text,
+                metric_name, breakdown, body,
             )
             raise InstagramAPIError(
                 f"Failed to fetch demographics for {metric_name}/{breakdown}"
@@ -416,12 +508,12 @@ async def fetch_demographics(
 async def fetch_media_insights(
     media_id: str,
     token: str,
-    media_type: str,
+    media_product_type: str,
 ) -> list[dict[str, Any]]:
     """Fetch per-media insights from the Graph API.
 
     Args:
-        media_type: "REEL", "STORY", or any other value (treated as feed post).
+        media_product_type: "REELS", "STORY", or any other value (treated as feed post).
 
     Returns:
         Raw `data` array from Meta's response.
@@ -429,12 +521,11 @@ async def fetch_media_insights(
     Raises:
         InstagramAPIError: If the API call fails.
     """
-    if media_type in ("VIDEO", "REEL"):
+    if media_product_type == "REELS":
         metrics = MEDIA_REELS_METRICS
-    elif media_type == "STORY":
+    elif media_product_type == "STORY":
         metrics = MEDIA_STORY_METRICS
     else:
-        # IMAGE, CAROUSEL_ALBUM, and any other types use feed metrics
         metrics = MEDIA_FEED_METRICS
 
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:

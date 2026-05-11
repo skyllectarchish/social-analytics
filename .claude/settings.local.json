@@ -21,7 +21,13 @@
       "PowerShell(ls \"C:\\\\laragon\\\\www\\\\social-analytics\\\\frontend\\\\src\\\\components\\\\landing\\\\sections\" | % { $_.Name })",
       "PowerShell(ls \"C:\\\\laragon\\\\www\\\\social-analytics\\\\frontend\\\\src\\\\components\\\\landing\\\\hero\" | % { $_.Name })",
       "PowerShell(ls \"C:\\\\laragon\\\\www\\\\social-analytics\\\\frontend\\\\src\\\\components\\\\landing\\\\ui\" | % { $_.Name })",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(npm install *)",
+      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\('recharts:', p.dependencies.recharts\\)\")",
+      "Bash(npm run *)",
+      "Bash(npx skills *)",
+      "Bash(npx add-skill *)",
+      "Bash(timeout 8)"
     ]
   }
 }

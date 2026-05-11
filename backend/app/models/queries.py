@@ -58,7 +58,7 @@ WHERE user_id = {user_id:UUID}
 
 GET_INSTAGRAM_MEDIA_PAGE = """
 SELECT ig_media_id, media_type, media_url, thumbnail_url, permalink,
-       caption, timestamp, like_count, comments_count
+       caption, timestamp, like_count, comments_count, media_product_type
 FROM instagram_media FINAL
 WHERE user_id = {user_id:UUID}
 ORDER BY timestamp DESC
@@ -66,7 +66,7 @@ LIMIT {limit:UInt32} OFFSET {offset:UInt32}
 """
 
 GET_ALL_INSTAGRAM_MEDIA_FOR_INSIGHTS = """
-SELECT ig_media_id, media_type
+SELECT ig_media_id, media_product_type
 FROM instagram_media FINAL
 WHERE user_id = {user_id:UUID}
 ORDER BY timestamp DESC
@@ -107,7 +107,7 @@ WHERE user_id = {user_id:UUID}
 """
 
 GET_MEDIA_NEEDING_SYNC = """
-SELECT m.ig_media_id, m.media_type
+SELECT m.ig_media_id, m.media_product_type
 FROM instagram_media m FINAL
 LEFT JOIN (
     SELECT ig_media_id, max(fetched_at) AS last_fetched

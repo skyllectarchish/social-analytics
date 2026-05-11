@@ -1,73 +1,89 @@
-const GENDER_COLORS = {
-  M: { fill: "#8b5cf6", label: "Male" },
-  F: { fill: "#ec4899", label: "Female" },
-  U: { fill: "#94a3b8", label: "Other" },
-};
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
-const R = 45;
-const CX = 70;
-const CY = 70;
-const CIRCUMFERENCE = 2 * Math.PI * R;
-const STROKE_WIDTH = 20;
+const COLOR_MAP = { M: "#7C3AED", F: "#EC4899", U: "#475569" };
+const LABEL_MAP = { M: "Male", F: "Female", U: "Other" };
+
+function DarkTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0];
+  return (
+    <div
+      style={{
+        background: "rgba(255,255,255,0.98)",
+        border: "1px solid rgba(0,0,0,0.08)",
+        borderRadius: 12,
+        padding: "10px 14px",
+        backdropFilter: "blur(20px)",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.10)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ width: 8, height: 8, borderRadius: "50%", background: d.payload.fill }} />
+        <span style={{ color: "#64748B", fontSize: 12 }}>{d.name}</span>
+        <span style={{ color: "#0F172A", fontSize: 13, fontWeight: 700, marginLeft: 8 }}>
+          {d.value.toLocaleString()} ({(d.payload.percent * 100).toFixed(1)}%)
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function CustomLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent }) {
+  if (percent < 0.06) return null;
+  const RADIAN = Math.PI / 180;
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  return (
+    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={700}>
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+}
 
 export default function GenderDonut({ data }) {
-  const total = data.reduce((s, d) => s + d.value, 0);
-  if (total === 0) {
-    return (
-      <div className="py-8 text-center text-sm text-slate-400">No gender data.</div>
-    );
-  }
-
-  let offset = 0;
-  const segments = data.map((d) => {
-    const key = d.dimension_value?.toUpperCase() || "U";
-    const color = GENDER_COLORS[key] ?? GENDER_COLORS.U;
-    const arc = (d.value / total) * CIRCUMFERENCE;
-    const seg = { ...color, arc, offset, pct: ((d.value / total) * 100).toFixed(1) };
-    offset += arc;
-    return seg;
-  });
+  const total = data.reduce((s, d) => s + d.value, 0) || 1;
+  const pieData = data.map((d) => ({
+    name: LABEL_MAP[d.dimension_value?.toUpperCase()] ?? d.dimension_value,
+    value: d.value,
+    key: d.dimension_value?.toUpperCase() ?? "U",
+    fill: COLOR_MAP[d.dimension_value?.toUpperCase()] ?? "#64748b",
+    percent: d.value / total,
+  }));
 
   return (
-    <div className="flex flex-col items-center gap-4 py-2">
-      <svg width={CX * 2} height={CY * 2} viewBox={`0 0 ${CX * 2} ${CY * 2}`}>
-        {segments.map((s, i) => (
-          <circle
-            key={i}
-            cx={CX}
-            cy={CY}
-            r={R}
-            fill="none"
-            stroke={s.fill}
-            strokeWidth={STROKE_WIDTH}
-            strokeDasharray={`${s.arc.toFixed(2)} ${(CIRCUMFERENCE - s.arc).toFixed(2)}`}
-            strokeDashoffset={(-s.offset + CIRCUMFERENCE / 4).toFixed(2)}
-            strokeLinecap="butt"
-          />
-        ))}
-        <text
-          x={CX}
-          y={CY - 6}
-          textAnchor="middle"
-          style={{ fontSize: 13, fontWeight: 700, fill: "#0a0e27", fontFamily: "system-ui" }}
-        >
-          {total.toLocaleString()}
-        </text>
-        <text
-          x={CX}
-          y={CY + 10}
-          textAnchor="middle"
-          style={{ fontSize: 9, fill: "#94a3b8", fontFamily: "system-ui" }}
-        >
-          total
-        </text>
-      </svg>
+    <div>
+      <ResponsiveContainer width="100%" height={180}>
+        <PieChart>
+          <Pie
+            data={pieData}
+            cx="50%"
+            cy="50%"
+            innerRadius={50}
+            outerRadius={75}
+            paddingAngle={3}
+            dataKey="value"
+            labelLine={false}
+            label={CustomLabel}
+            animationBegin={100}
+            animationDuration={800}
+          >
+            {pieData.map((entry) => (
+              <Cell key={entry.key} fill={entry.fill} stroke="none" />
+            ))}
+          </Pie>
+          <Tooltip content={<DarkTooltip />} />
+        </PieChart>
+      </ResponsiveContainer>
 
-      <div className="flex flex-wrap justify-center gap-3">
-        {segments.map((s, i) => (
-          <div key={i} className="flex items-center gap-1.5 text-xs text-slate-600">
-            <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: s.fill }} />
-            {s.label} <span className="text-slate-400">{s.pct}%</span>
+      <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 4 }}>
+        {pieData.map((d) => (
+          <div key={d.key} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: d.fill }} />
+            <span style={{ fontSize: 11, color: "#475569" }}>{d.name}</span>
+            <span style={{ fontSize: 11, color: "#64748B", fontWeight: 600 }}>
+              {(d.percent * 100).toFixed(0)}%
+            </span>
           </div>
         ))}
       </div>

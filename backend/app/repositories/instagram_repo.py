@@ -126,6 +126,7 @@ def bulk_insert_media(
             ig_user_id,
             user_id,
             item.get("media_type", "IMAGE"),
+            item.get("media_product_type", ""),
             item.get("media_url", ""),
             item.get("thumbnail_url", ""),
             item.get("permalink", ""),
@@ -141,7 +142,7 @@ def bulk_insert_media(
         rows,
         column_names=[
             "id", "ig_media_id", "ig_user_id", "user_id", "media_type",
-            "media_url", "thumbnail_url", "permalink", "caption",
+            "media_product_type", "media_url", "thumbnail_url", "permalink", "caption",
             "timestamp", "like_count", "comments_count", "fetched_at",
         ],
     )

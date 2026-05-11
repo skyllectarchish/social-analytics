@@ -12,6 +12,7 @@ class IGMedia:
 
     ig_media_id: str
     media_type: str
+    media_product_type: str
     media_url: str
     thumbnail_url: str
     permalink: str
@@ -26,7 +27,8 @@ class IGMedia:
 
         Expected column order:
             ig_media_id, media_type, media_url, thumbnail_url,
-            permalink, caption, timestamp, like_count, comments_count
+            permalink, caption, timestamp, like_count, comments_count,
+            media_product_type
         """
         return cls(
             ig_media_id=row[0],
@@ -38,6 +40,7 @@ class IGMedia:
             timestamp=row[6],
             like_count=row[7],
             comments_count=row[8],
+            media_product_type=row[9],
         )
 
     def to_schema_dict(self) -> dict:
@@ -45,6 +48,7 @@ class IGMedia:
         return {
             "ig_media_id": self.ig_media_id,
             "media_type": self.media_type,
+            "media_product_type": self.media_product_type,
             "media_url": self.media_url,
             "thumbnail_url": self.thumbnail_url,
             "permalink": self.permalink,

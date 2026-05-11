@@ -1,10 +1,10 @@
 import { motion } from "framer-motion";
 import { useDashboard } from "../../hooks/useInsights";
 
-const TYPE_BADGE = {
-  VIDEO: "bg-fuchsia-100 text-fuchsia-700",
-  IMAGE: "bg-sky-100 text-sky-700",
-  CAROUSEL_ALBUM: "bg-orange-100 text-orange-700",
+const TYPE_COLORS = {
+  VIDEO: { bg: "rgba(139,92,246,0.15)", color: "#c4b5fd", border: "rgba(139,92,246,0.25)" },
+  IMAGE: { bg: "rgba(6,182,212,0.15)", color: "#67e8f9", border: "rgba(6,182,212,0.25)" },
+  CAROUSEL_ALBUM: { bg: "rgba(245,158,11,0.15)", color: "#fcd34d", border: "rgba(245,158,11,0.25)" },
 };
 
 function fmtNum(v) {
@@ -15,14 +15,17 @@ function fmtNum(v) {
 
 function SkeletonRow() {
   return (
-    <div className="animate-pulse flex items-center gap-4 p-4">
-      <div className="w-6 h-6 rounded bg-slate-200" />
+    <div
+      className="animate-pulse flex items-center gap-4 px-5 py-4"
+      style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+    >
+      <div className="w-6 h-4 rounded" style={{ background: "rgba(255,255,255,0.06)" }} />
       <div className="flex-1 space-y-2">
-        <div className="h-3 w-48 bg-slate-200 rounded" />
-        <div className="h-3 w-24 bg-slate-100 rounded" />
+        <div className="h-3 w-48 rounded" style={{ background: "rgba(255,255,255,0.06)" }} />
+        <div className="h-3 w-24 rounded" style={{ background: "rgba(255,255,255,0.04)" }} />
       </div>
-      <div className="w-16 h-3 bg-slate-200 rounded" />
-      <div className="w-16 h-3 bg-slate-200 rounded" />
+      <div className="w-14 h-3 rounded" style={{ background: "rgba(255,255,255,0.06)" }} />
+      <div className="w-14 h-3 rounded" style={{ background: "rgba(255,255,255,0.06)" }} />
     </div>
   );
 }
@@ -31,84 +34,185 @@ export default function TopPostsTable({ days, onSelect }) {
   const { data, loading, error } = useDashboard(days);
 
   return (
-    <div className="glass rounded-2xl overflow-hidden" style={{ boxShadow: "var(--shadow-soft)" }}>
-      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+    <div
+      className="rounded-2xl overflow-hidden"
+      style={{
+        background: "rgba(255,255,255,0.03)",
+        border: "1px solid rgba(255,255,255,0.07)",
+      }}
+    >
+      {/* Header */}
+      <div
+        className="flex items-center justify-between px-5 py-4"
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: "#475569" }}>
           Top Posts
         </p>
-        <span className="rounded-full bg-fuchsia-100 px-2 py-0.5 text-[10px] font-semibold text-fuchsia-700">
-          Last {days} days
+        <span
+          style={{
+            background: "rgba(139,92,246,0.15)",
+            color: "#c4b5fd",
+            border: "1px solid rgba(139,92,246,0.25)",
+            fontSize: 10,
+            fontWeight: 700,
+            padding: "2px 8px",
+            borderRadius: 999,
+          }}
+        >
+          Last {days}d
         </span>
       </div>
 
+      {/* Column headers */}
+      {!loading && (data?.top_posts?.length ?? 0) > 0 && (
+        <div
+          className="flex items-center gap-4 px-5 py-2"
+          style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+        >
+          <span style={{ width: 24, fontSize: 10, color: "#334155" }}>#</span>
+          <span style={{ fontSize: 10, color: "#334155", letterSpacing: "0.08em", textTransform: "uppercase" }}>Type</span>
+          <span style={{ flex: 1, fontSize: 10, color: "#334155", letterSpacing: "0.08em", textTransform: "uppercase" }}>Caption</span>
+          <span style={{ fontSize: 10, color: "#334155", letterSpacing: "0.08em", textTransform: "uppercase", minWidth: 56, textAlign: "right" }}>Views</span>
+          <span style={{ fontSize: 10, color: "#334155", letterSpacing: "0.08em", textTransform: "uppercase", minWidth: 72, textAlign: "right" }}>Interactions</span>
+          <span style={{ width: 20 }} />
+        </div>
+      )}
+
       {loading ? (
-        <div className="divide-y divide-slate-100">
+        <div>
           {Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)}
         </div>
       ) : error || !data?.top_posts?.length ? (
-        <div className="py-12 text-center text-sm text-slate-400">
+        <div style={{ padding: "48px 0", textAlign: "center", fontSize: 13, color: "#334155" }}>
           {error || "No top posts yet — run a sync first."}
         </div>
       ) : (
-        <div className="divide-y divide-slate-100">
-          {data.top_posts.map((post, i) => (
-            <motion.div
-              key={post.ig_media_id}
-              initial={{ opacity: 0, x: -12 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 + i * 0.06, duration: 0.4 }}
-              onClick={() => onSelect?.(post)}
-              className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors cursor-pointer"
-            >
-              <span className="w-6 text-center font-display text-base font-semibold text-slate-300">
-                {i + 1}
-              </span>
+        <div>
+          {data.top_posts.map((post, i) => {
+            const typeStyle = TYPE_COLORS[post.media_type] ?? {
+              bg: "rgba(255,255,255,0.08)",
+              color: "#94a3b8",
+              border: "rgba(255,255,255,0.12)",
+            };
 
-              <span
-                className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                  TYPE_BADGE[post.media_type] ?? "bg-slate-100 text-slate-600"
-                }`}
+            return (
+              <motion.div
+                key={post.ig_media_id}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.05 + i * 0.05, duration: 0.35 }}
+                onClick={() => onSelect?.(post)}
+                className="flex items-center gap-4 px-5 py-3.5 cursor-pointer transition-all"
+                style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.03)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
               >
-                {post.media_type === "CAROUSEL_ALBUM" ? "CAROUSEL" : post.media_type}
-              </span>
-
-              <p className="flex-1 text-sm text-slate-700 truncate min-w-0">
-                {post.caption || <span className="text-slate-400 italic">No caption</span>}
-              </p>
-
-              <div className="shrink-0 flex items-center gap-1 text-xs text-slate-500">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-                {fmtNum(post.views)}
-              </div>
-
-              <div className="shrink-0 flex items-center gap-1 text-xs text-pink-500">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
-                </svg>
-                {fmtNum(post.interactions)}
-              </div>
-
-              {post.permalink && (
-                <a
-                  href={post.permalink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="shrink-0 text-slate-300 hover:text-violet-500 transition-colors"
-                  title="View on Instagram"
+                <span
+                  style={{
+                    width: 24,
+                    textAlign: "center",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: i < 3 ? "#8b5cf6" : "#334155",
+                    fontFamily: "system-ui",
+                  }}
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-                    <polyline points="15 3 21 3 21 9" />
-                    <line x1="10" y1="14" x2="21" y2="3" />
+                  {i + 1}
+                </span>
+
+                <span
+                  style={{
+                    flexShrink: 0,
+                    padding: "2px 8px",
+                    borderRadius: 6,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: "0.05em",
+                    background: typeStyle.bg,
+                    color: typeStyle.color,
+                    border: `1px solid ${typeStyle.border}`,
+                  }}
+                >
+                  {post.media_type === "CAROUSEL_ALBUM" ? "CAROUSEL" : post.media_type}
+                </span>
+
+                <p
+                  style={{
+                    flex: 1,
+                    fontSize: 13,
+                    color: "#94a3b8",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    minWidth: 0,
+                  }}
+                >
+                  {post.caption || <span style={{ color: "#334155", fontStyle: "italic" }}>No caption</span>}
+                </p>
+
+                <div
+                  style={{
+                    flexShrink: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 12,
+                    color: "#64748b",
+                    minWidth: 56,
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
                   </svg>
-                </a>
-              )}
-            </motion.div>
-          ))}
+                  {fmtNum(post.views)}
+                </div>
+
+                <div
+                  style={{
+                    flexShrink: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 12,
+                    color: "#ec4899",
+                    minWidth: 72,
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+                  </svg>
+                  {fmtNum(post.interactions)}
+                </div>
+
+                {post.permalink && (
+                  <a
+                    href={post.permalink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ flexShrink: 0, color: "#334155", transition: "color 0.15s" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "#8b5cf6"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "#334155"; }}
+                    title="View on Instagram"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                  </a>
+                )}
+              </motion.div>
+            );
+          })}
         </div>
       )}
     </div>

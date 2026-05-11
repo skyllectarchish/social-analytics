@@ -395,3 +395,107 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ===================== Light Dashboard Design System ===================== */
+
+.dashboard-root {
+  background: #F5F6FA;
+  min-height: 100dvh;
+  position: relative;
+  color: #0F172A;
+}
+
+.dashboard-aurora {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(65% 70% at 8% 18%, rgba(196,181,253,0.35), transparent 70%),
+    radial-gradient(55% 60% at 90% 8%, rgba(251,207,232,0.30), transparent 70%),
+    radial-gradient(60% 65% at 72% 88%, rgba(186,230,253,0.25), transparent 70%),
+    radial-gradient(50% 55% at 35% 90%, rgba(254,215,170,0.22), transparent 70%);
+  animation: meshShift 32s ease-in-out infinite;
+}
+
+.dashboard-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* Monospace for metric numbers */
+.font-mono {
+  font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-value {
+  font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+}
+
+/* Cards — white with soft shadow */
+.d-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(0,0,0,0.07);
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 6px 20px rgba(0,0,0,0.04);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.d-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07), 0 12px 32px rgba(0,0,0,0.06);
+}
+
+/* Metric card color-border variants */
+.glow-violet  { border-color: rgba(124,58,237,0.20);  box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 6px 20px rgba(124,58,237,0.08); transition: box-shadow 0.22s ease, transform 0.15s ease; }
+.glow-cyan    { border-color: rgba(6,182,212,0.20);    box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 6px 20px rgba(6,182,212,0.07);  transition: box-shadow 0.22s ease, transform 0.15s ease; }
+.glow-pink    { border-color: rgba(236,72,153,0.20);   box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 6px 20px rgba(236,72,153,0.07); transition: box-shadow 0.22s ease, transform 0.15s ease; }
+.glow-emerald { border-color: rgba(16,185,129,0.20);   box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 6px 20px rgba(16,185,129,0.07); transition: box-shadow 0.22s ease, transform 0.15s ease; }
+
+.glow-violet:hover  { box-shadow: 0 2px 8px rgba(0,0,0,0.07), 0 12px 32px rgba(124,58,237,0.14); }
+.glow-cyan:hover    { box-shadow: 0 2px 8px rgba(0,0,0,0.07), 0 12px 32px rgba(6,182,212,0.12); }
+.glow-pink:hover    { box-shadow: 0 2px 8px rgba(0,0,0,0.07), 0 12px 32px rgba(236,72,153,0.12); }
+.glow-emerald:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.07), 0 12px 32px rgba(16,185,129,0.12); }
+
+/* Instagram-branded gradient text */
+.ig-gradient {
+  background: linear-gradient(90deg, #7C3AED 0%, #EC4899 50%, #F97316 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Scrollbar for light dashboard */
+.dashboard-root ::-webkit-scrollbar { width: 6px; height: 6px; }
+.dashboard-root ::-webkit-scrollbar-track { background: rgba(0,0,0,0.03); }
+.dashboard-root ::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.15);
+  border-radius: 6px;
+}
+.dashboard-root ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }
+
+/* Live story pulse */
+@keyframes livePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.6); }
+  60% { box-shadow: 0 0 0 5px rgba(16,185,129,0); }
+}
+
+.live-dot {
+  animation: livePulse 2.5s ease-in-out infinite;
+}
+
+/* Sparkline gradient fade */
+.sparkline-fade {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 60px;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-aurora { animation: none; }
+  .live-dot { animation: none; }
+}

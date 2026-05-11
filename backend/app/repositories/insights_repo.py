@@ -205,7 +205,7 @@ def find_media_needing_sync(
     user_id: str,
     stale_hours: int = 24,
 ) -> list[tuple[str, str]]:
-    """Return (ig_media_id, media_type) for media whose insights are stale or never synced."""
+    """Return (ig_media_id, media_product_type) for media whose insights are stale or never synced."""
     stale_threshold = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=stale_hours)
     rows = client.query(
         GET_MEDIA_NEEDING_SYNC,
