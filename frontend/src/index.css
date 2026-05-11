@@ -45,8 +45,8 @@ html { scroll-behavior: smooth; }
 
 body {
   font-family: 'Inter', system-ui, sans-serif;
-  background-color: oklch(0.12 0.02 275);
-  color: oklch(0.95 0.01 275);
+  background-color: #fafafb;
+  color: #0a0e27;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -67,7 +67,7 @@ body {
 }
 
 ::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: #05060d; }
+::-webkit-scrollbar-track { background: #f3f4f7; }
 ::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, #6366f1, #a78bfa);
   border-radius: 6px;
@@ -374,6 +374,17 @@ body {
     0 1px 0 rgba(255, 255, 255, 0.95) inset,
     0 6px 16px -8px rgba(167, 139, 250, 0.20);
   color: rgba(10, 14, 39, 0.85);
+}
+
+/* Dashboard metric cards */
+.metric-card {
+  border-radius: 1rem;
+  padding: 1.25rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lift);
 }
 
 @media (prefers-reduced-motion: reduce) {

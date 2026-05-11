@@ -4,6 +4,7 @@ import { useAuth } from "./hooks/useAuth";
 import CallbackPage from "./pages/CallbackPage";
 import ConnectInstagramPage from "./pages/ConnectInstagramPage";
 import DashboardPage from "./pages/DashboardPage";
+import InstaDashboardPage from "./pages/InstaDashboardPage";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -38,6 +39,7 @@ function AppRoutes() {
       <Route path="/connect" element={<ProtectedRoute><ConnectInstagramPage /></ProtectedRoute>} />
       <Route path="/callback" element={<ProtectedRoute><CallbackPage /></ProtectedRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+      <Route path="/insta-dashboard" element={<ProtectedRoute><InstaDashboardPage /></ProtectedRoute>} />
     </Routes>
   );
 }

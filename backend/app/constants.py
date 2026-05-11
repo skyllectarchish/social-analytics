@@ -41,7 +41,13 @@ PASSWORD_MIN_LENGTH: int = 8
 
 # --- Insights API Metrics ---
 
-# Account-level interaction metrics (GET /{ig-user-id}/insights)
+# Account-level time-series metrics (metric_type=time_series)
+ACCOUNT_TIME_SERIES_METRICS: str = "reach,follows_and_unfollows,total_interactions,accounts_engaged"
+
+# Account-level total-value metrics (metric_type=total_value) — incompatible with time_series
+ACCOUNT_TOTAL_VALUE_METRICS: str = "views"
+
+# Combined — kept for backward compat if needed
 ACCOUNT_INTERACTION_METRICS: str = "views,reach,follows_and_unfollows,total_interactions,accounts_engaged"
 
 # Account-level demographic metrics (GET /{ig-user-id}/insights)

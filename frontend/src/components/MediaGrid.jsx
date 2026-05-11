@@ -5,7 +5,7 @@ export default function MediaGrid({ items, total, page, pageSize, onPageChange }
 
   if (!items.length) {
     return (
-      <div className="text-center py-20" style={{ color: "oklch(0.55 0.02 275)" }}>
+      <div className="text-center py-20 text-slate-400">
         No media found.
       </div>
     );
@@ -24,19 +24,17 @@ export default function MediaGrid({ items, total, page, pageSize, onPageChange }
           <button
             disabled={page === 1}
             onClick={() => onPageChange(page - 1)}
-            className="px-4 py-2 rounded-xl text-sm font-medium transition-opacity disabled:opacity-40"
-            style={{ background: "oklch(0.22 0.03 275)", color: "oklch(0.80 0.02 275)", border: "1px solid oklch(0.30 0.04 275)" }}
+            className="chip-soft px-4 py-2 rounded-xl text-sm font-medium transition-opacity disabled:opacity-40"
           >
             ← Prev
           </button>
-          <span className="text-sm px-3" style={{ color: "oklch(0.65 0.02 275)" }}>
+          <span className="text-sm px-3 text-slate-500">
             {page} / {totalPages}
           </span>
           <button
             disabled={page === totalPages}
             onClick={() => onPageChange(page + 1)}
-            className="px-4 py-2 rounded-xl text-sm font-medium transition-opacity disabled:opacity-40"
-            style={{ background: "oklch(0.22 0.03 275)", color: "oklch(0.80 0.02 275)", border: "1px solid oklch(0.30 0.04 275)" }}
+            className="chip-soft px-4 py-2 rounded-xl text-sm font-medium transition-opacity disabled:opacity-40"
           >
             Next →
           </button>

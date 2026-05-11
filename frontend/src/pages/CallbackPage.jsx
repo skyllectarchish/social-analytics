@@ -38,35 +38,40 @@ export default function CallbackPage() {
   }, [searchParams, navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "oklch(0.12 0.02 275)" }}>
+    <div className="lumen-landing min-h-screen flex items-center justify-center px-4" style={{ background: "#fafafb" }}>
       <div className="w-full max-w-md text-center animate-fade-in">
-        <div className="rounded-2xl p-10"
-          style={{ background: "oklch(0.18 0.02 275)", border: "1px solid oklch(0.30 0.04 275)", boxShadow: "0 4px 24px oklch(0 0 0 / 0.4)" }}>
+        <div
+          className="glass-strong rounded-2xl p-10"
+          style={{ boxShadow: "var(--shadow-pastel)" }}
+        >
           {!error ? (
             <>
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-6"
-                style={{ background: "oklch(0.65 0.25 275 / 0.2)", border: "2px solid oklch(0.65 0.25 275)" }}>
+              <div
+                className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-6"
+                style={{ background: "rgba(139,92,246,0.08)", border: "2px solid #8b5cf6" }}
+              >
                 <svg className="animate-spin" width="28" height="28" viewBox="0 0 24 24" fill="none"
-                  stroke="oklch(0.65 0.25 275)" strokeWidth="2.5" strokeLinecap="round">
-                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/>
+                  stroke="#8b5cf6" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4" />
                 </svg>
               </div>
-              <h2 className="text-lg font-semibold mb-2" style={{ color: "oklch(0.95 0.01 275)" }}>
-                {status}
-              </h2>
-              <p className="text-sm" style={{ color: "oklch(0.65 0.02 275)" }}>This may take a few seconds.</p>
+              <h2 className="font-display text-lg font-semibold text-[#0a0e27] mb-2">{status}</h2>
+              <p className="text-sm text-slate-500">This may take a few seconds.</p>
             </>
           ) : (
             <>
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-6"
-                style={{ background: "oklch(0.65 0.25 25 / 0.2)", border: "2px solid oklch(0.65 0.25 25)" }}>
-                <span style={{ fontSize: 28, color: "oklch(0.65 0.25 25)" }}>✕</span>
+              <div
+                className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-6"
+                style={{ background: "rgba(244,63,94,0.08)", border: "2px solid #f43f5e" }}
+              >
+                <span style={{ fontSize: 28, color: "#f43f5e" }}>✕</span>
               </div>
-              <h2 className="text-lg font-semibold mb-2" style={{ color: "oklch(0.95 0.01 275)" }}>Connection Failed</h2>
-              <p className="text-sm mb-6" style={{ color: "oklch(0.65 0.25 25)" }}>{error}</p>
-              <button onClick={() => navigate("/connect")}
-                className="px-6 py-3 rounded-xl font-semibold text-sm"
-                style={{ background: "linear-gradient(135deg, oklch(0.65 0.25 275), oklch(0.75 0.20 330))", color: "white" }}>
+              <h2 className="font-display text-lg font-semibold text-[#0a0e27] mb-2">Connection Failed</h2>
+              <p className="text-sm mb-6 text-rose-600">{error}</p>
+              <button
+                onClick={() => navigate("/connect")}
+                className="btn-magnetic btn-primary-glow px-6 py-3 rounded-xl font-semibold text-sm"
+              >
                 Try again
               </button>
             </>

@@ -14,56 +14,71 @@ function CommentIcon() {
   );
 }
 
-export default function MediaCard({ media }) {
+function EyeIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function fmtNum(v) {
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`;
+  return String(v);
+}
+
+export default function MediaCard({ media, onInsightsClick }) {
   const imgSrc = media.media_type === "VIDEO" ? media.thumbnail_url : media.media_url;
 
   return (
-    <a
-      href={media.permalink}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group block rounded-2xl overflow-hidden"
-      style={{
-        background: "oklch(0.18 0.02 275)",
-        border: "1px solid oklch(0.30 0.04 275)",
-        boxShadow: "0 4px 24px oklch(0 0 0 / 0.4)",
-        transition: "transform 0.2s ease, box-shadow 0.2s ease",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "translateY(-4px)";
-        e.currentTarget.style.boxShadow = "0 12px 40px oklch(0.65 0.25 275 / 0.2)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = "translateY(0)";
-        e.currentTarget.style.boxShadow = "0 4px 24px oklch(0 0 0 / 0.4)";
-      }}
+    <div
+      className="group block glass rounded-2xl overflow-hidden metric-card cursor-pointer"
+      style={{ boxShadow: "var(--shadow-soft)" }}
+      onClick={() => onInsightsClick?.(media)}
     >
       <div className="relative aspect-square overflow-hidden">
         {imgSrc ? (
-          <img src={imgSrc} alt={media.caption?.slice(0, 60) || "Post"} className="w-full h-full object-cover"
-            style={{ transition: "transform 0.3s ease" }}
-            onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.05)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+          <img
+            src={imgSrc}
+            alt={media.caption?.slice(0, 60) || "Post"}
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center"
-            style={{ background: "oklch(0.22 0.03 275)" }}>
-            <span style={{ color: "oklch(0.50 0.02 275)", fontSize: 40 }}>
+          <div className="w-full h-full flex items-center justify-center bg-slate-100">
+            <span className="text-4xl text-slate-400">
               {media.media_type === "VIDEO" ? "▶" : "🖼"}
             </span>
           </div>
         )}
+
+        {/* Hover overlay */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+          style={{ background: "linear-gradient(to top, rgba(10,14,39,0.7) 0%, rgba(10,14,39,0.3) 60%, transparent 100%)" }}
+        >
+          <div className="flex items-center gap-4 text-white text-sm font-semibold mt-auto mb-3">
+            <span className="flex items-center gap-1.5">
+              <EyeIcon /> {fmtNum(media.like_count + media.comments_count)}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <HeartIcon /> {fmtNum(media.like_count)}
+            </span>
+          </div>
+        </div>
+
         {media.media_type === "VIDEO" && (
-          <div className="absolute top-2 right-2 rounded-md px-2 py-0.5 text-xs font-medium"
-            style={{ background: "oklch(0 0 0 / 0.7)", color: "white" }}>
+          <div className="absolute top-2 right-2 rounded-md px-2 py-0.5 text-xs font-semibold bg-fuchsia-100 text-fuchsia-700">
             VIDEO
           </div>
         )}
         {media.media_type === "CAROUSEL_ALBUM" && (
           <div className="absolute top-2 right-2">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="white" style={{ filter: "drop-shadow(0 1px 2px black)" }}>
-              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
-              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="white" style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.4))" }}>
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
             </svg>
           </div>
         )}
@@ -71,22 +86,22 @@ export default function MediaCard({ media }) {
 
       <div className="p-4">
         {media.caption && (
-          <p className="text-sm mb-3 line-clamp-2 leading-relaxed" style={{ color: "oklch(0.75 0.02 275)" }}>
+          <p className="text-sm mb-3 line-clamp-2 leading-relaxed text-slate-600">
             {media.caption}
           </p>
         )}
-        <div className="flex items-center gap-4 text-xs" style={{ color: "oklch(0.60 0.02 275)" }}>
-          <span className="flex items-center gap-1.5" style={{ color: "oklch(0.65 0.25 25)" }}>
+        <div className="flex items-center gap-4 text-xs text-slate-400">
+          <span className="flex items-center gap-1.5 text-rose-500">
             <HeartIcon /> {media.like_count.toLocaleString()}
           </span>
-          <span className="flex items-center gap-1.5" style={{ color: "oklch(0.65 0.25 275)" }}>
+          <span className="flex items-center gap-1.5 text-violet-500">
             <CommentIcon /> {media.comments_count.toLocaleString()}
           </span>
-          <span className="ml-auto" style={{ color: "oklch(0.50 0.02 275)" }}>
+          <span className="ml-auto text-slate-400">
             {new Date(media.timestamp).toLocaleDateString()}
           </span>
         </div>
       </div>
-    </a>
+    </div>
   );
 }

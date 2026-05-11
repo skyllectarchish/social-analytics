@@ -15,7 +15,8 @@ import httpx
 from ..config import settings
 from ..constants import (
     ACCOUNT_DEMOGRAPHIC_METRICS,
-    ACCOUNT_INTERACTION_METRICS,
+    ACCOUNT_TIME_SERIES_METRICS,
+    ACCOUNT_TOTAL_VALUE_METRICS,
     DEFAULT_MEDIA_FETCH_LIMIT,
     GRAPH_BASE_URL,
     HTTP_TIMEOUT_SECONDS,
@@ -303,24 +304,18 @@ async def fetch_account_insights(
     since: int,
     until: int,
 ) -> list[dict[str, Any]]:
-    """Fetch daily time-series account insights from the Graph API.
+    """Fetch account insights: time-series metrics + total-value metrics (two calls).
 
-    Args:
-        since: UNIX timestamp for the start of the range.
-        until: UNIX timestamp for the end of the range.
-
-    Returns:
-        Raw `data` array from Meta's response (one entry per metric).
-
-    Raises:
-        InstagramAPIError: If the API call fails.
+    Returns a unified list in the same shape as Meta's time_series response:
+    [{name, values: [{value, end_time}]}]
     """
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+        # Call 1: time-series metrics (reach, follows_and_unfollows, etc.)
         try:
             resp = await client.get(
                 f"{GRAPH_BASE_URL}/{ig_user_id}/insights",
                 params={
-                    "metric": ACCOUNT_INTERACTION_METRICS,
+                    "metric": ACCOUNT_TIME_SERIES_METRICS,
                     "period": "day",
                     "metric_type": "time_series",
                     "since": since,
@@ -329,13 +324,42 @@ async def fetch_account_insights(
                 },
             )
             resp.raise_for_status()
-            return resp.json().get("data", [])
+            results = resp.json().get("data", [])
         except httpx.HTTPStatusError as exc:
-            logger.error("Failed to fetch account insights: %s", exc.response.text)
+            logger.error("Failed to fetch account insights (time_series): %s", exc.response.text)
             raise InstagramAPIError("Failed to fetch account insights")
         except httpx.HTTPError as exc:
-            logger.error("Failed to fetch account insights: %s", exc)
+            logger.error("Failed to fetch account insights (time_series): %s", exc)
             raise InstagramAPIError("Failed to fetch account insights")
+
+        # Call 2: total_value metrics (views) — normalize to same shape
+        try:
+            resp2 = await client.get(
+                f"{GRAPH_BASE_URL}/{ig_user_id}/insights",
+                params={
+                    "metric": ACCOUNT_TOTAL_VALUE_METRICS,
+                    "period": "day",
+                    "metric_type": "total_value",
+                    "since": since,
+                    "until": until,
+                    "access_token": token,
+                },
+            )
+            resp2.raise_for_status()
+            from datetime import datetime, timezone as _tz
+            now_iso = datetime.now(_tz.utc).strftime("%Y-%m-%dT%H:%M:%S+0000")
+            for entry in resp2.json().get("data", []):
+                total = entry.get("total_value", {}).get("value", 0)
+                results.append({
+                    "name": entry.get("name", ""),
+                    "values": [{"value": total, "end_time": now_iso}],
+                })
+        except httpx.HTTPStatusError as exc:
+            logger.warning("Failed to fetch account insights (total_value): %s", exc.response.text)
+        except httpx.HTTPError as exc:
+            logger.warning("Failed to fetch account insights (total_value): %s", exc)
+
+        return results
 
 
 async def fetch_demographics(
