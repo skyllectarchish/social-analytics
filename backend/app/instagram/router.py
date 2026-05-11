@@ -22,16 +22,33 @@ from ..models.queries import (
     GET_DASHBOARD_SUMMARY,
     GET_FOLLOWER_GROWTH,
     GET_TOP_PERFORMING_MEDIA,
+    GET_FORMAT_BREAKDOWN,
 )
 from ..models.user import User
 from ..repositories import instagram_repo, insights_repo
 from . import service
 from .schemas import (
+    AlgorithmMetricsResponse,
+    AlgorithmMetricsSummary,
+    AlgorithmPostItem,
+    BestTimePost,
+    BestTimePostsResponse,
+    BestTimeResponse,
+    BestTimeSlot,
     CallbackResponse,
     ConnectResponse,
     DashboardSummary,
     DemographicBreakdown,
     DemographicResponse,
+    FollowerQualityCohort,
+    FollowerQualityResponse,
+    FollowerQualitySummary,
+    FollowerSpike,
+    FollowerSpikesResponse,
+    FormatBreakdownItem,
+    FormatBreakdownPost,
+    FormatBreakdownPostsResponse,
+    FormatBreakdownResponse,
     InsightDataPoint,
     InstagramMedia,
     InstagramProfile,
@@ -40,6 +57,10 @@ from .schemas import (
     MediaListResponse,
     MetricTimeSeries,
     OverviewResponse,
+    ReelRetentionItem,
+    ReelsRetentionResponse,
+    ReelsTrendPoint,
+    ReelsTrendResponse,
     StoriesResponse,
     StoryWithInsights,
     SyncResponse,
@@ -386,9 +407,11 @@ def get_dashboard(
             ig_media_id=r[0],
             media_type=r[1],
             permalink=r[2],
-            caption=r[3] or "",
-            views=int(r[4]),
-            interactions=int(r[5]),
+            thumbnail_url=r[3] or "",
+            media_url=r[4] or "",
+            caption=r[5] or "",
+            views=int(r[6]),
+            interactions=int(r[7]),
         )
         for r in top_rows
     ]
@@ -401,6 +424,100 @@ def get_dashboard(
         total_accounts_engaged=int(sv[3]),
         net_follower_growth=net_follower_change,
         top_posts=top_posts,
+    )
+
+
+@router.get("/insights/format-breakdown", response_model=FormatBreakdownResponse)
+def get_format_breakdown(
+    days: int = Query(90, ge=1, le=365),
+    current_user: User = Depends(get_current_user),
+):
+    """Return average metrics per content format (FEED/REELS/STORY × IMAGE/VIDEO/CAROUSEL)."""
+    client = get_client()
+    user_id = str(current_user.id)
+
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+    rows = insights_repo.find_format_breakdown(client, user_id, since)
+
+    return FormatBreakdownResponse(
+        period_days=days,
+        data=[FormatBreakdownItem(**r) for r in rows],
+    )
+
+
+@router.get("/insights/best-time", response_model=BestTimeResponse)
+def get_best_time_to_post(
+    days: int = Query(90, ge=1, le=365),
+    min_sample: int = Query(3, ge=1, le=20),
+    current_user: User = Depends(get_current_user),
+):
+    """Return a day-of-week × hour-of-day engagement heatmap for personalised posting time advice."""
+    client = get_client()
+    user_id = str(current_user.id)
+
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+    rows = insights_repo.find_best_time_to_post(client, user_id, since, min_sample)
+
+    return BestTimeResponse(
+        period_days=days,
+        min_sample=min_sample,
+        data=[BestTimeSlot(**r) for r in rows],
+    )
+
+
+@router.get("/insights/algorithm-metrics", response_model=AlgorithmMetricsResponse)
+def get_algorithm_metrics(
+    days: int = Query(30, ge=1, le=90),
+    limit: int = Query(20, ge=1, le=50),
+    current_user: User = Depends(get_current_user),
+):
+    """Return per-post save rate, share rate, and composite algorithm score, plus account-level summary."""
+    client = get_client()
+    user_id = str(current_user.id)
+
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+
+    posts_raw = insights_repo.find_algorithm_metrics_posts(client, user_id, since, limit)
+    summary_raw = insights_repo.find_algorithm_metrics_summary(
+        client, user_id, ig_profile.ig_user_id, since
+    )
+
+    posts = [
+        AlgorithmPostItem(
+            ig_media_id=r["ig_media_id"],
+            media_product_type=r["media_product_type"],
+            media_type=r["media_type"],
+            permalink=r["permalink"] or "",
+            thumbnail_url=r["thumbnail_url"] or "",
+            media_url=r["media_url"] or "",
+            caption=r["caption"] or "",
+            timestamp=str(r["timestamp"]),
+            saved=float(r["saved"]),
+            shares=float(r["shares"]),
+            reach=float(r["reach"]),
+            save_rate=float(r["save_rate"]),
+            share_rate=float(r["share_rate"]),
+            algorithm_score=float(r["algorithm_score"]),
+        )
+        for r in posts_raw
+    ]
+
+    return AlgorithmMetricsResponse(
+        period_days=days,
+        summary=AlgorithmMetricsSummary(**summary_raw),
+        posts=posts,
     )
 
 
@@ -448,3 +565,202 @@ async def get_stories(current_user: User = Depends(get_current_user)):
         )
 
     return StoriesResponse(stories=stories_out)
+
+
+# --- Feature 4: Reels Retention ---
+
+@router.get("/insights/reels-retention", response_model=ReelsRetentionResponse)
+def get_reels_retention(
+    days: int = Query(90, ge=7, le=365),
+    limit: int = Query(50, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+):
+    """Return per-Reel retention, hook strength, and replay metrics."""
+    client = get_client()
+    user_id = str(current_user.id)
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+    rows = insights_repo.find_reels_retention(client, user_id, since, limit)
+
+    reels = [
+        ReelRetentionItem(
+            ig_media_id=r[0], permalink=r[1], caption_preview=r[2] or "",
+            timestamp=str(r[3]), avg_watch_time=float(r[4]),
+            total_view_time=float(r[5]), reach=float(r[6]), views=float(r[7]),
+            skip_rate=float(r[8]), estimated_avg_duration_sec=float(r[9]),
+            hook_strength_pct=float(r[10]), estimated_replay_rate=float(r[11]),
+        )
+        for r in rows
+    ]
+    return ReelsRetentionResponse(period_days=days, reels=reels)
+
+
+@router.get("/insights/reels-retention/trend", response_model=ReelsTrendResponse)
+def get_reels_retention_trend(
+    days: int = Query(180, ge=30, le=730),
+    current_user: User = Depends(get_current_user),
+):
+    """Return weekly Reels hook strength trend over time."""
+    client = get_client()
+    user_id = str(current_user.id)
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+    rows = insights_repo.find_reels_retention_trend(client, user_id, since)
+
+    trend = [
+        ReelsTrendPoint(
+            week_start=str(r[0]), reels_count=int(r[1]),
+            avg_hook_strength_pct=float(r[2]), avg_watch_time_sec=float(r[3]),
+            avg_reach=float(r[4]), avg_views=float(r[5]),
+        )
+        for r in rows
+    ]
+    return ReelsTrendResponse(period_days=days, trend=trend)
+
+
+# --- Feature 5: Follower Quality Score ---
+
+@router.get("/insights/follower-quality", response_model=FollowerQualityResponse)
+def get_follower_quality(
+    breakdown: Literal["age", "gender", "city", "country"] = Query("age"),
+    current_user: User = Depends(get_current_user),
+):
+    """Return per-cohort follower quality scores."""
+    client = get_client()
+    user_id = str(current_user.id)
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+
+    rows = insights_repo.find_follower_quality(
+        client, user_id, ig_profile.ig_user_id, breakdown,
+    )
+    cohorts = [
+        FollowerQualityCohort(
+            dimension_key=r[0], dimension_value=r[1],
+            follower_count=int(r[2]), engaged_count=int(r[3]),
+            engagement_rate_pct=float(r[4]), quality_tier=r[5],
+        )
+        for r in rows
+    ]
+    return FollowerQualityResponse(breakdown=breakdown, cohorts=cohorts)
+
+
+@router.get("/insights/follower-quality/summary", response_model=FollowerQualitySummary)
+def get_follower_quality_summary(
+    breakdown: Literal["age", "gender", "city", "country"] = Query("age"),
+    current_user: User = Depends(get_current_user),
+):
+    """Return overall follower quality summary."""
+    client = get_client()
+    user_id = str(current_user.id)
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+
+    rows = insights_repo.find_follower_quality_summary(
+        client, user_id, ig_profile.ig_user_id, breakdown,
+    )
+    r = rows[0] if rows else (0, 0, 0, 0.0, 0, 0, 0, 0)
+    return FollowerQualitySummary(
+        breakdown=breakdown,
+        total_cohorts=int(r[0]), total_followers_tracked=int(r[1]),
+        total_engaged_tracked=int(r[2]), overall_quality_pct=float(r[3]),
+        high_quality_cohorts=int(r[4]), medium_quality_cohorts=int(r[5]),
+        low_quality_cohorts=int(r[6]), dormant_cohorts=int(r[7]),
+    )
+
+
+@router.get("/insights/follower-quality/spikes", response_model=FollowerSpikesResponse)
+def get_follower_spikes(
+    days: int = Query(90, ge=7, le=365),
+    threshold: int = Query(50, ge=5, le=10000),
+    current_user: User = Depends(get_current_user),
+):
+    """Return follower growth spikes flagged for suspicious activity."""
+    client = get_client()
+    user_id = str(current_user.id)
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+    rows = insights_repo.find_follower_spikes(
+        client, user_id, ig_profile.ig_user_id, since, threshold,
+    )
+    spikes = [
+        FollowerSpike(
+            spike_date=str(r[0]), follows_change=int(r[1]),
+            interactions=int(r[2]), interaction_per_follow_ratio=float(r[3]),
+            is_suspicious=bool(r[4]),
+        )
+        for r in rows
+    ]
+    return FollowerSpikesResponse(period_days=days, spike_threshold=threshold, spikes=spikes)
+
+
+# --- Phase 7: Drill-Down APIs ---
+
+@router.get("/insights/format-breakdown/posts", response_model=FormatBreakdownPostsResponse)
+def get_format_breakdown_posts(
+    format: str = Query(..., description="Content format: FEED, REELS, or STORY"),
+    days: int = Query(90, ge=1, le=365),
+    limit: int = Query(20, ge=1, le=50),
+    current_user: User = Depends(get_current_user),
+):
+    """Return posts for a specific content format, ranked by algorithm score."""
+    client = get_client()
+    user_id = str(current_user.id)
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+    rows = insights_repo.find_format_breakdown_posts(client, user_id, since, format, limit)
+
+    posts = [
+        FormatBreakdownPost(
+            ig_media_id=r[0], media_product_type=r[1], media_type=r[2],
+            permalink=r[3], thumbnail_url=r[4] or None,
+            caption_preview=r[5] or "", timestamp=str(r[6]),
+            reach=float(r[7]), likes=float(r[8]), saved=float(r[9]),
+            shares=float(r[10]), algorithm_score_pct=float(r[11]),
+        )
+        for r in rows
+    ]
+    return FormatBreakdownPostsResponse(format=format, period_days=days, posts=posts)
+
+
+@router.get("/insights/best-time/posts", response_model=BestTimePostsResponse)
+def get_best_time_posts(
+    day: int = Query(..., ge=1, le=7, description="Day of week: 1=Monday … 7=Sunday"),
+    hour: int = Query(..., ge=0, le=23, description="Hour of day: 0–23"),
+    days: int = Query(90, ge=1, le=365),
+    current_user: User = Depends(get_current_user),
+):
+    """Return posts from a specific day/hour slot, ranked by engagement rate."""
+    client = get_client()
+    user_id = str(current_user.id)
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+    rows = insights_repo.find_best_time_posts(client, user_id, since, day, hour)
+
+    posts = [
+        BestTimePost(
+            ig_media_id=r[0], media_product_type=r[1], permalink=r[2],
+            thumbnail_url=r[3] or None, caption_preview=r[4] or "",
+            timestamp=str(r[5]), reach=float(r[6]),
+            total_interactions=float(r[7]), engagement_rate_pct=float(r[8]),
+        )
+        for r in rows
+    ]
+    return BestTimePostsResponse(day_of_week=day, hour_of_day=hour, period_days=days, posts=posts)

@@ -62,7 +62,7 @@ MEDIA_FEED_METRICS: str = "likes,comments,saved,shares,reach,views,total_interac
 # Per-media metrics — REELS (GET /{media-id}/insights)
 MEDIA_REELS_METRICS: str = (
     "likes,comments,saved,shares,reach,views,total_interactions,"
-    "ig_reels_avg_watch_time,ig_reels_video_view_total_time,reposts"
+    "ig_reels_avg_watch_time,ig_reels_video_view_total_time,reposts,reels_skip_rate"
 )
 
 # Per-media metrics — STORY (GET /{media-id}/insights)

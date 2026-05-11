@@ -378,13 +378,15 @@ async def fetch_account_insights(
             all_follows_values = []
             all_total_interactions_values = []
             all_accounts_engaged_values = []
+            all_saves_values = []
+            all_shares_values = []
 
             while current_dt < until_dt:
                 next_dt = current_dt + timedelta(days=1)
                 if next_dt > until_dt:
                     next_dt = until_dt
 
-                rel_url = f"{ig_user_id}/insights?metric=follows_and_unfollows,total_interactions,accounts_engaged&period=day&metric_type=total_value&since={int(current_dt.timestamp())}&until={int(next_dt.timestamp())}"
+                rel_url = f"{ig_user_id}/insights?metric=follows_and_unfollows,total_interactions,accounts_engaged,saves,shares&period=day&metric_type=total_value&since={int(current_dt.timestamp())}&until={int(next_dt.timestamp())}"
                 batch_requests.append({
                     "method": "GET",
                     "relative_url": rel_url
@@ -414,26 +416,25 @@ async def fetch_account_insights(
                                     all_total_interactions_values.append({"value": total, "end_time": end_time_iso})
                                 elif name == "accounts_engaged":
                                     all_accounts_engaged_values.append({"value": total, "end_time": end_time_iso})
+                                elif name == "saves":
+                                    all_saves_values.append({"value": total, "end_time": end_time_iso})
+                                elif name == "shares":
+                                    all_shares_values.append({"value": total, "end_time": end_time_iso})
 
                     # Reset for next chunk
                     batch_requests = []
                     days_list = []
 
             if all_follows_values:
-                results.append({
-                    "name": "follows_and_unfollows",
-                    "values": all_follows_values
-                })
+                results.append({"name": "follows_and_unfollows", "values": all_follows_values})
             if all_total_interactions_values:
-                results.append({
-                    "name": "total_interactions",
-                    "values": all_total_interactions_values
-                })
+                results.append({"name": "total_interactions", "values": all_total_interactions_values})
             if all_accounts_engaged_values:
-                results.append({
-                    "name": "accounts_engaged",
-                    "values": all_accounts_engaged_values
-                })
+                results.append({"name": "accounts_engaged", "values": all_accounts_engaged_values})
+            if all_saves_values:
+                results.append({"name": "saves", "values": all_saves_values})
+            if all_shares_values:
+                results.append({"name": "shares", "values": all_shares_values})
 
         except httpx.HTTPStatusError as exc:
             logger.warning("Failed to fetch account insights (batch follows_and_unfollows): %s", exc.response.text)

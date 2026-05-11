@@ -13,9 +13,20 @@ from ..models.media_insight import MediaInsight
 
 from ..models.queries import (
     GET_ACCOUNT_INSIGHTS,
+    GET_ALGORITHM_METRICS_POSTS,
+    GET_ALGORITHM_METRICS_SUMMARY,
+    GET_BEST_TIME_POSTS,
+    GET_BEST_TIME_TO_POST,
     GET_DEMOGRAPHIC_INSIGHTS,
+    GET_FOLLOWER_QUALITY_BY_COHORT,
+    GET_FOLLOWER_QUALITY_SUMMARY,
+    GET_FOLLOWER_SPIKES,
+    GET_FORMAT_BREAKDOWN,
+    GET_FORMAT_BREAKDOWN_POSTS,
     GET_MEDIA_INSIGHTS,
     GET_MEDIA_NEEDING_SYNC,
+    GET_REELS_RETENTION,
+    GET_REELS_RETENTION_TREND,
 )
 
 logger = logging.getLogger(__name__)
@@ -212,3 +223,197 @@ def find_media_needing_sync(
         parameters={"user_id": user_id, "stale_threshold": stale_threshold},
     )
     return [(r[0], r[1]) for r in rows.result_rows]
+
+
+# --- Feature 1: Content-Format Performance Breakdown ---
+
+def find_format_breakdown(
+    client: Client,
+    user_id: str,
+    since: datetime,
+) -> list[dict]:
+    """Return per-format aggregate performance metrics."""
+    rows = client.query(
+        GET_FORMAT_BREAKDOWN,
+        parameters={"user_id": user_id, "since": since},
+    )
+    cols = [
+        "media_product_type", "media_type", "post_count",
+        "avg_reach", "avg_views", "avg_likes", "avg_saves", "avg_shares",
+        "avg_interactions", "avg_engagement_rate", "avg_save_rate", "avg_share_rate",
+    ]
+    return [dict(zip(cols, r)) for r in rows.result_rows]
+
+
+# --- Feature 2: Best Time to Post ---
+
+def find_best_time_to_post(
+    client: Client,
+    user_id: str,
+    since: datetime,
+    min_sample: int = 3,
+) -> list[dict]:
+    """Return engagement-by-hour heatmap rows."""
+    rows = client.query(
+        GET_BEST_TIME_TO_POST,
+        parameters={
+            "user_id": user_id,
+            "since": since,
+            "min_sample": min_sample,
+        },
+    )
+    cols = [
+        "day_of_week", "hour_of_day", "sample_size",
+        "avg_interactions", "avg_reach", "avg_engagement_rate",
+    ]
+    return [dict(zip(cols, r)) for r in rows.result_rows]
+
+
+# --- Feature 3: Algorithm Metrics ---
+
+def find_algorithm_metrics_posts(
+    client: Client,
+    user_id: str,
+    since: datetime,
+    limit: int = 20,
+) -> list[dict]:
+    """Return per-post save rate, share rate, and algorithm score."""
+    rows = client.query(
+        GET_ALGORITHM_METRICS_POSTS,
+        parameters={"user_id": user_id, "since": since, "limit": limit},
+    )
+    cols = [
+        "ig_media_id", "media_product_type", "media_type",
+        "permalink", "thumbnail_url", "media_url", "caption", "timestamp",
+        "saved", "shares", "reach", "likes", "comments",
+        "save_rate", "share_rate", "algorithm_score",
+    ]
+    return [dict(zip(cols, r)) for r in rows.result_rows]
+
+
+def find_algorithm_metrics_summary(
+    client: Client,
+    user_id: str,
+    ig_user_id: str,
+    since: datetime,
+) -> dict:
+    """Return account-level aggregate save/share rates."""
+    rows = client.query(
+        GET_ALGORITHM_METRICS_SUMMARY,
+        parameters={"user_id": user_id, "ig_user_id": ig_user_id, "since": since},
+    )
+    if not rows.result_rows:
+        return {
+            "total_saves": 0.0, "total_shares": 0.0, "total_reach": 0.0,
+            "account_save_rate": 0.0, "account_share_rate": 0.0,
+        }
+    r = rows.result_rows[0]
+    return {
+        "total_saves": float(r[0]),
+        "total_shares": float(r[1]),
+        "total_reach": float(r[2]),
+        "account_save_rate": float(r[3]),
+        "account_share_rate": float(r[4]),
+    }
+
+
+# --- Feature 4: Reels Retention ---
+
+def find_reels_retention(
+    client: Client,
+    user_id: str,
+    since: datetime,
+    limit: int = 50,
+) -> list[tuple]:
+    return client.query(
+        GET_REELS_RETENTION,
+        parameters={"user_id": user_id, "since": since, "limit": limit},
+    ).result_rows
+
+
+def find_reels_retention_trend(
+    client: Client,
+    user_id: str,
+    since: datetime,
+) -> list[tuple]:
+    return client.query(
+        GET_REELS_RETENTION_TREND,
+        parameters={"user_id": user_id, "since": since},
+    ).result_rows
+
+
+# --- Feature 5: Follower Quality Score ---
+
+def find_follower_quality(
+    client: Client,
+    user_id: str,
+    ig_user_id: str,
+    breakdown: str,
+) -> list[tuple]:
+    return client.query(
+        GET_FOLLOWER_QUALITY_BY_COHORT,
+        parameters={"user_id": user_id, "ig_user_id": ig_user_id, "breakdown": breakdown},
+    ).result_rows
+
+
+def find_follower_quality_summary(
+    client: Client,
+    user_id: str,
+    ig_user_id: str,
+    breakdown: str,
+) -> list[tuple]:
+    return client.query(
+        GET_FOLLOWER_QUALITY_SUMMARY,
+        parameters={"user_id": user_id, "ig_user_id": ig_user_id, "breakdown": breakdown},
+    ).result_rows
+
+
+def find_follower_spikes(
+    client: Client,
+    user_id: str,
+    ig_user_id: str,
+    since: datetime,
+    spike_threshold: int,
+) -> list[tuple]:
+    return client.query(
+        GET_FOLLOWER_SPIKES,
+        parameters={
+            "user_id": user_id,
+            "ig_user_id": ig_user_id,
+            "since": since,
+            "spike_threshold": spike_threshold,
+        },
+    ).result_rows
+
+
+# --- Phase 7: Drill-Down APIs ---
+
+def find_format_breakdown_posts(
+    client: Client,
+    user_id: str,
+    since: datetime,
+    format_type: str,
+    limit: int = 20,
+) -> list[tuple]:
+    return client.query(
+        GET_FORMAT_BREAKDOWN_POSTS,
+        parameters={"user_id": user_id, "since": since, "format": format_type, "limit": limit},
+    ).result_rows
+
+
+def find_best_time_posts(
+    client: Client,
+    user_id: str,
+    since: datetime,
+    day_of_week: int,
+    hour_of_day: int,
+) -> list[tuple]:
+    return client.query(
+        GET_BEST_TIME_POSTS,
+        parameters={
+            "user_id": user_id,
+            "since": since,
+            "day_of_week": day_of_week,
+            "hour_of_day": hour_of_day,
+        },
+    ).result_rows
