@@ -2,10 +2,12 @@
 
 This document details the endpoints required for user registration, authentication, and session management.
 
+All routes are mounted under the prefix `/api/auth`.
+
 ---
 
 ## 1. Register User
-Creates a new user account and returns an access token for immediate login.
+Creates a new user account and returns an access token for immediate login. No second login round-trip is needed.
 
 * **URL:** `/api/auth/register`
 * **Method:** `POST`
@@ -19,6 +21,15 @@ Creates a new user account and returns an access token for immediate login.
   "password": "securepassword123"
 }
 ```
+
+### Validation Rules
+The backend rejects the request with `422 Unprocessable Entity` if any of these are violated:
+
+| Field      | Rule                                                                                         |
+|------------|----------------------------------------------------------------------------------------------|
+| `email`    | Must be a syntactically valid email address (`pydantic.EmailStr`).                           |
+| `username` | 3–30 characters, leading/trailing whitespace stripped. May only contain `[a-zA-Z0-9_.-]`.    |
+| `password` | Minimum 8 characters. Stored using bcrypt — never returned by the API.                       |
 
 ### Response (201 Created)
 Returns a JWT access token and the created user's basic profile.
@@ -35,6 +46,10 @@ Returns a JWT access token and the created user's basic profile.
   }
 }
 ```
+
+### Error Responses
+* **409 Conflict** — A user with this email already exists.
+* **422 Unprocessable Entity** — Body failed Pydantic validation (see rules above).
 
 ---
 
@@ -54,7 +69,7 @@ Authenticates an existing user using their email and password.
 ```
 
 ### Response (200 OK)
-Returns a JWT access token to be used for subsequent authenticated requests.
+Returns a JWT access token and the user's basic profile. The shape matches `/register`.
 
 ```json
 {
@@ -70,13 +85,13 @@ Returns a JWT access token to be used for subsequent authenticated requests.
 ```
 
 ### Error Responses
-* **401 Unauthorized:** Invalid credentials (incorrect email or password).
-* **403 Forbidden:** Account is disabled.
+* **401 Unauthorized** — Invalid credentials (unknown email or wrong password). The API does not distinguish between the two, by design.
+* **403 Forbidden** — Account is disabled (`is_active = false`).
 
 ---
 
 ## 3. Get Current User (Me)
-Retrieves the profile information of the currently authenticated user based on their JWT token. Useful for validating sessions on frontend load.
+Retrieves the profile information of the currently authenticated user based on their JWT token. Useful for validating sessions on frontend load (e.g., on app start, hydrate auth state by calling this).
 
 * **URL:** `/api/auth/me`
 * **Method:** `GET`
@@ -93,4 +108,6 @@ Retrieves the profile information of the currently authenticated user based on t
 ```
 
 ### Error Responses
-* **401 Unauthorized:** Missing or expired JWT token.
+* **401 Unauthorized** — Token is malformed, expired, or missing its `sub` claim (`AuthenticationError`).
+* **403 Forbidden** — The `Authorization` header is missing entirely (FastAPI's `HTTPBearer` default behavior).
+* **404 Not Found** — The token is valid but the user it references no longer exists (`EntityNotFoundError`).

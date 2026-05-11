@@ -5,14 +5,18 @@ Welcome to the backend API documentation for the Social Analytics platform. This
 ## 🔗 Base URL
 All API requests should be prefixed with your backend's base URL (e.g., `http://localhost:8000`).
 
+The FastAPI app also exposes interactive docs at `/docs` (Swagger UI) and `/redoc` while the server is running.
+
 ## 🔐 Authentication
-Most endpoints require authentication. The backend uses JSON Web Tokens (JWT).
+Most endpoints require authentication. The backend uses JSON Web Tokens (JWT) signed with HS256.
 When an endpoint states `Requires Auth: Yes`, you must include the token in the `Authorization` header of your HTTP request.
 
 **Format:**
 ```http
 Authorization: Bearer <your_jwt_token>
 ```
+
+Tokens are returned by `POST /api/auth/register` and `POST /api/auth/login`. The token's `sub` claim is the user's UUID. Send the token on every protected request; the backend will respond with `401 Unauthorized` if the header is missing, malformed, or expired.
 
 ## 📚 API Categories
 
@@ -24,6 +28,26 @@ The API is divided into three main categories. Click on the links below to view 
    * Endpoints for connecting an Instagram account via Meta OAuth, fetching basic profile data, and retrieving a paginated list of media posts.
 3. **[Analytics & Insights](./insights.md)**
    * Endpoints for the analytics dashboard. Includes pre-computed dashboard aggregates, detailed time-series demographic data, per-post media insights, active stories, and the background synchronization trigger.
+
+## 🩺 Health Check
+
+A lightweight, unauthenticated health probe is available for uptime monitoring and readiness checks.
+
+* **URL:** `/api/health`
+* **Method:** `GET`
+* **Requires Auth:** No
+
+### Response (200 OK)
+Reports overall service status and ClickHouse connectivity.
+
+```json
+{
+  "status": "ok",
+  "database": true
+}
+```
+
+If ClickHouse is unreachable, `status` becomes `"degraded"` and `database` becomes `false` — the endpoint itself still returns `200 OK`.
 
 ---
 
@@ -37,12 +61,24 @@ The API returns standard HTTP status codes. Errors will typically follow this JS
 }
 ```
 
-### Common Status Codes
-* **200 OK**: Request succeeded.
-* **201 Created**: Resource was successfully created (e.g., Registration).
-* **400 Bad Request**: Invalid input or parameters.
-* **401 Unauthorized**: Missing or invalid JWT token.
-* **403 Forbidden**: Token is valid, but the user doesn't have permission (or Instagram is not connected).
-* **404 Not Found**: Resource doesn't exist.
-* **429 Too Many Requests**: Rate limit exceeded (especially relevant for Instagram sync).
-* **500 Internal Server Error**: An unexpected backend issue occurred.
+`5xx` responses are intentionally generic (`"An internal error occurred"`) to avoid leaking internal details; the underlying exception is logged server-side.
+
+### Status Code Map
+
+The backend maps each domain exception to a specific HTTP status code via a central handler. The table below is the source-of-truth mapping (see `app/exception_handlers.py`).
+
+| Status                          | Trigger                                                              |
+|---------------------------------|----------------------------------------------------------------------|
+| **200 OK**                      | Request succeeded                                                    |
+| **201 Created**                 | Resource was created (e.g., `POST /api/auth/register`)               |
+| **400 Bad Request**             | OAuth flow failed (`OAuthError`) or request validation failed        |
+| **401 Unauthorized**            | Missing/invalid/expired JWT or invalid login credentials             |
+| **403 Forbidden**               | Account disabled (`AccountDisabledError`)                            |
+| **404 Not Found**               | Resource not found, **or** no Instagram account connected for user   |
+| **409 Conflict**                | Duplicate entity (e.g., email already registered)                    |
+| **422 Unprocessable Entity**    | Pydantic body/query validation error                                 |
+| **500 Internal Server Error**   | Unhandled exception                                                  |
+| **502 Bad Gateway**             | Upstream Meta/Instagram Graph API call failed (`InstagramAPIError`)  |
+| **503 Service Unavailable**     | ClickHouse / database unavailable (`DatabaseError`)                  |
+
+> **Note on `404` for Instagram routes:** when a user hasn't completed the OAuth flow, protected Instagram endpoints raise `InstagramNotConnectedError` which maps to `404`. The frontend should treat this as a signal to send the user to `/connect`, not as a permanent missing-resource error.
