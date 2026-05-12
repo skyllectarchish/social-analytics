@@ -30,7 +30,7 @@ from ..constants import (
     REQUIRED_INSTAGRAM_SCOPES,
     STORY_FIELDS,
 )
-from ..exceptions import InstagramAPIError, OAuthError
+from ..exceptions import InstagramAPIError, InstagramSetupError, OAuthError
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +135,14 @@ async def get_instagram_business_account(token: str) -> tuple[str, str]:
             logger.error("Failed to fetch Facebook pages: %s", exc)
             raise InstagramAPIError("Failed to retrieve Facebook pages")
 
+    # Diagnostic: log what Meta actually returned so account-setup issues are debuggable.
+    page_names = [p.get("name", "?") for p in pages]
+    pages_with_ig = [p.get("name", "?") for p in pages if p.get("instagram_business_account")]
+    logger.info(
+        "Meta returned %d Facebook Page(s): %s. Pages with linked IG Business account: %s",
+        len(pages), page_names, pages_with_ig or "none",
+    )
+
     for page in pages:
         ig_account = page.get("instagram_business_account")
         if ig_account:
@@ -142,11 +150,23 @@ async def get_instagram_business_account(token: str) -> tuple[str, str]:
             if not page_token:
                 logger.warning("No page access token found, falling back to user token")
                 page_token = token
-                
+
             logger.info("Found Instagram business account: %s", ig_account["id"])
             return ig_account["id"], page_token
 
-    raise InstagramAPIError("No Instagram Business/Creator account linked to any Facebook Page")
+    if not pages:
+        raise InstagramSetupError(
+            "No Facebook Pages found for this account. Instagram analytics requires "
+            "a Business/Creator IG account linked to a Facebook Page you manage. "
+            "On the Meta consent screen, make sure you grant access to at least one Page."
+        )
+
+    raise InstagramSetupError(
+        "Your Facebook account has Pages but none have a linked Instagram Business/Creator account. "
+        "Link your IG account to a Page in Meta Business Suite (Settings → Accounts → Instagram accounts), "
+        "switch your IG account to Business or Creator in the Instagram app if you haven't, "
+        "then re-run the connect flow and check the Page on the Meta consent screen."
+    )
 
 
 async def fetch_profile(ig_user_id: str, token: str) -> dict[str, Any]:

@@ -14,6 +14,7 @@ from .exceptions import (
     EntityNotFoundError,
     InstagramAPIError,
     InstagramNotConnectedError,
+    InstagramSetupError,
     OAuthError,
 )
 
@@ -27,6 +28,7 @@ _STATUS_MAP: dict[type[AppError], int] = {
     EntityNotFoundError: 404,
     InstagramNotConnectedError: 404,
     OAuthError: 400,
+    InstagramSetupError: 400,
     InstagramAPIError: 502,
     DatabaseError: 503,
 }

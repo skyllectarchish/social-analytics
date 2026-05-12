@@ -46,9 +46,21 @@ class InstagramNotConnectedError(AppError):
 
 
 class InstagramAPIError(AppError):
-    """Raised when an Instagram/Meta Graph API call fails."""
+    """Raised when an Instagram/Meta Graph API call fails (network/5xx/Meta-side)."""
 
     def __init__(self, message: str = "Instagram API request failed") -> None:
+        super().__init__(message)
+
+
+class InstagramSetupError(AppError):
+    """Raised when the user's IG/Facebook account isn't set up correctly for analytics.
+
+    Distinct from InstagramAPIError: this is a user-fixable configuration problem
+    (no Business/Creator account, no linked Page, missing scope grant), not a Meta
+    outage. Surfaced as 400 with the full message so the UI can guide the user.
+    """
+
+    def __init__(self, message: str = "Instagram account not set up for analytics") -> None:
         super().__init__(message)
 
 

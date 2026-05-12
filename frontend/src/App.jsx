@@ -8,6 +8,9 @@ import InstaDashboardPage from "./pages/InstaDashboardPage";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import ContentLabPage from "./pages/ContentLabPage";
+import ReelsStudioPage from "./pages/ReelsStudioPage";
+import AudienceDNAPage from "./pages/AudienceDNAPage";
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -39,6 +42,9 @@ function AppRoutes() {
       <Route path="/connect" element={<ProtectedRoute><ConnectInstagramPage /></ProtectedRoute>} />
       <Route path="/callback" element={<ProtectedRoute><CallbackPage /></ProtectedRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+      <Route path="/dashboard/content" element={<ProtectedRoute><ContentLabPage /></ProtectedRoute>} />
+      <Route path="/dashboard/reels" element={<ProtectedRoute><ReelsStudioPage /></ProtectedRoute>} />
+      <Route path="/dashboard/audience" element={<ProtectedRoute><AudienceDNAPage /></ProtectedRoute>} />
       <Route path="/insta-dashboard" element={<ProtectedRoute><InstaDashboardPage /></ProtectedRoute>} />
     </Routes>
   );

@@ -27,7 +27,17 @@
       "Bash(npm run *)",
       "Bash(npx skills *)",
       "Bash(npx add-skill *)",
-      "Bash(timeout 8)"
+      "Bash(timeout 8)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(py *)",
+      "PowerShell(netsh interface *)",
+      "PowerShell(Get-NetTCPConnection *)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(netstat *)",
+      "PowerShell(Stop-Process *)",
+      "PowerShell(& \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend\\\\venv\\\\Scripts\\\\python.exe\" -m pip list 2>$null | findstr /I \"passlib bcrypt clickhouse pydantic jose\")",
+      "PowerShell(npm *)",
+      "PowerShell(Get-CimInstance *)"
     ]
   }
 }
