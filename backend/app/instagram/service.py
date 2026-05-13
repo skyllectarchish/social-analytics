@@ -1,17 +1,19 @@
-"""Instagram Graph API client — async HTTP operations only.
+"""Instagram Login API client — async HTTP operations only.
 
 All database operations are handled by app.repositories.instagram_repo.
-This module is responsible only for Meta/Instagram API communication.
+This module is responsible only for Instagram API communication.
 """
 
 import asyncio
 import json
 import logging
 import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlencode
 
 import httpx
+from jose import JWTError, jwt
 
 from ..config import settings
 from ..constants import (
@@ -29,22 +31,47 @@ from ..constants import (
     OAUTH_DIALOG_URL,
     REQUIRED_INSTAGRAM_SCOPES,
     STORY_FIELDS,
+    TOKEN_EXCHANGE_URL,
 )
-from ..exceptions import InstagramAPIError, InstagramSetupError, OAuthError
+from ..exceptions import InstagramAPIError, OAuthError
 
 logger = logging.getLogger(__name__)
 
 
-def generate_oauth_state() -> str:
-    """Generate a cryptographically random state token for CSRF protection."""
-    return secrets.token_urlsafe(32)
+def create_signed_oauth_state(user_id: str) -> str:
+    """Mint a signed, short-lived state token bound to the logged-in user.
+
+    The state is a JWT signed with the app's JWT secret. It carries the user id,
+    a nonce, an expiry, and a purpose tag — verified on `/callback` to prevent
+    CSRF and cross-user code injection.
+    """
+    payload = {
+        "uid": user_id,
+        "nonce": secrets.token_urlsafe(16),
+        "exp": datetime.now(tz=timezone.utc)
+        + timedelta(seconds=settings.oauth_state_ttl_seconds),
+        "purpose": "ig_oauth_state",
+    }
+    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+
+def verify_oauth_state(state: str, expected_user_id: str) -> None:
+    """Verify a state token on /callback. Raises OAuthError on any failure."""
+    try:
+        payload = jwt.decode(
+            state, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
+        )
+    except JWTError:
+        raise OAuthError("Invalid or expired OAuth state token")
+    if payload.get("purpose") != "ig_oauth_state" or payload.get("uid") != expected_user_id:
+        raise OAuthError("OAuth state user mismatch")
 
 
 def get_oauth_url(state: str) -> str:
-    """Construct the Meta OAuth dialog URL.
+    """Construct the Instagram Login OAuth dialog URL.
 
     Args:
-        state: CSRF token (mandatory). Must be verified on callback.
+        state: signed JWT state (mandatory). Verified on callback.
     """
     params = {
         "client_id": settings.meta_app_id,
@@ -56,35 +83,46 @@ def get_oauth_url(state: str) -> str:
     return f"{OAUTH_DIALOG_URL}?{urlencode(params)}"
 
 
-async def exchange_code_for_token(code: str) -> str:
-    """Exchange an OAuth authorization code for a short-lived access token.
+async def exchange_code_for_token(code: str) -> tuple[str, str]:
+    """Exchange an OAuth authorization code for a short-lived token + IG user ID.
+
+    The Instagram Login API returns the IG Business user ID directly in the
+    token-exchange response, so we no longer need a separate /me/accounts walk.
+
+    Returns:
+        Tuple of (short_lived_token, ig_user_id).
 
     Raises:
         OAuthError: If the token exchange fails.
     """
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
         try:
-            resp = await client.get(
-                f"{GRAPH_BASE_URL}/oauth/access_token",
-                params={
+            resp = await client.post(
+                TOKEN_EXCHANGE_URL,
+                data={
                     "client_id": settings.meta_app_id,
                     "client_secret": settings.meta_app_secret,
+                    "grant_type": "authorization_code",
                     "redirect_uri": settings.meta_redirect_uri,
                     "code": code,
                 },
             )
             resp.raise_for_status()
-            return resp.json()["access_token"]
+            body = resp.json()
+            # Meta has historically returned user_id as int OR string — normalize.
+            return body["access_token"], str(body["user_id"])
         except httpx.HTTPStatusError as exc:
             logger.error("Token exchange failed: %s", exc.response.text)
             raise OAuthError("Failed to exchange authorization code for token")
         except (KeyError, httpx.HTTPError) as exc:
             logger.error("Token exchange error: %s", exc)
-            raise OAuthError("Invalid response from Meta token endpoint")
+            raise OAuthError("Invalid response from Instagram token endpoint")
 
 
 async def get_long_lived_token(short_token: str) -> tuple[str, int]:
-    """Exchange a short-lived token for a long-lived token (60 days).
+    """Exchange a short-lived token for a long-lived token (~60 days).
+
+    Uses the IG Login `ig_exchange_token` grant on `graph.instagram.com`.
 
     Returns:
         Tuple of (long_lived_token, expires_in_seconds).
@@ -95,12 +133,11 @@ async def get_long_lived_token(short_token: str) -> tuple[str, int]:
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
         try:
             resp = await client.get(
-                f"{GRAPH_BASE_URL}/oauth/access_token",
+                f"{GRAPH_BASE_URL}/access_token",
                 params={
-                    "grant_type": "fb_exchange_token",
-                    "client_id": settings.meta_app_id,
+                    "grant_type": "ig_exchange_token",
                     "client_secret": settings.meta_app_secret,
-                    "fb_exchange_token": short_token,
+                    "access_token": short_token,
                 },
             )
             resp.raise_for_status()
@@ -111,62 +148,7 @@ async def get_long_lived_token(short_token: str) -> tuple[str, int]:
             raise OAuthError("Failed to exchange for long-lived token")
         except (KeyError, httpx.HTTPError) as exc:
             logger.error("Long-lived token error: %s", exc)
-            raise OAuthError("Invalid response from Meta token endpoint")
-
-
-async def get_instagram_business_account(token: str) -> tuple[str, str]:
-    """Discover the Instagram Business Account ID linked to the user's Facebook Pages.
-
-    Returns:
-        Tuple of (ig_user_id, page_access_token).
-
-    Raises:
-        InstagramAPIError: If no IG business account is found.
-    """
-    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
-        try:
-            resp = await client.get(
-                f"{GRAPH_BASE_URL}/me/accounts",
-                params={"access_token": token, "fields": "id,name,instagram_business_account,access_token"},
-            )
-            resp.raise_for_status()
-            pages = resp.json().get("data", [])
-        except httpx.HTTPError as exc:
-            logger.error("Failed to fetch Facebook pages: %s", exc)
-            raise InstagramAPIError("Failed to retrieve Facebook pages")
-
-    # Diagnostic: log what Meta actually returned so account-setup issues are debuggable.
-    page_names = [p.get("name", "?") for p in pages]
-    pages_with_ig = [p.get("name", "?") for p in pages if p.get("instagram_business_account")]
-    logger.info(
-        "Meta returned %d Facebook Page(s): %s. Pages with linked IG Business account: %s",
-        len(pages), page_names, pages_with_ig or "none",
-    )
-
-    for page in pages:
-        ig_account = page.get("instagram_business_account")
-        if ig_account:
-            page_token = page.get("access_token")
-            if not page_token:
-                logger.warning("No page access token found, falling back to user token")
-                page_token = token
-
-            logger.info("Found Instagram business account: %s", ig_account["id"])
-            return ig_account["id"], page_token
-
-    if not pages:
-        raise InstagramSetupError(
-            "No Facebook Pages found for this account. Instagram analytics requires "
-            "a Business/Creator IG account linked to a Facebook Page you manage. "
-            "On the Meta consent screen, make sure you grant access to at least one Page."
-        )
-
-    raise InstagramSetupError(
-        "Your Facebook account has Pages but none have a linked Instagram Business/Creator account. "
-        "Link your IG account to a Page in Meta Business Suite (Settings → Accounts → Instagram accounts), "
-        "switch your IG account to Business or Creator in the Instagram app if you haven't, "
-        "then re-run the connect flow and check the Page on the Meta consent screen."
-    )
+            raise OAuthError("Invalid response from Instagram token endpoint")
 
 
 async def fetch_profile(ig_user_id: str, token: str) -> dict[str, Any]:

@@ -1,10 +1,10 @@
 # Instagram Core Integration API
 
-This section details the endpoints used to connect an Instagram Business/Creator account via Meta OAuth, fetch the connected profile, and retrieve a paginated list of the user's media posts.
+This section details the endpoints used to connect an Instagram Business/Creator account via the **Instagram Login API** (direct Instagram OAuth — no Facebook account or Page required), fetch the connected profile, and retrieve a paginated list of the user's media posts.
 
 All routes are mounted under the prefix `/api/instagram`. Every endpoint requires an authenticated user (Bearer JWT).
 
-> **Account requirement:** the connected Instagram account must be a **Business** or **Creator** account linked to a Facebook Page. Personal accounts are not supported by the Meta Graph API endpoints this service uses.
+> **Account requirement:** the connected Instagram account must be a **Business** or **Creator** account. Personal accounts are not supported by the Instagram Graph API endpoints this service uses. No Facebook Page is required.
 
 ---
 
@@ -16,34 +16,34 @@ Initiates the OAuth 2.0 flow. The frontend should request this URL and then redi
 * **Requires Auth:** Yes (Bearer Token)
 
 ### Response (200 OK)
-Returns the Meta OAuth dialog URL and a CSRF `state` token.
+Returns the Instagram OAuth dialog URL and a signed CSRF `state` token (JWT bound to the current user, ~10 min TTL).
 
 ```json
 {
-  "oauth_url": "https://www.facebook.com/v21.0/dialog/oauth?client_id=123...&redirect_uri=...&scope=instagram_basic%2Cpages_show_list%2Cpages_read_engagement%2Cinstagram_manage_insights%2Cbusiness_management&response_type=code&state=xyz...",
-  "state": "random_secure_csrf_string"
+  "oauth_url": "https://www.instagram.com/oauth/authorize?client_id=123...&redirect_uri=...&scope=instagram_business_basic%2Cinstagram_business_manage_insights%2Cinstagram_business_manage_comments%2Cinstagram_business_manage_messages&response_type=code&state=eyJhbGciOiJIUzI1NiIs...",
+  "state": "eyJhbGciOiJIUzI1NiIs..."
 }
 ```
 
-Requested scopes: `instagram_basic`, `pages_show_list`, `pages_read_engagement`, `instagram_manage_insights`, `business_management`.
+Requested scopes: `instagram_business_basic`, `instagram_business_manage_insights`, `instagram_business_manage_comments`, `instagram_business_manage_messages`.
 
-> **Frontend Integration Note:** You must store the `state` value (e.g., in `localStorage` or `sessionStorage`) before redirecting the user. When Meta redirects back to your app, you should verify the state matches before forwarding the `code` to `/callback`, to prevent Cross-Site Request Forgery (CSRF).
+> **Frontend Integration Note:** Instagram's redirect back to your app includes the original `state` value in the query string. Forward it as-is to `/callback`; the backend verifies the signature, expiry, and user binding server-side.
 
 ---
 
 ## 2. OAuth Callback
-Handles the redirect from Meta after the user authorizes the app. It exchanges the authorization `code` for a long-lived access token (~60 days), discovers the user's Instagram Business Account ID by walking `/me/accounts`, fetches the initial profile and media data, and stores everything in ClickHouse. The long-lived token is encrypted before storage.
+Handles the redirect from Instagram after the user authorizes the app. It verifies the signed `state`, POSTs the authorization `code` to `api.instagram.com/oauth/access_token` (which returns the short-lived token **plus** the IG user ID directly — no `/me/accounts` walk needed), upgrades to a long-lived token (~60 days) via `graph.instagram.com/access_token?grant_type=ig_exchange_token`, fetches the initial profile and media, and stores everything in ClickHouse. The long-lived token is encrypted before storage.
 
 * **URL:** `/api/instagram/callback`
 * **Method:** `GET`
 * **Requires Auth:** Yes (Bearer Token)
 
 ### Query Parameters
-* `code` (string, **required**): The authorization code appended to the URL by Meta.
-* `state` (string, optional): The CSRF state token to verify. The frontend should verify state equality client-side before invoking this endpoint.
+* `code` (string, **required**): The authorization code appended to the URL by Instagram.
+* `state` (string, **required**): The signed CSRF state token returned from `/connect`. Verified server-side (signature + expiry + user binding).
 
 ### Example Request
-`GET /api/instagram/callback?code=AQBxyz...&state=random_secure_csrf_string`
+`GET /api/instagram/callback?code=AQBxyz...&state=eyJhbGciOiJIUzI1NiIs...`
 
 ### Response (200 OK)
 Returns a success flag and the newly connected Instagram profile data. The `id` field is the application's user ID, not the Instagram ID (see `ig_user_id` for that).
@@ -67,8 +67,8 @@ Returns a success flag and the newly connected Instagram profile data. The `id` 
 ```
 
 ### Error Responses
-* **400 Bad Request** — `OAuthError`: code/token exchange failed, or the user has no linked Page with a Business Instagram Account.
-* **502 Bad Gateway** — Upstream Meta Graph API returned an error during profile/media fetch.
+* **400 Bad Request** — `OAuthError`: state verification failed (invalid/expired/user-mismatch) or code/token exchange failed.
+* **502 Bad Gateway** — Upstream Instagram Graph API returned an error during profile/media fetch.
 
 ---
 
@@ -155,7 +155,7 @@ Returns a list of media items and the total count.
 ---
 
 ## 5. Refresh Profile & Media Data
-Forces a manual re-fetch of the basic profile and media data from the Meta Graph API using the stored long-lived token (no new OAuth round-trip) and updates the local database.
+Forces a manual re-fetch of the basic profile and media data from the Instagram Graph API using the stored long-lived token (no new OAuth round-trip) and updates the local database.
 
 > This does **not** sync analytics/insights — only the basic post list and follower counts. For insights, call `/api/instagram/insights/sync` (see [Analytics & Insights](./insights.md)).
 
@@ -186,4 +186,4 @@ Returns the updated profile data (same structure as `/api/instagram/callback`).
 
 ### Error Responses
 * **404 Not Found** — `InstagramNotConnectedError`: user has not connected an Instagram account.
-* **502 Bad Gateway** — Upstream Meta Graph API request failed.
+* **502 Bad Gateway** — Upstream Instagram Graph API request failed.

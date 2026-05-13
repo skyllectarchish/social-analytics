@@ -52,7 +52,12 @@ export default function ConnectInstagramPage() {
             style={{ background: "rgba(15,23,42,0.03)", border: "1px solid rgba(15,23,42,0.08)" }}
           >
             <p className="font-medium mb-3 text-slate-700">Required permissions:</p>
-            {["instagram_basic — view profile & media", "pages_show_list — access linked Facebook Pages", "instagram_manage_insights — read analytics data"].map((p) => (
+            {[
+              "instagram_business_basic — view profile & media",
+              "instagram_business_manage_insights — read analytics",
+              "instagram_business_manage_comments — manage comments",
+              "instagram_business_manage_messages — manage DMs",
+            ].map((p) => (
               <div key={p} className="flex items-start gap-2">
                 <span className="text-emerald-500 font-bold">✓</span>
                 <span className="text-slate-600">{p}</span>
@@ -72,7 +77,7 @@ export default function ConnectInstagramPage() {
             className="btn-magnetic btn-primary-glow w-full py-4 rounded-xl font-semibold"
             style={{ opacity: loading ? 0.7 : 1 }}
           >
-            {loading ? "Redirecting to Meta..." : "Connect with Instagram"}
+            {loading ? "Redirecting to Instagram..." : "Connect with Instagram"}
           </button>
 
           <button

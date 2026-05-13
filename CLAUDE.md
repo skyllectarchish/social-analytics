@@ -41,13 +41,13 @@ FastAPI app composed of two feature modules — `auth/` and `instagram/` — eac
 
 **Auth.** JWT bearer (HS256) via `python-jose`; passwords hashed with `passlib[bcrypt]`. `auth/dependencies.py::get_current_user` is the dependency every protected route uses; it decodes the token, fetches the user from ClickHouse, and returns a dict (`{id, email, username, is_active}`). Routes consume that dict — there is no SQLAlchemy/ORM model.
 
-**Instagram OAuth flow** (in `instagram/service.py`, all routes mounted under `/api/instagram`):
-1. `/connect` returns a Meta OAuth URL (built from `META_APP_ID` + `META_REDIRECT_URI` + scopes including `instagram_basic`, `pages_show_list`, `pages_read_engagement`, `instagram_manage_insights`, `business_management`).
-2. Frontend redirects user to Meta, Meta redirects back to `META_REDIRECT_URI` with `?code=`.
-3. `/callback` exchanges code → short-lived token → long-lived token (~60 days) → discovers the IG Business Account ID by walking `/me/accounts` for a Page with `instagram_business_account` set → fetches profile and paginated media → stores everything in ClickHouse.
-4. `/refresh` re-runs the fetch using the stored long-lived token (no new OAuth).
+**Instagram OAuth flow** (Instagram Login API — direct, no Facebook account or Page required; in `instagram/service.py`, all routes mounted under `/api/instagram`):
+1. `/connect` mints a signed JWT `state` bound to the current user (~10 min TTL) and returns an Instagram OAuth URL built from `META_APP_ID` + `META_REDIRECT_URI` + scopes `instagram_business_basic`, `instagram_business_manage_insights`, `instagram_business_manage_comments`, `instagram_business_manage_messages`. The dialog host is `https://www.instagram.com/oauth/authorize`.
+2. Frontend redirects user to Instagram, Instagram redirects back to `META_REDIRECT_URI` with `?code=&state=`.
+3. `/callback` verifies the signed `state` (CSRF), POSTs the code to `https://api.instagram.com/oauth/access_token` — that single response carries both the short-lived token **and** the IG user ID, so there is no `/me/accounts` Page walk. It then upgrades to a long-lived token (~60 days) via `https://graph.instagram.com/access_token?grant_type=ig_exchange_token`, fetches profile + paginated media, and stores everything in ClickHouse.
+4. `/refresh` re-runs the profile/media fetch using the stored long-lived token (no new OAuth).
 
-Graph API base is `https://graph.facebook.com/v25.0` (constant in `instagram/service.py`). The flow requires the user's IG account to be a Business/Creator account linked to a Facebook Page — there is no fallback for personal accounts.
+Graph API base is `https://graph.instagram.com` (unversioned; constant in `app/constants.py`). The flow requires the user's IG account to be a **Business or Creator** account — there is no fallback for personal accounts, but no Facebook account or Page is needed.
 
 ### Frontend (`frontend/src/`)
 

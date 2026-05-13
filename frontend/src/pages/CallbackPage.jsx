@@ -14,6 +14,7 @@ export default function CallbackPage() {
     called.current = true;
 
     const code = searchParams.get("code");
+    const state = searchParams.get("state");
     const errorParam = searchParams.get("error");
 
     if (errorParam) {
@@ -24,11 +25,15 @@ export default function CallbackPage() {
       setError("No authorization code received.");
       return;
     }
+    if (!state) {
+      setError("Missing OAuth state token.");
+      return;
+    }
 
     (async () => {
       try {
         setStatus("Exchanging authorization code...");
-        await api.get(`/instagram/callback?code=${code}`);
+        await api.get(`/instagram/callback`, { params: { code, state } });
         setStatus("Account connected! Redirecting...");
         setTimeout(() => navigate("/dashboard"), 1000);
       } catch (err) {

@@ -3,17 +3,17 @@
 # Token expiry
 DEFAULT_TOKEN_EXPIRY_SECONDS: int = 60 * 24 * 3600  # 60 days
 
-# Instagram Graph API
-GRAPH_API_VERSION: str = "v21.0"
-GRAPH_BASE_URL: str = f"https://graph.facebook.com/{GRAPH_API_VERSION}"
-OAUTH_DIALOG_URL: str = f"https://www.facebook.com/{GRAPH_API_VERSION}/dialog/oauth"
+# Instagram Login API (direct, no Facebook Page required).
+# IG Login Graph endpoints are unversioned and live on graph.instagram.com.
+GRAPH_BASE_URL: str = "https://graph.instagram.com"
+OAUTH_DIALOG_URL: str = "https://www.instagram.com/oauth/authorize"
+TOKEN_EXCHANGE_URL: str = "https://api.instagram.com/oauth/access_token"
 
 REQUIRED_INSTAGRAM_SCOPES: list[str] = [
-    "instagram_basic",
-    "pages_show_list",
-    "pages_read_engagement",
-    "instagram_manage_insights",
-    "business_management",
+    "instagram_business_basic",
+    "instagram_business_manage_insights",
+    "instagram_business_manage_comments",
+    "instagram_business_manage_messages",
 ]
 
 INSTAGRAM_PROFILE_FIELDS: str = (

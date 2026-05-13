@@ -73,9 +73,13 @@ router = APIRouter(prefix="/api/instagram", tags=["instagram"])
 
 
 @router.get("/connect", response_model=ConnectResponse)
-def connect(_: User = Depends(get_current_user)):
-    """Return the Meta OAuth URL for the frontend to redirect to."""
-    state = service.generate_oauth_state()
+def connect(current_user: User = Depends(get_current_user)):
+    """Return the Instagram OAuth URL for the frontend to redirect to.
+
+    The `state` is a signed JWT bound to the current user and verified on
+    `/callback` to prevent CSRF and cross-user code injection.
+    """
+    state = service.create_signed_oauth_state(str(current_user.id))
     oauth_url = service.get_oauth_url(state)
     return ConnectResponse(oauth_url=oauth_url, state=state)
 
@@ -83,20 +87,20 @@ def connect(_: User = Depends(get_current_user)):
 @router.get("/callback", response_model=CallbackResponse)
 async def callback(
     code: str = Query(...),
-    state: str | None = Query(None, description="CSRF state token from /connect response"),
+    state: str = Query(..., description="Signed CSRF state token from /connect response"),
     current_user: User = Depends(get_current_user),
 ):
-    """Handle the OAuth callback: exchange code → fetch data → store in ClickHouse."""
+    """Handle the OAuth callback: verify state → exchange code → fetch data → store."""
     user_id = str(current_user.id)
+    service.verify_oauth_state(state, user_id)
 
-    short_token = await service.exchange_code_for_token(code)
+    short_token, ig_user_id = await service.exchange_code_for_token(code)
     long_token, expires_in = await service.get_long_lived_token(short_token)
-    ig_user_id, token = await service.get_instagram_business_account(long_token)
 
-    profile_data = await service.fetch_profile(ig_user_id, token)
-    media_list = await service.fetch_media(ig_user_id, token)
+    profile_data = await service.fetch_profile(ig_user_id, long_token)
+    media_list = await service.fetch_media(ig_user_id, long_token)
 
-    encrypted_token = encrypt_token(token, settings.jwt_secret_key)
+    encrypted_token = encrypt_token(long_token, settings.jwt_secret_key)
     token_expires_at = datetime.fromtimestamp(
         datetime.now(timezone.utc).timestamp() + expires_in,
         tz=timezone.utc,

@@ -37,7 +37,9 @@
       "PowerShell(Stop-Process *)",
       "PowerShell(& \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend\\\\venv\\\\Scripts\\\\python.exe\" -m pip list 2>$null | findstr /I \"passlib bcrypt clickhouse pydantic jose\")",
       "PowerShell(npm *)",
-      "PowerShell(Get-CimInstance *)"
+      "PowerShell(Get-CimInstance *)",
+      "Bash(xargs grep -l \"error\\\\|Error\")",
+      "Bash(xargs grep -l \"Facebook Page\\\\|page_access_token\\\\|facebook.com\")"
     ]
   }
 }

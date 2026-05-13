@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     meta_app_secret: str
     meta_redirect_uri: str
 
+    # OAuth state CSRF token (signed JWT, scoped to the IG connect flow)
+    oauth_state_ttl_seconds: int = 600
+
     # App
     frontend_url: str = "http://localhost:5173"
     log_level: str = "INFO"
