@@ -20,7 +20,7 @@ This covers Instagram's native "Insights" feature set well. To move from "passiv
 
 ---
 
-## Tier 1 — Highest Impact (Build These First)
+## Tier 1 — Highest Impact (Build These First)  
 
 ### 1. Content-Format Performance Breakdown
 

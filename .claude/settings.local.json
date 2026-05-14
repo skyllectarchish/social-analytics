@@ -39,7 +39,14 @@
       "PowerShell(npm *)",
       "PowerShell(Get-CimInstance *)",
       "Bash(xargs grep -l \"error\\\\|Error\")",
-      "Bash(xargs grep -l \"Facebook Page\\\\|page_access_token\\\\|facebook.com\")"
+      "Bash(xargs grep -l \"Facebook Page\\\\|page_access_token\\\\|facebook.com\")",
+      "Bash(netstat -ano)",
+      "Bash(findstr :8000)",
+      "Bash(curl -s \"http://127.0.0.1:8000/api/health\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8000/api/health)",
+      "Bash(curl -s http://127.0.0.1:8000/openapi.json)",
+      "PowerShell($openapi = Invoke-RestMethod -Uri \"http://127.0.0.1:8000/openapi.json\"; $paths = $openapi.paths; $insightSyncParams = $paths.'/api/instagram/insights/sync'.post.parameters; Write-Host \"=== /insights/sync params ===\"; $insightSyncParams | ForEach-Object { \"{0,-16} default={1,-5} le={2}\" -f $_.name, $_.schema.default, $_.schema.maximum }; Write-Host \"\"; Write-Host \"=== days caps across all GET endpoints ===\"; $paths.PSObject.Properties | ForEach-Object { $p = $_.Value.get; if \\($p -and $p.parameters\\) { $daysParam = $p.parameters | Where-Object { $_.name -eq 'days' }; if \\($daysParam\\) { \"{0,-50} le={1}\" -f $_.Name, $daysParam.schema.maximum } } })",
+      "PowerShell($sql = \"SELECT replace\\(GET_TOP_PERFORMING_MEDIA, '\\\\n', ' '\\) FROM \\(SELECT 1 AS x\\)\"; & .\\\\venv\\\\Scripts\\\\python.exe -c \"from app.models.queries import GET_TOP_PERFORMING_MEDIA; s = GET_TOP_PERFORMING_MEDIA.replace\\('\\\\n', ' '\\); print\\('SELECT order check:'\\); print\\('  ' + s[:300]\\)\")"
     ]
   }
 }

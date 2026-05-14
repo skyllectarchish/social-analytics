@@ -40,7 +40,7 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center gap-3">
           <PeriodSelector days={days} onChange={setDays} />
-          <SyncButton />
+          <SyncButton days={days} />
         </div>
       </div>
 

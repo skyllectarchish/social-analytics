@@ -12,7 +12,9 @@ from ..constants import (
     ACCOUNT_DEMOGRAPHIC_METRICS,
     DEFAULT_PAGE_SIZE,
     DEFAULT_TOKEN_EXPIRY_SECONDS,
+    INSIGHTS_INITIAL_FETCH_DAYS,
     INSIGHTS_LOOKBACK_DAYS,
+    INSIGHTS_MAX_LOOKBACK_DAYS,
     MAX_PAGE_SIZE,
 )
 from ..crypto import decrypt_token, encrypt_token
@@ -86,11 +88,17 @@ def connect(current_user: User = Depends(get_current_user)):
 
 @router.get("/callback", response_model=CallbackResponse)
 async def callback(
+    background_tasks: BackgroundTasks,
     code: str = Query(...),
     state: str = Query(..., description="Signed CSRF state token from /connect response"),
     current_user: User = Depends(get_current_user),
 ):
-    """Handle the OAuth callback: verify state → exchange code → fetch data → store."""
+    """Handle the OAuth callback: verify state → exchange code → fetch data → store.
+
+    Also schedules an initial INSIGHTS_INITIAL_FETCH_DAYS-day insights backfill in
+    the background so the dashboard has historical data immediately on first connect
+    (Meta retains ~90 days of historical account insights server-side).
+    """
     user_id = str(current_user.id)
     service.verify_oauth_state(state, user_id)
 
@@ -111,6 +119,10 @@ async def callback(
         client, user_id, ig_user_id, profile_data, encrypted_token, token_expires_at,
     )
     instagram_repo.bulk_insert_media(client, user_id, ig_user_id, media_list)
+
+    background_tasks.add_task(
+        _run_insights_sync, user_id, ig_user_id, long_token, INSIGHTS_INITIAL_FETCH_DAYS,
+    )
 
     logger.info("Instagram connected for user %s (ig: %s)", user_id, ig_user_id)
     profile = InstagramProfile.from_api_data(user_id, ig_user_id, profile_data)
@@ -181,7 +193,7 @@ async def refresh(current_user: User = Depends(get_current_user)):
 
 @router.get("/insights/overview", response_model=OverviewResponse)
 def get_overview(
-    days: int = Query(INSIGHTS_LOOKBACK_DAYS, ge=1, le=90),
+    days: int = Query(INSIGHTS_LOOKBACK_DAYS, ge=1, le=INSIGHTS_MAX_LOOKBACK_DAYS),
     current_user: User = Depends(get_current_user),
 ):
     """Return stored account-level time-series metrics for the last N days."""
@@ -260,12 +272,32 @@ def get_media_insights(
     )
 
 
-async def _run_insights_sync(user_id: str, ig_user_id: str, token: str) -> None:
-    """Background task: full insights sync for one user."""
+async def _run_insights_sync(
+    user_id: str,
+    ig_user_id: str,
+    token: str,
+    lookback_days: int = INSIGHTS_LOOKBACK_DAYS,
+    purge: bool = False,
+) -> None:
+    """Background task: full insights sync for one user over the last `lookback_days`.
+
+    When `purge=True`, deletes existing account_insights rows in the window before
+    re-fetching. Use this to clean up legacy rows (e.g. pre-refactor 'views' snapshots
+    stamped at end_time=now() that double-count under sumIf).
+    """
     client = get_client()
     now = datetime.now(timezone.utc)
-    since_ts = int((now - timedelta(days=INSIGHTS_LOOKBACK_DAYS)).timestamp())
+    since_ts = int((now - timedelta(days=lookback_days)).timestamp())
     until_ts = int(now.timestamp())
+    since_dt = datetime.fromtimestamp(since_ts, tz=timezone.utc).replace(tzinfo=None)
+
+    if purge:
+        try:
+            insights_repo.purge_account_insights_window(
+                client, user_id, ig_user_id, since_dt,
+            )
+        except Exception:
+            logger.exception("Background sync: purge failed for user %s", user_id)
 
     # Account insights
     try:
@@ -346,6 +378,20 @@ async def _run_insights_sync(user_id: str, ig_user_id: str, token: str) -> None:
 @router.post("/insights/sync", response_model=SyncResponse)
 async def sync_insights(
     background_tasks: BackgroundTasks,
+    lookback_days: int = Query(
+        INSIGHTS_LOOKBACK_DAYS,
+        ge=1,
+        le=INSIGHTS_MAX_LOOKBACK_DAYS,
+        description="How many days back to sync. Meta retains ~90 days of historical account "
+                    "insights; longer windows are mostly useful for refreshing ClickHouse from "
+                    "what is still in Meta's retention.",
+    ),
+    purge: bool = Query(
+        False,
+        description="If true, delete existing account_insights rows in the window before "
+                    "re-fetching. Use once to clean up legacy 'views' snapshots that inflate "
+                    "sumIf totals after the per-day storage refactor.",
+    ),
     current_user: User = Depends(get_current_user),
 ):
     """Kick off an async insights sync and return immediately.
@@ -360,7 +406,10 @@ async def sync_insights(
         raise InstagramNotConnectedError()
 
     token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
-    background_tasks.add_task(_run_insights_sync, user_id, token_data.ig_user_id, token)
+    background_tasks.add_task(
+        _run_insights_sync,
+        user_id, token_data.ig_user_id, token, lookback_days, purge,
+    )
 
     logger.info("Insights sync queued for user %s", user_id)
     return SyncResponse(
@@ -374,7 +423,7 @@ async def sync_insights(
 
 @router.get("/insights/dashboard", response_model=DashboardSummary)
 def get_dashboard(
-    days: int = Query(INSIGHTS_LOOKBACK_DAYS, ge=1, le=90),
+    days: int = Query(INSIGHTS_LOOKBACK_DAYS, ge=1, le=INSIGHTS_MAX_LOOKBACK_DAYS),
     top_n: int = Query(5, ge=1, le=20),
     current_user: User = Depends(get_current_user),
 ):
@@ -397,9 +446,10 @@ def get_dashboard(
         GET_FOLLOWER_GROWTH,
         parameters={"user_id": user_id, "ig_user_id": ig_user_id, "since": since},
     ).result_rows
+    # Period-scoped top posts: filter by m.timestamp so the selector changes the set.
     top_rows = client.query(
         GET_TOP_PERFORMING_MEDIA,
-        parameters={"user_id": user_id, "limit": top_n},
+        parameters={"user_id": user_id, "since": since, "limit": top_n},
     ).result_rows
 
     sv = summary_rows[0] if summary_rows else (0, 0, 0, 0)
@@ -479,7 +529,7 @@ def get_best_time_to_post(
 
 @router.get("/insights/algorithm-metrics", response_model=AlgorithmMetricsResponse)
 def get_algorithm_metrics(
-    days: int = Query(30, ge=1, le=90),
+    days: int = Query(30, ge=1, le=INSIGHTS_MAX_LOOKBACK_DAYS),
     limit: int = Query(20, ge=1, le=50),
     current_user: User = Depends(get_current_user),
 ):

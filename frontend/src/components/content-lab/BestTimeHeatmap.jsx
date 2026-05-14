@@ -153,7 +153,7 @@ function SlotPostsDrawer({ slot, days, onClose }) {
 }
 
 export default function BestTimeHeatmap({ days = 90 }) {
-  const { data, loading, error } = useBestTime(days, 3);
+  const { data, loading, error } = useBestTime(days, 1);
   const [hovered, setHovered] = useState(null);
   const [selected, setSelected] = useState(null);
 
@@ -203,6 +203,13 @@ export default function BestTimeHeatmap({ days = 90 }) {
 
       {error ? (
         <p className="text-xs text-rose-500 py-8">{error}</p>
+      ) : (data?.data ?? []).length === 0 ? (
+        <div className="py-10 text-center">
+          <p className="text-sm text-slate-600 font-medium">Not enough data yet</p>
+          <p className="text-xs text-slate-400 mt-1">
+            Sync more posts or extend the time range to see your best posting windows.
+          </p>
+        </div>
       ) : (
         <div className="relative">
           <div className="flex flex-col gap-1">

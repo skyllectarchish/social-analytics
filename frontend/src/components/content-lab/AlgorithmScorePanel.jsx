@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Bookmark, Share2 } from "lucide-react";
+import { Bookmark, Share2, Image as ImageIcon, Film } from "lucide-react";
 import AnimatedCard from "../shared/AnimatedCard";
 import { SkeletonChart } from "../shared/Skeleton";
 import { useAlgorithmMetrics } from "../../hooks/useTier1Insights";
@@ -78,6 +78,22 @@ function RadialGauge({ score }) {
   );
 }
 
+function TypeBadge({ productType }) {
+  const isReel = productType === "REELS";
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0"
+      style={{
+        background: isReel ? "rgba(236,72,153,0.10)" : "rgba(59,130,246,0.10)",
+        color: isReel ? "#db2777" : "#2563eb",
+      }}
+    >
+      {isReel ? <Film size={9} /> : <ImageIcon size={9} />}
+      {isReel ? "Reel" : "Post"}
+    </span>
+  );
+}
+
 function PostMiniRow({ post, index, onSelect }) {
   return (
     <motion.button
@@ -98,9 +114,12 @@ function PostMiniRow({ post, index, onSelect }) {
         <div className="w-10 h-10 rounded-lg bg-slate-100 shrink-0" />
       )}
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-slate-800 truncate">
-          {post.caption || "(no caption)"}
-        </p>
+        <div className="flex items-center gap-1.5">
+          <TypeBadge productType={post.media_product_type} />
+          <p className="text-xs text-slate-800 truncate">
+            {post.caption || "(no caption)"}
+          </p>
+        </div>
         <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-400">
           <span className="flex items-center gap-0.5">
             <Bookmark size={9} /> {post.save_rate.toFixed(1)}%
@@ -124,7 +143,7 @@ function PostMiniRow({ post, index, onSelect }) {
 }
 
 export default function AlgorithmScorePanel({ days = 30, onSelectPost }) {
-  const limitedDays = Math.min(days, 90);
+  const limitedDays = Math.min(days, 365);
   const { data, loading, error } = useAlgorithmMetrics(limitedDays);
 
   if (loading) return <SkeletonChart height="h-[460px]" />;
@@ -136,7 +155,9 @@ export default function AlgorithmScorePanel({ days = 30, onSelectPost }) {
     );
 
   const score = gaugeScore(data?.summary);
-  const topPosts = (data?.posts ?? []).slice(0, 5);
+  const allPosts = data?.posts ?? [];
+  const topFeed = allPosts.filter((p) => p.media_product_type === "FEED").slice(0, 3);
+  const topReels = allPosts.filter((p) => p.media_product_type === "REELS").slice(0, 3);
 
   return (
     <AnimatedCard className="p-5" delay={0.05}>
@@ -172,26 +193,58 @@ export default function AlgorithmScorePanel({ days = 30, onSelectPost }) {
         </div>
       </div>
 
-      <div className="border-t border-slate-100 pt-3">
-        <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-2">
-          Top 5 posts
-        </p>
-        <div className="space-y-1">
-          {topPosts.length === 0 ? (
-            <p className="text-xs text-slate-400 py-4 text-center">
-              No posts yet — run a sync.
-            </p>
-          ) : (
-            topPosts.map((p, i) => (
-              <PostMiniRow
-                key={p.ig_media_id}
-                post={p}
-                index={i}
-                onSelect={onSelectPost}
-              />
-            ))
-          )}
-        </div>
+      <div className="border-t border-slate-100 pt-3 space-y-4">
+        {topFeed.length === 0 && topReels.length === 0 ? (
+          <p className="text-xs text-slate-400 py-4 text-center">
+            No posts yet — run a sync.
+          </p>
+        ) : (
+          <>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1">
+                <ImageIcon size={10} /> Top Posts
+              </p>
+              <div className="space-y-1">
+                {topFeed.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 px-2 py-2">
+                    No feed posts in this range.
+                  </p>
+                ) : (
+                  topFeed.map((p, i) => (
+                    <PostMiniRow
+                      key={p.ig_media_id}
+                      post={p}
+                      index={i}
+                      onSelect={onSelectPost}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1">
+                <Film size={10} /> Top Reels
+              </p>
+              <div className="space-y-1">
+                {topReels.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 px-2 py-2">
+                    No reels in this range.
+                  </p>
+                ) : (
+                  topReels.map((p, i) => (
+                    <PostMiniRow
+                      key={p.ig_media_id}
+                      post={p}
+                      index={i}
+                      onSelect={onSelectPost}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </AnimatedCard>
   );

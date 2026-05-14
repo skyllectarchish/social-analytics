@@ -47,7 +47,7 @@ export default function ContentLabPage() {
         subtitle="Discover which formats, times, and styles the algorithm rewards most."
         days={days}
         onDaysChange={setDays}
-        actions={<SyncButton />}
+        actions={<SyncButton days={days} />}
       />
 
       <div className="space-y-4">

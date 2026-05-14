@@ -27,7 +27,7 @@ export function useFormatBreakdown(days = 90) {
 }
 
 // Feature 2: Best Time to Post
-export function useBestTime(days = 90, minSample = 3) {
+export function useBestTime(days = 90, minSample = 1) {
   return useFetch(
     `/instagram/insights/best-time?days=${days}&min_sample=${minSample}`,
     [days, minSample],

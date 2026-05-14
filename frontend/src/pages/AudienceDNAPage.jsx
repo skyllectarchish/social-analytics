@@ -25,7 +25,7 @@ export default function AudienceDNAPage() {
         title="Audience DNA"
         emoji="👥"
         subtitle="Understand which follower segments are truly engaged vs dormant."
-        actions={<SyncButton />}
+        actions={<SyncButton days={spikeDays} />}
       />
 
       <div className="space-y-4">

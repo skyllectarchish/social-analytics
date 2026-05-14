@@ -19,7 +19,7 @@ export default function ReelsStudioPage() {
         subtitle="Track hook strength, watch time, and retention across all your Reels."
         days={days}
         onDaysChange={setDays}
-        actions={<SyncButton />}
+        actions={<SyncButton days={days} />}
       />
 
       <div className="space-y-4">

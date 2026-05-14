@@ -57,19 +57,27 @@ ACCOUNT_DEMOGRAPHIC_METRICS: list[str] = [
 ]
 
 # Per-media metrics — FEED posts (GET /{media-id}/insights)
-MEDIA_FEED_METRICS: str = "likes,comments,saved,shares,reach,views,total_interactions,profile_visits,reposts"
+# Note: `reposts` was dropped from Meta's IG Insights Media API and now returns
+# HTTP 400 "endpoint does not support the metrics: reposts". Removed.
+MEDIA_FEED_METRICS: str = "likes,comments,saved,shares,reach,views,total_interactions,profile_visits"
 
 # Per-media metrics — REELS (GET /{media-id}/insights)
 MEDIA_REELS_METRICS: str = (
     "likes,comments,saved,shares,reach,views,total_interactions,"
-    "ig_reels_avg_watch_time,ig_reels_video_view_total_time,reposts,reels_skip_rate"
+    "ig_reels_avg_watch_time,ig_reels_video_view_total_time,reels_skip_rate"
 )
 
 # Per-media metrics — STORY (GET /{media-id}/insights)
-MEDIA_STORY_METRICS: str = "reach,views,shares,replies,navigation,reposts,total_interactions"
+MEDIA_STORY_METRICS: str = "reach,views,shares,replies,navigation,total_interactions"
 
 # Insights sync defaults
 INSIGHTS_LOOKBACK_DAYS: int = 30
+# Maximum lookback exposed to query endpoints (1 year of accumulated ClickHouse data).
+INSIGHTS_MAX_LOOKBACK_DAYS: int = 365
+# Meta caps account-insights since/until at ~30 days per request — chunk size for backfill.
+INSIGHTS_API_WINDOW_DAYS: int = 30
+# How far back to backfill on first /callback. Meta retains ~90 days of historical insights.
+INSIGHTS_INITIAL_FETCH_DAYS: int = 90
 
 # Stories
 STORY_FIELDS: str = "id,media_type,media_url,thumbnail_url,permalink,timestamp"

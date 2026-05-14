@@ -34,6 +34,33 @@ logger = logging.getLogger(__name__)
 
 # --- Account Insights ---
 
+def purge_account_insights_window(
+    client: Client,
+    user_id: str,
+    ig_user_id: str,
+    since: datetime,
+) -> None:
+    """Synchronously delete account_insights rows in [since, now] for this user.
+
+    Used by sync's purge mode to wipe stale rows whose end_time doesn't align with
+    the new per-day storage convention (e.g. legacy 'views' snapshots stamped at
+    end_time=now() that would inflate sumIf totals). ClickHouse ALTER ... DELETE
+    is a mutation; mutations_sync=2 makes it block until the part is rewritten so
+    the subsequent INSERT lands on a clean slate.
+    """
+    client.command(
+        "ALTER TABLE account_insights DELETE "
+        "WHERE user_id = {user_id:UUID} "
+        "  AND ig_user_id = {ig_user_id:String} "
+        "  AND end_time >= {since:DateTime}",
+        parameters={"user_id": user_id, "ig_user_id": ig_user_id, "since": since},
+        settings={"mutations_sync": 2},
+    )
+    logger.info(
+        "Purged account_insights for user %s ig %s since %s", user_id, ig_user_id, since
+    )
+
+
 def bulk_upsert_account_insights(
     client: Client,
     user_id: str,

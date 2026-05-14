@@ -145,14 +145,15 @@ WHERE user_id = {user_id:UUID}
 """
 
 GET_TOP_PERFORMING_MEDIA = """
-SELECT mi.ig_media_id, m.media_type, m.permalink, m.caption,
-       m.thumbnail_url, m.media_url,
+SELECT mi.ig_media_id, m.media_type, m.permalink,
+       m.thumbnail_url, m.media_url, m.caption,
        toInt64(sumIf(mi.metric_value, mi.metric_name = 'views')) AS views,
        toInt64(sumIf(mi.metric_value, mi.metric_name = 'total_interactions')) AS interactions
 FROM media_insights mi FINAL
 JOIN instagram_media m FINAL ON mi.ig_media_id = m.ig_media_id AND mi.user_id = m.user_id
 WHERE mi.user_id = {user_id:UUID}
-GROUP BY mi.ig_media_id, m.media_type, m.permalink, m.caption, m.thumbnail_url, m.media_url
+  AND m.timestamp >= {since:DateTime}
+GROUP BY mi.ig_media_id, m.media_type, m.permalink, m.thumbnail_url, m.media_url, m.caption
 ORDER BY interactions DESC
 LIMIT {limit:UInt32}
 """
@@ -203,7 +204,7 @@ SELECT
     count(DISTINCT m.ig_media_id) AS sample_size,
     avg(metrics.total_interactions) AS avg_interactions,
     avg(metrics.reach) AS avg_reach,
-    avgIf(metrics.total_interactions / metrics.reach, metrics.reach > 0) AS avg_engagement_rate
+    avgIf(metrics.total_interactions / metrics.reach * 100, metrics.reach > 0) AS avg_engagement_rate
 FROM instagram_media m FINAL
 INNER JOIN (
     SELECT ig_media_id, user_id,
@@ -238,10 +239,10 @@ SELECT
     metrics.reach,
     metrics.likes,
     metrics.comments,
-    if(metrics.reach > 0, metrics.saved / metrics.reach, 0) AS save_rate,
-    if(metrics.reach > 0, metrics.shares / metrics.reach, 0) AS share_rate,
+    if(metrics.reach > 0, metrics.saved / metrics.reach * 100, 0) AS save_rate,
+    if(metrics.reach > 0, metrics.shares / metrics.reach * 100, 0) AS share_rate,
     if(metrics.reach > 0,
-        (metrics.shares * 0.4 + metrics.saved * 0.35 + metrics.likes * 0.15 + metrics.comments * 0.10) / metrics.reach,
+        (metrics.shares * 0.4 + metrics.saved * 0.35 + metrics.likes * 0.15 + metrics.comments * 0.10) / metrics.reach * 100,
         0
     ) AS algorithm_score
 FROM instagram_media m FINAL
@@ -258,6 +259,7 @@ INNER JOIN (
 ) metrics ON m.ig_media_id = metrics.ig_media_id AND m.user_id = metrics.user_id
 WHERE m.user_id = {user_id:UUID}
   AND m.timestamp >= {since:DateTime}
+  AND m.media_product_type IN ('FEED', 'REELS')
 ORDER BY algorithm_score DESC
 LIMIT {limit:UInt32}
 """
@@ -268,10 +270,10 @@ SELECT
     sumIf(metric_value, metric_name = 'shares') AS total_shares,
     sumIf(metric_value, metric_name = 'reach') AS total_reach,
     if(sumIf(metric_value, metric_name = 'reach') > 0,
-       sumIf(metric_value, metric_name = 'saves') / sumIf(metric_value, metric_name = 'reach'), 0
+       sumIf(metric_value, metric_name = 'saves') / sumIf(metric_value, metric_name = 'reach') * 100, 0
     ) AS account_save_rate,
     if(sumIf(metric_value, metric_name = 'reach') > 0,
-       sumIf(metric_value, metric_name = 'shares') / sumIf(metric_value, metric_name = 'reach'), 0
+       sumIf(metric_value, metric_name = 'shares') / sumIf(metric_value, metric_name = 'reach') * 100, 0
     ) AS account_share_rate
 FROM account_insights FINAL
 WHERE user_id = {user_id:UUID}

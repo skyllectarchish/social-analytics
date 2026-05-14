@@ -90,7 +90,7 @@ export function useStories() {
   return { data, loading, error, refetch };
 }
 
-export function useSyncInsights() {
+export function useSyncInsights(lookbackDays) {
   const [syncing, setSyncing] = useState(false);
   const [synced, setSynced] = useState(false);
 
@@ -100,9 +100,15 @@ export function useSyncInsights() {
     try {
       // Step 1: Pull latest posts into the database
       await api.post("/instagram/refresh");
-      // Step 2: Trigger the background sync for insights
-      await api.post("/instagram/insights/sync");
-      
+      // Step 2: Trigger the background sync for insights, scoped to the current
+      // UI period. purge=true wipes existing rows in the window first so legacy
+      // ad-hoc 'views' snapshots from before the per-day refactor stop inflating
+      // sumIf totals.
+      const params = new URLSearchParams();
+      if (lookbackDays) params.set("lookback_days", String(lookbackDays));
+      params.set("purge", "true");
+      await api.post(`/instagram/insights/sync?${params.toString()}`);
+
       setSynced(true);
       setTimeout(() => setSynced(false), 3000);
     } catch (err) {
@@ -110,7 +116,7 @@ export function useSyncInsights() {
     } finally {
       setSyncing(false);
     }
-  }, []);
+  }, [lookbackDays]);
 
   return { syncing, synced, trigger };
 }

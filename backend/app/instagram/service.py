@@ -5,7 +5,6 @@ This module is responsible only for Instagram API communication.
 """
 
 import asyncio
-import json
 import logging
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -19,10 +18,10 @@ from ..config import settings
 from ..constants import (
     ACCOUNT_DEMOGRAPHIC_METRICS,
     ACCOUNT_TIME_SERIES_METRICS,
-    ACCOUNT_TOTAL_VALUE_METRICS,
     DEFAULT_MEDIA_FETCH_LIMIT,
     GRAPH_BASE_URL,
     HTTP_TIMEOUT_SECONDS,
+    INSIGHTS_API_WINDOW_DAYS,
     INSTAGRAM_MEDIA_FIELDS,
     INSTAGRAM_PROFILE_FIELDS,
     MEDIA_FEED_METRICS,
@@ -306,144 +305,199 @@ async def fetch_active_stories(ig_user_id: str, token: str) -> list[dict[str, An
             raise InstagramAPIError("Failed to fetch active stories")
 
 
+def _iter_windows(since: int, until: int, window_days: int) -> list[tuple[int, int]]:
+    """Split [since, until] (unix seconds) into ≤ window_days chunks.
+
+    Meta caps account-insights since/until at ~30 days per request, so callers
+    requesting longer ranges (e.g. 90- or 365-day backfills) must chunk.
+    """
+    window_secs = window_days * 86400
+    windows: list[tuple[int, int]] = []
+    cursor = since
+    while cursor < until:
+        end = min(cursor + window_secs, until)
+        windows.append((cursor, end))
+        cursor = end
+    return windows
+
+
 async def fetch_account_insights(
     ig_user_id: str,
     token: str,
     since: int,
     until: int,
 ) -> list[dict[str, Any]]:
-    """Fetch account insights: time-series metrics + total-value metrics (two calls).
+    """Fetch account insights as a unified time-series list.
 
-    Returns a unified list in the same shape as Meta's time_series response:
-    [{name, values: [{value, end_time}]}]
+    Chunks the window into INSIGHTS_API_WINDOW_DAYS-sized requests so the same
+    code path supports both the default 30-day sync and the 90-day initial
+    backfill / 365-day historical pulls.
+
+    Returns: [{name, values: [{value, end_time}]}]
     """
+    windows = _iter_windows(since, until, INSIGHTS_API_WINDOW_DAYS)
+    # Accumulate per-metric values across all windows, keyed by metric name.
+    merged: dict[str, list[dict[str, Any]]] = {}
+    time_series_attempts = 0
+    time_series_successes = 0
+
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
-        # Call 1: time-series metrics (reach, follows_and_unfollows, etc.)
-        try:
-            resp = await client.get(
-                f"{GRAPH_BASE_URL}/{ig_user_id}/insights",
-                params={
-                    "metric": ACCOUNT_TIME_SERIES_METRICS,
-                    "period": "day",
-                    "metric_type": "time_series",
-                    "since": since,
-                    "until": until,
-                    "access_token": token,
-                },
-            )
-            resp.raise_for_status()
-            results = resp.json().get("data", [])
-        except httpx.HTTPStatusError as exc:
-            logger.error("Failed to fetch account insights (time_series): %s", exc.response.text)
-            raise InstagramAPIError("Failed to fetch account insights")
-        except httpx.HTTPError as exc:
-            logger.error("Failed to fetch account insights (time_series): %s", exc)
-            raise InstagramAPIError("Failed to fetch account insights")
+        # Call 1: time-series metrics (reach). Chunked because Meta caps per-request.
+        # Windows older than Meta's ~90-day retention will return errors or empty data —
+        # tolerate those and keep iterating so we still capture whatever Meta has.
+        for w_since, w_until in windows:
+            time_series_attempts += 1
+            try:
+                resp = await client.get(
+                    f"{GRAPH_BASE_URL}/{ig_user_id}/insights",
+                    params={
+                        "metric": ACCOUNT_TIME_SERIES_METRICS,
+                        "period": "day",
+                        "metric_type": "time_series",
+                        "since": w_since,
+                        "until": w_until,
+                        "access_token": token,
+                    },
+                )
+                resp.raise_for_status()
+                for entry in resp.json().get("data", []):
+                    merged.setdefault(entry.get("name", ""), []).extend(
+                        entry.get("values", [])
+                    )
+                time_series_successes += 1
+            except httpx.HTTPStatusError as exc:
+                logger.warning(
+                    "Time_series window %s-%s skipped (HTTP %d): %s",
+                    w_since, w_until, exc.response.status_code, exc.response.text[:300],
+                )
+            except httpx.HTTPError as exc:
+                logger.warning(
+                    "Time_series window %s-%s skipped: %s", w_since, w_until, exc,
+                )
 
-        # Call 2: total_value metrics (views) — normalize to same shape
-        try:
-            resp2 = await client.get(
-                f"{GRAPH_BASE_URL}/{ig_user_id}/insights",
-                params={
-                    "metric": ACCOUNT_TOTAL_VALUE_METRICS,
-                    "period": "day",
-                    "metric_type": "total_value",
-                    "since": since,
-                    "until": until,
-                    "access_token": token,
-                },
-            )
-            resp2.raise_for_status()
-            from datetime import datetime, timezone as _tz
-            now_iso = datetime.now(_tz.utc).strftime("%Y-%m-%dT%H:%M:%S+0000")
-            for entry in resp2.json().get("data", []):
-                total = entry.get("total_value", {}).get("value", 0)
-                results.append({
-                    "name": entry.get("name", ""),
-                    "values": [{"value": total, "end_time": now_iso}],
-                })
-        except httpx.HTTPStatusError as exc:
-            logger.warning("Failed to fetch account insights (total_value): %s", exc.response.text)
-        except httpx.HTTPError as exc:
-            logger.warning("Failed to fetch account insights (total_value): %s", exc)
+        logger.info(
+            "Account insights time_series: %d/%d windows succeeded",
+            time_series_successes, time_series_attempts,
+        )
 
-        # Call 3: batch request for follows_and_unfollows + total_interactions (time series recreation)
-        try:
-            from datetime import datetime, timezone as _tz, timedelta
-            since_dt = datetime.fromtimestamp(since, tz=_tz.utc)
-            until_dt = datetime.fromtimestamp(until, tz=_tz.utc)
+        # Call 2: per-day total_value metrics via concurrent single GETs.
+        #
+        # We previously batched these via Meta's batch endpoint, but graph.instagram.com
+        # returns HTTP 400 for /?batch=... (verified via diag_meta.py) — that endpoint
+        # is Facebook-Graph-only and can't be used with IG Login tokens. Falling back to
+        # one GET per day with a small semaphore for concurrency.
+        #
+        # `follows_and_unfollows` needs `breakdown=follow_type` to populate total_value
+        # (without it, Meta returns the metric entry with NO total_value field at all,
+        # which silently became 0 in the old code). Fetched in a separate call to keep
+        # the breakdown from affecting the other metrics.
+        since_dt = datetime.fromtimestamp(since, tz=timezone.utc)
+        until_dt = datetime.fromtimestamp(until, tz=timezone.utc)
+        day_windows: list[tuple[int, int, datetime]] = []
+        cur = since_dt
+        while cur < until_dt:
+            nxt = min(cur + timedelta(days=1), until_dt)
+            day_windows.append((int(cur.timestamp()), int(nxt.timestamp()), nxt))
+            cur = nxt
 
-            batch_requests = []
-            days_list = []
-            current_dt = since_dt
+        sem = asyncio.Semaphore(5)
+        flat_metrics = "views,total_interactions,accounts_engaged,saves,shares"
 
-            all_follows_values = []
-            all_total_interactions_values = []
-            all_accounts_engaged_values = []
-            all_saves_values = []
-            all_shares_values = []
+        async def fetch_flat(d_since: int, d_until: int) -> list[dict[str, Any]]:
+            async with sem:
+                try:
+                    r = await client.get(
+                        f"{GRAPH_BASE_URL}/{ig_user_id}/insights",
+                        params={
+                            "metric": flat_metrics,
+                            "period": "day",
+                            "metric_type": "total_value",
+                            "since": d_since,
+                            "until": d_until,
+                            "access_token": token,
+                        },
+                    )
+                    if r.status_code != 200:
+                        return []
+                    return r.json().get("data", [])
+                except httpx.HTTPError:
+                    return []
 
-            while current_dt < until_dt:
-                next_dt = current_dt + timedelta(days=1)
-                if next_dt > until_dt:
-                    next_dt = until_dt
+        async def fetch_follow(d_since: int, d_until: int) -> list[dict[str, Any]]:
+            async with sem:
+                try:
+                    r = await client.get(
+                        f"{GRAPH_BASE_URL}/{ig_user_id}/insights",
+                        params={
+                            "metric": "follows_and_unfollows",
+                            "period": "day",
+                            "metric_type": "total_value",
+                            "breakdown": "follow_type",
+                            "since": d_since,
+                            "until": d_until,
+                            "access_token": token,
+                        },
+                    )
+                    if r.status_code != 200:
+                        return []
+                    return r.json().get("data", [])
+                except httpx.HTTPError:
+                    return []
 
-                rel_url = f"{ig_user_id}/insights?metric=follows_and_unfollows,total_interactions,accounts_engaged,saves,shares&period=day&metric_type=total_value&since={int(current_dt.timestamp())}&until={int(next_dt.timestamp())}"
-                batch_requests.append({
-                    "method": "GET",
-                    "relative_url": rel_url
-                })
-                days_list.append(next_dt)
-                current_dt = next_dt
+        flat_results, follow_results = await asyncio.gather(
+            asyncio.gather(*[fetch_flat(s, u) for s, u, _ in day_windows]),
+            asyncio.gather(*[fetch_follow(s, u) for s, u, _ in day_windows]),
+        )
 
-                # Meta limits batches to 50 operations. Chunk if needed.
-                if len(batch_requests) == 50 or current_dt >= until_dt:
-                    batch_payload = {"access_token": token, "batch": json.dumps(batch_requests)}
-                    resp3 = await client.post(GRAPH_BASE_URL, data=batch_payload)
-                    resp3.raise_for_status()
+        flat_success = 0
+        follow_success = 0
+        for (_, _, day_end), entries in zip(day_windows, flat_results):
+            if not entries:
+                continue
+            flat_success += 1
+            end_time_iso = day_end.strftime("%Y-%m-%dT%H:%M:%S+0000")
+            for entry in entries:
+                name = entry.get("name", "")
+                value = entry.get("total_value", {}).get("value")
+                if not name or value is None:
+                    continue
+                merged.setdefault(name, []).append(
+                    {"value": int(value), "end_time": end_time_iso}
+                )
 
-                    batch_responses = resp3.json()
+        for (_, _, day_end), entries in zip(day_windows, follow_results):
+            if not entries:
+                continue
+            end_time_iso = day_end.strftime("%Y-%m-%dT%H:%M:%S+0000")
+            for entry in entries:
+                if entry.get("name") != "follows_and_unfollows":
+                    continue
+                # Net change = FOLLOWER (new follows) - NON_FOLLOWER (unfollows).
+                net = 0
+                got_any = False
+                for bd in entry.get("total_value", {}).get("breakdowns", []) or []:
+                    for res in bd.get("results", []) or []:
+                        dim = res.get("dimension_values", []) or []
+                        v = int(res.get("value", 0) or 0)
+                        if not dim:
+                            continue
+                        got_any = True
+                        if dim[-1] == "FOLLOWER":
+                            net += v
+                        elif dim[-1] == "NON_FOLLOWER":
+                            net -= v
+                if got_any:
+                    follow_success += 1
+                    merged.setdefault("follows_and_unfollows", []).append(
+                        {"value": net, "end_time": end_time_iso}
+                    )
 
-                    for i, batch_res in enumerate(batch_responses):
-                        if batch_res.get("code") == 200:
-                            body = json.loads(batch_res.get("body", "{}"))
-                            data = body.get("data", [])
-                            end_time_iso = days_list[i].strftime("%Y-%m-%dT%H:%M:%S+0000")
-                            for entry in data:
-                                total = entry.get("total_value", {}).get("value", 0)
-                                name = entry.get("name", "")
-                                if name == "follows_and_unfollows":
-                                    all_follows_values.append({"value": total, "end_time": end_time_iso})
-                                elif name == "total_interactions":
-                                    all_total_interactions_values.append({"value": total, "end_time": end_time_iso})
-                                elif name == "accounts_engaged":
-                                    all_accounts_engaged_values.append({"value": total, "end_time": end_time_iso})
-                                elif name == "saves":
-                                    all_saves_values.append({"value": total, "end_time": end_time_iso})
-                                elif name == "shares":
-                                    all_shares_values.append({"value": total, "end_time": end_time_iso})
+        logger.info(
+            "Account insights per-day: flat=%d/%d follow=%d/%d days populated",
+            flat_success, len(day_windows), follow_success, len(day_windows),
+        )
 
-                    # Reset for next chunk
-                    batch_requests = []
-                    days_list = []
-
-            if all_follows_values:
-                results.append({"name": "follows_and_unfollows", "values": all_follows_values})
-            if all_total_interactions_values:
-                results.append({"name": "total_interactions", "values": all_total_interactions_values})
-            if all_accounts_engaged_values:
-                results.append({"name": "accounts_engaged", "values": all_accounts_engaged_values})
-            if all_saves_values:
-                results.append({"name": "saves", "values": all_saves_values})
-            if all_shares_values:
-                results.append({"name": "shares", "values": all_shares_values})
-
-        except httpx.HTTPStatusError as exc:
-            logger.warning("Failed to fetch account insights (batch follows_and_unfollows): %s", exc.response.text)
-        except httpx.HTTPError as exc:
-            logger.warning("Failed to fetch account insights (batch follows_and_unfollows): %s", exc)
-
-        return results
+        return [{"name": name, "values": values} for name, values in merged.items()]
 
 
 async def fetch_demographics(
