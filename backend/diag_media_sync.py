@@ -31,7 +31,7 @@ async def main():
     print(f"user_id={user_id}  ig_user_id={ig_user_id}\n")
 
     print("=== Step 1: find_media_needing_sync ===")
-    stale = insights_repo.find_media_needing_sync(client, str(user_id))
+    stale = insights_repo.find_media_needing_sync(client, str(user_id), str(ig_user_id))
     print(f"  -> {len(stale)} media items need insights")
     if not stale:
         print("  (empty: nothing to fetch — but media_insights is empty too, suggesting it ran once with errors)")

@@ -1,0 +1,173 @@
+"""Tier 2 — in-process APScheduler for Tier 2 batch jobs.
+
+The API process owns a single AsyncIOScheduler that drives the three Tier 2
+background jobs on the cadence documented in the implementation plan:
+
+* `competitor_sync` — daily at `SCHEDULER_COMPETITOR_SYNC_HOUR` UTC.
+* `sentiment_batch` — every `SCHEDULER_SENTIMENT_BATCH_MINUTES` minutes.
+* `topic_clustering` — weekly on `SCHEDULER_TOPIC_CLUSTERING_DAY` /
+  `SCHEDULER_TOPIC_CLUSTERING_HOUR` UTC.
+
+Set ENABLE_SCHEDULER=false to disable everything — useful when:
+- running cron externally,
+- running multiple uvicorn workers (only one should schedule),
+- developing locally without the optional anthropic/scikit-learn deps installed.
+
+Each scheduled run is wrapped in an exception barrier so a failing job does
+not crash the scheduler thread. Misfires (e.g., laptop sleep) are coalesced.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from typing import Any
+
+from .config import settings
+
+logger = logging.getLogger(__name__)
+
+# Singleton — created lazily on startup so importing this module does not
+# require apscheduler to be installed at import time. The lifespan hook is
+# the only caller of `start_scheduler()` / `shutdown_scheduler()`.
+_scheduler: Any | None = None
+
+
+async def _run_competitor_sync() -> None:
+    # Async wrapper — registered as a coroutine so AsyncIOScheduler awaits it
+    # on the running event loop. The sync entry point `competitor_sync.main()`
+    # wraps `asyncio.run()`, which would crash inside an active event loop, so
+    # we call the async `_run()` directly here.
+    from .jobs import competitor_sync
+    try:
+        await competitor_sync._run()
+    except Exception:
+        logger.exception("Scheduled competitor_sync failed")
+
+
+def _run_sentiment_batch() -> None:
+    # Pure sync — APScheduler's AsyncIOExecutor runs sync callables in a
+    # ThreadPoolExecutor, so this doesn't block the event loop.
+    from .jobs import sentiment_batch
+    try:
+        sentiment_batch.main()
+    except Exception:
+        logger.exception("Scheduled sentiment_batch failed")
+
+
+def _run_topic_clustering() -> None:
+    # Pure sync (TF-IDF + KMeans in scikit-learn). Same thread-pool note.
+    from .jobs import topic_clustering
+    try:
+        topic_clustering.main()
+    except Exception:
+        logger.exception("Scheduled topic_clustering failed")
+
+
+async def _run_branded_hashtag_sync() -> None:
+    # Async — same reasoning as _run_competitor_sync.
+    from .jobs import branded_hashtag_sync
+    try:
+        await branded_hashtag_sync._run()
+    except Exception:
+        logger.exception("Scheduled branded_hashtag_sync failed")
+
+
+def start_scheduler() -> None:
+    """Start the in-process scheduler if `ENABLE_SCHEDULER` is true.
+
+    Idempotent: re-calling after the scheduler is running is a no-op.
+    """
+    global _scheduler
+    if not settings.enable_scheduler:
+        logger.info("Scheduler disabled via ENABLE_SCHEDULER=false")
+        return
+    if _scheduler is not None:
+        return
+
+    try:
+        from apscheduler.schedulers.asyncio import AsyncIOScheduler
+        from apscheduler.triggers.cron import CronTrigger
+        from apscheduler.triggers.interval import IntervalTrigger
+    except ImportError:
+        logger.warning(
+            "apscheduler not installed — batch jobs will not run on a schedule. "
+            "Install it (pip install apscheduler) or set ENABLE_SCHEDULER=false."
+        )
+        return
+
+    # AsyncIOScheduler reuses the running event loop. Pin executor pool to 1
+    # per job so the three jobs don't all run concurrently and clobber each
+    # other's ClickHouse client (the client is a process-wide singleton).
+    sch = AsyncIOScheduler(
+        timezone="UTC",
+        job_defaults={"coalesce": True, "max_instances": 1, "misfire_grace_time": 600},
+    )
+
+    sch.add_job(
+        _run_competitor_sync,
+        CronTrigger(hour=settings.scheduler_competitor_sync_hour, minute=0),
+        id="competitor_sync",
+        name="Daily competitor snapshot",
+        replace_existing=True,
+    )
+    sch.add_job(
+        _run_sentiment_batch,
+        IntervalTrigger(minutes=settings.scheduler_sentiment_batch_minutes),
+        id="sentiment_batch",
+        name="Score pending comments",
+        replace_existing=True,
+        # Don't fire immediately on startup — give the API a moment to settle.
+        next_run_time=None,
+    )
+    sch.add_job(
+        _run_topic_clustering,
+        CronTrigger(
+            day_of_week=settings.scheduler_topic_clustering_day,
+            hour=settings.scheduler_topic_clustering_hour,
+            minute=0,
+        ),
+        id="topic_clustering",
+        name="Weekly topic clustering",
+        replace_existing=True,
+    )
+
+    # Branded-hashtag sync — weekly because Meta caps hashtag queries at 30
+    # per IG user per rolling 7 days. We run a day after topic_clustering so
+    # the two heavyweight jobs don't overlap.
+    sch.add_job(
+        _run_branded_hashtag_sync,
+        CronTrigger(
+            day_of_week=(settings.scheduler_topic_clustering_day + 1) % 7,
+            hour=settings.scheduler_topic_clustering_hour,
+            minute=15,
+        ),
+        id="branded_hashtag_sync",
+        name="Weekly branded hashtag mention sync",
+        replace_existing=True,
+    )
+
+    sch.start()
+    _scheduler = sch
+    logger.info(
+        "Scheduler started: competitor_sync @ %02d:00 UTC daily, "
+        "sentiment_batch every %d min, "
+        "topic_clustering weekday=%d @ %02d:00 UTC",
+        settings.scheduler_competitor_sync_hour,
+        settings.scheduler_sentiment_batch_minutes,
+        settings.scheduler_topic_clustering_day,
+        settings.scheduler_topic_clustering_hour,
+    )
+
+
+def shutdown_scheduler() -> None:
+    """Stop the scheduler if it was started. Idempotent."""
+    global _scheduler
+    if _scheduler is None:
+        return
+    try:
+        _scheduler.shutdown(wait=False)
+    except Exception:
+        logger.exception("Scheduler shutdown raised")
+    finally:
+        _scheduler = None

@@ -1,7 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "../api/client";
+import { usePeriodComparator } from "../context/PeriodComparatorContext";
 
-export function useDashboard(days = 30) {
+function buildUrl(base, params) {
+  const qs = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== null && v !== "")
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+    .join("&");
+  return qs ? `${base}?${qs}` : base;
+}
+
+export function useDashboard() {
+  const { days, compareTo } = usePeriodComparator();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -9,16 +19,18 @@ export function useDashboard(days = 30) {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    api.get(`/instagram/insights/dashboard?days=${days}`)
+    api
+      .get(buildUrl("/instagram/insights/dashboard", { days, compare_to: compareTo }))
       .then((res) => setData(res.data))
       .catch((err) => setError(err.response?.data?.detail || "Failed to load dashboard"))
       .finally(() => setLoading(false));
-  }, [days]);
+  }, [days, compareTo]);
 
   return { data, loading, error };
 }
 
-export function useOverview(days = 30) {
+export function useOverview() {
+  const { days, compareTo } = usePeriodComparator();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -26,11 +38,12 @@ export function useOverview(days = 30) {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    api.get(`/instagram/insights/overview?days=${days}`)
+    api
+      .get(buildUrl("/instagram/insights/overview", { days, compare_to: compareTo }))
       .then((res) => setData(res.data))
       .catch((err) => setError(err.response?.data?.detail || "Failed to load overview"))
       .finally(() => setLoading(false));
-  }, [days]);
+  }, [days, compareTo]);
 
   return { data, loading, error };
 }
@@ -71,6 +84,27 @@ export function useMediaInsights(mediaId) {
   return { data, loading, error };
 }
 
+export function useMediaConversion(mediaId) {
+  // Conversion is only computable for FEED/REELS posts inside the
+  // attribution window — the endpoint 404s for STORY / older posts. We
+  // swallow 404 so the drawer just hides the section in that case.
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!mediaId) return;
+    setLoading(true);
+    setData(null);
+    api
+      .get(`/instagram/insights/media/${mediaId}/conversion`)
+      .then((res) => setData(res.data))
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  }, [mediaId]);
+
+  return { data, loading };
+}
+
 export function useStories() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -90,7 +124,8 @@ export function useStories() {
   return { data, loading, error, refetch };
 }
 
-export function useSyncInsights(lookbackDays) {
+export function useSyncInsights() {
+  const { days } = usePeriodComparator();
   const [syncing, setSyncing] = useState(false);
   const [synced, setSynced] = useState(false);
 
@@ -98,14 +133,9 @@ export function useSyncInsights(lookbackDays) {
     setSyncing(true);
     setSynced(false);
     try {
-      // Step 1: Pull latest posts into the database
       await api.post("/instagram/refresh");
-      // Step 2: Trigger the background sync for insights, scoped to the current
-      // UI period. purge=true wipes existing rows in the window first so legacy
-      // ad-hoc 'views' snapshots from before the per-day refactor stop inflating
-      // sumIf totals.
       const params = new URLSearchParams();
-      if (lookbackDays) params.set("lookback_days", String(lookbackDays));
+      if (days) params.set("lookback_days", String(days));
       params.set("purge", "true");
       await api.post(`/instagram/insights/sync?${params.toString()}`);
 
@@ -116,7 +146,7 @@ export function useSyncInsights(lookbackDays) {
     } finally {
       setSyncing(false);
     }
-  }, [lookbackDays]);
+  }, [days]);
 
   return { syncing, synced, trigger };
 }

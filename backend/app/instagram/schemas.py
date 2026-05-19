@@ -2,13 +2,30 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from ..models.instagram_media import IGMedia
     from ..models.instagram_profile import IGProfile
+
+
+# --- Tier 2 / F1: Period-over-Period comparison primitives ---
+
+class ComparisonValue(BaseModel):
+    """Single scalar metric with optional prior-period comparison.
+
+    Routes that accept `compare_to` populate `prior`, `delta_pct`, and
+    `significant`; routes called without `compare_to` leave them None so the
+    response is backward-compatible.
+    """
+
+    current: float
+    prior: float | None = None
+    delta_pct: float | None = None
+    significant: bool | None = None
 
 
 class InstagramProfile(BaseModel):
@@ -104,13 +121,19 @@ class MetricTimeSeries(BaseModel):
 
 
 class OverviewResponse(BaseModel):
-    """Response for GET /api/instagram/insights/overview."""
+    """Response for GET /api/instagram/insights/overview.
+
+    `prior` is populated when the request carries a non-empty `compare_to`
+    query param and the comparison window has data; otherwise None. Same
+    shape as the top-level fields so the FE can overlay the two series.
+    """
 
     views: MetricTimeSeries
     reach: MetricTimeSeries
     follows_and_unfollows: MetricTimeSeries
     total_interactions: MetricTimeSeries
     accounts_engaged: MetricTimeSeries
+    prior: "OverviewResponse | None" = None
 
 
 class DemographicBreakdown(BaseModel):
@@ -152,6 +175,14 @@ class SyncResponse(BaseModel):
     message: str = ""
 
 
+class PurgeResponse(BaseModel):
+    """Response for POST /api/instagram/purge."""
+
+    success: bool
+    ig_user_id: str
+    media_deleted: int
+
+
 class TopPost(BaseModel):
     """A top-performing media post."""
 
@@ -166,7 +197,14 @@ class TopPost(BaseModel):
 
 
 class DashboardSummary(BaseModel):
-    """Pre-computed summary for the dashboard hero cards."""
+    """Pre-computed summary for the dashboard hero cards.
+
+    See `OverviewResponse.prior` for the comparison contract.
+
+    `comparisons` is the per-metric `ComparisonValue` map used by the FE's
+    `ComparisonMetricPill`. Populated only when `compare_to` is set and prior
+    data exists. Keys mirror the scalar field names on this model.
+    """
 
     period_days: int
     total_views: int
@@ -175,6 +213,8 @@ class DashboardSummary(BaseModel):
     total_accounts_engaged: int
     net_follower_growth: int
     top_posts: list[TopPost]
+    prior: "DashboardSummary | None" = None
+    comparisons: dict[str, ComparisonValue] | None = None
 
 
 class StoryWithInsights(BaseModel):
@@ -215,6 +255,7 @@ class FormatBreakdownItem(BaseModel):
 class FormatBreakdownResponse(BaseModel):
     period_days: int
     data: list[FormatBreakdownItem]
+    prior: "FormatBreakdownResponse | None" = None
 
 
 # --- Feature 2: Best Time to Post ---
@@ -232,6 +273,7 @@ class BestTimeResponse(BaseModel):
     period_days: int
     min_sample: int
     data: list[BestTimeSlot]
+    prior: "BestTimeResponse | None" = None
 
 
 # --- Feature 3: Algorithm Metrics ---
@@ -265,6 +307,13 @@ class AlgorithmMetricsResponse(BaseModel):
     period_days: int
     summary: AlgorithmMetricsSummary
     posts: list[AlgorithmPostItem]
+    prior: "AlgorithmMetricsResponse | None" = None
+    # Per-metric ComparisonValue map for the summary fields. Keys:
+    # total_saves, total_shares, total_reach, account_save_rate, account_share_rate.
+    # The two rate fields carry a 2-prop z-test `significant` flag; the counts
+    # carry delta only (significant=None) because we don't have per-period
+    # variance from a single sum.
+    comparisons: dict[str, ComparisonValue] | None = None
 
 
 # --- Feature 4: Reels Retention ---
@@ -287,6 +336,7 @@ class ReelRetentionItem(BaseModel):
 class ReelsRetentionResponse(BaseModel):
     period_days: int
     reels: list[ReelRetentionItem]
+    prior: "ReelsRetentionResponse | None" = None
 
 
 class ReelsTrendPoint(BaseModel):
@@ -301,6 +351,7 @@ class ReelsTrendPoint(BaseModel):
 class ReelsTrendResponse(BaseModel):
     period_days: int
     trend: list[ReelsTrendPoint]
+    prior: "ReelsTrendResponse | None" = None
 
 
 # --- Feature 5: Follower Quality Score ---
@@ -337,6 +388,10 @@ class FollowerSpike(BaseModel):
     interactions: int
     interaction_per_follow_ratio: float
     is_suspicious: bool
+    # Tier 2 / F5.5: candidate driver posts in the 24h window before this
+    # spike. Empty list when no eligible posts were found or attribution
+    # couldn't be computed — the FE renders the empty-state copy in that case.
+    candidate_drivers: list["GrowthDriverItem"] = []
 
 
 class FollowerSpikesResponse(BaseModel):
@@ -385,3 +440,334 @@ class BestTimePostsResponse(BaseModel):
     hour_of_day: int
     period_days: int
     posts: list[BestTimePost]
+
+
+# --- Tier 2 / F5: Audience Growth Drivers ---
+
+class GrowthDriverItem(BaseModel):
+    ig_media_id: str
+    media_product_type: str
+    permalink: str
+    thumbnail_url: str | None = None
+    caption: str
+    reach: float
+    non_follower_reach: float
+    attributed_follows: float
+    conversion_rate_pct: float
+
+
+class GrowthDriversResponse(BaseModel):
+    period_days: int
+    drivers: list[GrowthDriverItem]
+
+
+class GrowthCorrelationPoint(BaseModel):
+    day: str
+    follows: int
+    reach: float
+
+
+class GrowthCorrelationResponse(BaseModel):
+    period_days: int
+    points: list[GrowthCorrelationPoint]
+    # Pearson r between daily follows and same-day (non-)follower reach.
+    # None when the window has < 3 data points or zero variance.
+    correlation: float | None = None
+    # True when the response used non_follower_reach; False means the
+    # breakdown sync hasn't populated yet and we fell back to total reach.
+    uses_non_follower_reach: bool
+
+
+class PostConversionResponse(BaseModel):
+    """Per-post follower-conversion stats for the PostInsightsDrawer.
+
+    Mirrors the per-post slice of GrowthDriversResponse. `attributed_follows`
+    is "share of the day's follower gain attributed to this post", not a
+    causal claim — the FE labels it as a rough estimate.
+    """
+
+    ig_media_id: str
+    non_follower_reach: float
+    attributed_follows: float
+    conversion_rate_pct: float
+
+
+# --- Tier 2 / F2: Hashtag Performance ---
+
+class HashtagPerformanceItem(BaseModel):
+    hashtag: str
+    post_count: int
+    avg_reach: float
+    avg_engagement_rate_pct: float
+    avg_save_rate_pct: float
+
+
+class HashtagsResponse(BaseModel):
+    period_days: int
+    data: list[HashtagPerformanceItem]
+    prior: "HashtagsResponse | None" = None
+
+
+class HashtagTrendPoint(BaseModel):
+    week_start: str
+    posts_used: int
+    avg_reach: float
+    avg_engagement_rate_pct: float
+
+
+class HashtagTrendResponse(BaseModel):
+    tag: str
+    period_days: int
+    data: list[HashtagTrendPoint]
+    prior: "HashtagTrendResponse | None" = None
+
+
+class HashtagComboItem(BaseModel):
+    tag_a: str
+    tag_b: str
+    cooccurrence_count: int
+    avg_engagement_pct: float
+
+
+class HashtagComboResponse(BaseModel):
+    period_days: int
+    data: list[HashtagComboItem]
+    prior: "HashtagComboResponse | None" = None
+
+
+# --- Tier 2 / F4: Comment Sentiment ---
+
+class SentimentDistribution(BaseModel):
+    positive: int = 0
+    neutral: int = 0
+    negative: int = 0
+
+
+class SentimentTrendPoint(BaseModel):
+    week_start: str
+    positive: int
+    neutral: int
+    negative: int
+
+
+class SentimentSummaryResponse(BaseModel):
+    period_days: int
+    total: int
+    distribution: SentimentDistribution
+    trend: list[SentimentTrendPoint]
+    # Populated when the request carries a non-empty `compare_to`. Mirrors the
+    # comparison contract on every other Tier 2 endpoint so the FE can render
+    # delta pills / overlay the prior weekly trend on the area chart.
+    prior: "SentimentSummaryResponse | None" = None
+
+
+class TopicItem(BaseModel):
+    cluster_id: int
+    label: str
+    size: int
+    is_question: bool = False
+
+
+class TopicsResponse(BaseModel):
+    period_days: int
+    topics: list[TopicItem]
+
+
+class QuestionPostItem(BaseModel):
+    ig_media_id: str
+    permalink: str
+    thumbnail_url: str | None = None
+    caption: str
+    timestamp: str
+    question_count: int
+    total_comments: int
+
+
+class QuestionPostsResponse(BaseModel):
+    period_days: int
+    posts: list[QuestionPostItem]
+
+
+class SentimentDiagnoseResponse(BaseModel):
+    """Why the Audience Voice section may be empty.
+
+    `ig_comments_total` is what Meta reports across the user's media via
+    `comments_count` (always accessible). `stored_comments` is what we
+    actually have in our table. When the first is large and the second is
+    zero, Meta is filtering comment payloads — usually because the app
+    hasn't been approved for Advanced Access on
+    `instagram_business_manage_comments`.
+    """
+
+    ig_comments_total: int
+    stored_comments: int
+    stored_sentiment: int
+    stored_topics: int
+    status: str  # "ok" | "no_data" | "scope_blocked" | "not_connected"
+    reason: str
+
+
+class SeedDemoResponse(BaseModel):
+    """Counts written by the synthetic-data seeder. All rows are tagged with
+    synthetic_v1 markers so /purge?synth_only=true can clean them later."""
+
+    comments: int
+    sentiment: int
+    topics: int
+
+
+class SentimentSampleComment(BaseModel):
+    ig_comment_id: str
+    username: str
+    text: str
+    sentiment: str
+
+
+class MediaSentimentResponse(BaseModel):
+    ig_media_id: str
+    total: int
+    distribution: SentimentDistribution
+    samples: list[SentimentSampleComment]
+
+
+# --- Tier 2 / F3: Competitor Benchmarking ---
+
+class AddCompetitorRequest(BaseModel):
+    handle: str = Field(..., min_length=1, max_length=30, pattern=r"^[A-Za-z0-9._]+$")
+
+
+class CompetitorSnapshot(BaseModel):
+    handle: str
+    snapshot_date: date
+    followers_count: int
+    media_count: int
+    posts_last_7d: int
+    reels_last_7d: int
+    carousels_last_7d: int
+    avg_likes_last_25: float
+    avg_comments_last_25: float
+    avg_engagement_rate_pct: float
+
+
+class SelfSnapshot(BaseModel):
+    """Authenticated user's metrics in the same shape as a competitor snapshot.
+
+    Engagement rate here is computed the same way as for competitors
+    (`(likes + comments) / followers_count` over the last 25 posts) so the
+    side-by-side comparison is apples-to-apples.
+    """
+
+    followers_count: int
+    media_count: int
+    posts_last_7d: int
+    reels_last_7d: int
+    carousels_last_7d: int
+    avg_likes_last_25: float
+    avg_comments_last_25: float
+    avg_engagement_rate_pct: float
+
+
+class CompetitorItem(BaseModel):
+    handle: str
+    ig_user_id: str
+    display_name: str
+    profile_picture_url: str
+    latest_snapshot: CompetitorSnapshot | None = None
+    # Number of consecutive failed competitor_sync runs. Surfaced so the FE
+    # can render a "data may be stale" indicator before the auto-disable
+    # threshold (see competitor_repo.MAX_CONSECUTIVE_FAILURES). Always 0 for
+    # freshly-added handles.
+    consecutive_failures: int = 0
+
+
+class CompetitorListResponse(BaseModel):
+    competitors: list[CompetitorItem]
+    you: SelfSnapshot | None = None
+
+
+class CompetitorTimelinePoint(BaseModel):
+    date: str
+    followers: int
+
+
+class CompetitorTimelineSeries(BaseModel):
+    handle: str
+    display_name: str
+    points: list[CompetitorTimelinePoint]
+
+
+class CompetitorTimelineResponse(BaseModel):
+    period_days: int
+    series: list[CompetitorTimelineSeries]
+
+
+class ContentMixDistribution(BaseModel):
+    reels: float = 0.0
+    carousel: float = 0.0
+    image: float = 0.0
+
+
+class ContentMixAccount(BaseModel):
+    handle: str
+    display_name: str
+    mix: ContentMixDistribution
+
+
+class ContentMixResponse(BaseModel):
+    period_days: int
+    accounts: list[ContentMixAccount]
+
+
+# --- Tier 2 / F2: Branded Hashtag Tracking ---
+
+
+class AddBrandedHashtagRequest(BaseModel):
+    hashtag: str = Field(..., min_length=1, max_length=60, pattern=r"^[A-Za-z0-9_]+$")
+
+
+class BrandedHashtagMention(BaseModel):
+    """A single mention of a tracked branded hashtag.
+
+    `source` distinguishes:
+      - 'post': the authenticated user's own post used the tag in its caption.
+        `ig_comment_id` is then `'post:<ig_media_id>'` (synthetic dedup key),
+        `username` is empty (it's your own post), and `text` is the post
+        caption.
+      - 'comment': a comment on one of the user's posts mentioned the tag.
+        `ig_comment_id` is the real comment id; `username` is the commenter.
+
+    We scan stored captions and comments — NOT external public posts —
+    because the Instagram Login API doesn't grant access to Meta's
+    ig_hashtag_search endpoint.
+    """
+
+    ig_comment_id: str
+    ig_media_id: str
+    permalink: str
+    username: str
+    text: str
+    like_count: int
+    timestamp: str
+    source: str = "comment"
+
+
+class BrandedHashtagItem(BaseModel):
+    hashtag: str
+    last_synced_at: str | None = None
+    mention_count: int = 0
+    total_likes: int = 0
+    # Distinct commenters who used this brand tag in the window — a more
+    # useful metric than raw mention count for spotting community pickup.
+    unique_authors: int = 0
+    latest_mention: str | None = None
+
+
+class BrandedHashtagListResponse(BaseModel):
+    period_days: int
+    branded: list[BrandedHashtagItem]
+
+
+class BrandedHashtagMentionsResponse(BaseModel):
+    hashtag: str
+    period_days: int
+    mentions: list[BrandedHashtagMention]

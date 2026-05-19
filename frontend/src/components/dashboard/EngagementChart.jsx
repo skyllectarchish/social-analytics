@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useOverview } from "../../hooks/useInsights";
+import { alignSeriesByDate, attachPriorByIndex } from "../../utils/series";
 
 function fmtNum(v) {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -137,8 +138,8 @@ function ChartSkeleton() {
   );
 }
 
-export default function EngagementChart({ days }) {
-  const { data: overview, loading, error } = useOverview(days);
+export default function EngagementChart() {
+  const { data: overview, loading, error } = useOverview();
   const [hidden, setHidden] = useState(new Set());
 
   const onToggle = (key) => {
@@ -155,17 +156,29 @@ export default function EngagementChart({ days }) {
   const reachData = overview?.reach?.data ?? [];
   const interactData = overview?.total_interactions?.data ?? [];
 
-  const chartData = viewsData.map((d, i) => ({
-    date: fmtDate(d.end_time),
-    Views: d.value,
-    Reach: reachData[i]?.value ?? 0,
-    Interactions: interactData[i]?.value ?? 0,
-  }));
+  const priorViews = overview?.prior?.views?.data ?? [];
+  const priorReach = overview?.prior?.reach?.data ?? [];
+  const priorInteract = overview?.prior?.total_interactions?.data ?? [];
+  const hasPrior = priorViews.length > 0 || priorReach.length > 0 || priorInteract.length > 0;
+
+  const chartData = alignSeriesByDate({
+    Views: viewsData,
+    Reach: reachData,
+    Interactions: interactData,
+  }).map((row) => ({ ...row, date: fmtDate(row.end_time) }));
+
+  if (hasPrior) {
+    attachPriorByIndex(chartData, {
+      ViewsPrior: priorViews,
+      ReachPrior: priorReach,
+      InteractionsPrior: priorInteract,
+    });
+  }
 
   const totals = {
-    Views: viewsData.reduce((s, d) => s + d.value, 0),
-    Reach: reachData.reduce((s, d) => s + d.value, 0),
-    Interactions: interactData.reduce((s, d) => s + d.value, 0),
+    Views: viewsData.reduce((s, d) => s + (d.value ?? 0), 0),
+    Reach: reachData.reduce((s, d) => s + (d.value ?? 0), 0),
+    Interactions: interactData.reduce((s, d) => s + (d.value ?? 0), 0),
   };
 
   return (
@@ -261,6 +274,7 @@ export default function EngagementChart({ days }) {
                 activeDot={{ r: 5, fill: "#7C3AED", stroke: "rgba(124,58,237,0.35)", strokeWidth: 5 }}
                 animationDuration={1200}
                 animationEasing="ease-out"
+                connectNulls
               />
             )}
             {!hidden.has("Reach") && (
@@ -275,6 +289,7 @@ export default function EngagementChart({ days }) {
                 strokeDasharray="6 3"
                 animationDuration={1400}
                 animationEasing="ease-out"
+                connectNulls
               />
             )}
             {!hidden.has("Interactions") && (
@@ -287,6 +302,50 @@ export default function EngagementChart({ days }) {
                 activeDot={{ r: 5, fill: "#EC4899", stroke: "rgba(236,72,153,0.35)", strokeWidth: 5 }}
                 animationDuration={1600}
                 animationEasing="ease-out"
+                connectNulls
+              />
+            )}
+
+            {hasPrior && !hidden.has("Views") && (
+              <Line
+                type="monotone"
+                dataKey="ViewsPrior"
+                stroke="#7C3AED"
+                strokeWidth={1.5}
+                strokeDasharray="3 4"
+                strokeOpacity={0.4}
+                dot={false}
+                isAnimationActive={false}
+                name="Views (prior)"
+                connectNulls
+              />
+            )}
+            {hasPrior && !hidden.has("Reach") && (
+              <Line
+                type="monotone"
+                dataKey="ReachPrior"
+                stroke="#06B6D4"
+                strokeWidth={1.5}
+                strokeDasharray="3 4"
+                strokeOpacity={0.4}
+                dot={false}
+                isAnimationActive={false}
+                name="Reach (prior)"
+                connectNulls
+              />
+            )}
+            {hasPrior && !hidden.has("Interactions") && (
+              <Line
+                type="monotone"
+                dataKey="InteractionsPrior"
+                stroke="#EC4899"
+                strokeWidth={1.5}
+                strokeDasharray="3 4"
+                strokeOpacity={0.4}
+                dot={false}
+                isAnimationActive={false}
+                name="Interactions (prior)"
+                connectNulls
               />
             )}
 

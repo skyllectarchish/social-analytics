@@ -1,0 +1,9 @@
+# Keep SQL migration files on LF endings always — the clickhouse-migrations
+# library stores the file content verbatim in `schema_versions` and uses an
+# MD5 hash to detect drift. If a Windows checkout converts these to CRLF,
+# the MD5 stops matching and `run_migrations.py` aborts with
+# "Migrations md5 is not equal".
+backend/migrations/*.sql text eol=lf
+
+# Same logic for any shell scripts we run via Bash on Windows.
+*.sh text eol=lf

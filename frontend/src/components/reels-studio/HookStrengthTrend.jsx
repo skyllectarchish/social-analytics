@@ -57,9 +57,8 @@ function CustomTooltip({ active, payload, label }) {
   );
 }
 
-export default function HookStrengthTrend({ days = 90 }) {
-  const lookback = Math.max(days, 180);
-  const { data, loading, error } = useReelsTrend(lookback);
+export default function HookStrengthTrend() {
+  const { data, loading, error } = useReelsTrend();
 
   if (loading) {
     return (
@@ -77,9 +76,12 @@ export default function HookStrengthTrend({ days = 90 }) {
     );
   }
 
-  const trend = (data?.trend ?? []).map((t) => ({
+  const priorTrend = data?.prior?.trend ?? [];
+  const hasPrior = priorTrend.length > 0;
+  const trend = (data?.trend ?? []).map((t, i) => ({
     ...t,
     week_start_label: fmtWeek(t.week_start),
+    avg_hook_strength_pct_prior: priorTrend[i]?.avg_hook_strength_pct ?? null,
   }));
 
   return (
@@ -173,6 +175,20 @@ export default function HookStrengthTrend({ days = 90 }) {
                 dot={false}
                 activeDot={{ r: 4, strokeWidth: 2, fill: "#06b6d4", stroke: "#fff" }}
               />
+              {hasPrior && (
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="avg_hook_strength_pct_prior"
+                  stroke="#8b5cf6"
+                  strokeWidth={1.5}
+                  strokeDasharray="3 4"
+                  strokeOpacity={0.4}
+                  dot={false}
+                  isAnimationActive={false}
+                  name="Hook (prior)"
+                />
+              )}
             </ComposedChart>
           </ResponsiveContainer>
         </div>

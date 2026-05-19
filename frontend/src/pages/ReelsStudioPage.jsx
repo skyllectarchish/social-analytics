@@ -8,7 +8,6 @@ import PostInsightsDrawer from "../components/dashboard/PostInsightsDrawer";
 import SyncButton from "../components/dashboard/SyncButton";
 
 export default function ReelsStudioPage() {
-  const [days, setDays] = useState(90);
   const [selectedMedia, setSelectedMedia] = useState(null);
 
   return (
@@ -17,15 +16,13 @@ export default function ReelsStudioPage() {
         title="Reels Studio"
         emoji="🎬"
         subtitle="Track hook strength, watch time, and retention across all your Reels."
-        days={days}
-        onDaysChange={setDays}
-        actions={<SyncButton days={days} />}
+        actions={<SyncButton />}
       />
 
       <div className="space-y-4">
-        <ReelsHeroMetrics days={days} />
-        <HookStrengthTrend days={days} />
-        <ReelsRetentionTable days={days} onSelect={setSelectedMedia} />
+        <ReelsHeroMetrics />
+        <HookStrengthTrend />
+        <ReelsRetentionTable onSelect={setSelectedMedia} />
       </div>
 
       <PostInsightsDrawer

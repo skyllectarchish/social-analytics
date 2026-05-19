@@ -8,10 +8,11 @@ from app.models.queries import GET_TOP_PERFORMING_MEDIA
 
 client = get_client()
 rows = client.query(
-    "SELECT user_id FROM instagram_profiles FINAL ORDER BY updated_at DESC LIMIT 1"
+    "SELECT user_id, ig_user_id FROM instagram_profiles FINAL ORDER BY updated_at DESC LIMIT 1"
 ).result_rows
 user_id = str(rows[0][0])
-print(f"user_id={user_id}\n")
+ig_user_id = str(rows[0][1])
+print(f"user_id={user_id}  ig_user_id={ig_user_id}\n")
 
 print("=== media_insights row counts per media (top 15 by row count) ===")
 rows = client.query(
@@ -34,9 +35,18 @@ for r in rows:
 print()
 
 print("=== GET_TOP_PERFORMING_MEDIA (limit=10) — exactly what dashboard uses ===")
+from datetime import datetime, timedelta, timezone
+_until = datetime.now(timezone.utc).replace(tzinfo=None)
+_since = _until - timedelta(days=365)
 rows = client.query(
     GET_TOP_PERFORMING_MEDIA,
-    parameters={"user_id": user_id, "limit": 10},
+    parameters={
+        "user_id": user_id,
+        "ig_user_id": ig_user_id,
+        "since": _since,
+        "until": _until,
+        "limit": 10,
+    },
 ).result_rows
 for r in rows:
     # cols: ig_media_id, media_type, permalink, thumbnail_url, media_url, caption, views, interactions

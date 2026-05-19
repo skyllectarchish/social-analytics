@@ -1,7 +1,13 @@
 import { motion } from "framer-motion";
-import PeriodSelector from "../dashboard/PeriodSelector";
+import PeriodComparatorBar from "./PeriodComparatorBar";
 
-export default function PageHeader({ title, subtitle, emoji, days, onDaysChange, actions }) {
+export default function PageHeader({
+  title,
+  subtitle,
+  emoji,
+  showComparator = true,
+  actions,
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8, filter: "blur(4px)" }}
@@ -18,8 +24,8 @@ export default function PageHeader({ title, subtitle, emoji, days, onDaysChange,
           <p className="text-slate-500 text-[13px] mt-1.5 max-w-lg">{subtitle}</p>
         )}
       </div>
-      <div className="flex items-center gap-3">
-        {days !== undefined && <PeriodSelector days={days} onChange={onDaysChange} />}
+      <div className="flex items-center gap-3 flex-wrap">
+        {showComparator && <PeriodComparatorBar />}
         {actions}
       </div>
     </motion.div>

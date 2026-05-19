@@ -11,6 +11,7 @@ import RegisterPage from "./pages/RegisterPage";
 import ContentLabPage from "./pages/ContentLabPage";
 import ReelsStudioPage from "./pages/ReelsStudioPage";
 import AudienceDNAPage from "./pages/AudienceDNAPage";
+import CompetitorsPage from "./pages/CompetitorsPage";
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -45,6 +46,7 @@ function AppRoutes() {
       <Route path="/dashboard/content" element={<ProtectedRoute><ContentLabPage /></ProtectedRoute>} />
       <Route path="/dashboard/reels" element={<ProtectedRoute><ReelsStudioPage /></ProtectedRoute>} />
       <Route path="/dashboard/audience" element={<ProtectedRoute><AudienceDNAPage /></ProtectedRoute>} />
+      <Route path="/dashboard/competitors" element={<ProtectedRoute><CompetitorsPage /></ProtectedRoute>} />
       <Route path="/insta-dashboard" element={<ProtectedRoute><InstaDashboardPage /></ProtectedRoute>} />
     </Routes>
   );

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useDashboard } from "../../hooks/useInsights";
+import { usePeriodComparator } from "../../context/PeriodComparatorContext";
 
 function fmtNum(v) {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -228,8 +229,9 @@ function SkeletonCard() {
   );
 }
 
-export default function TopPostsGrid({ days, onSelect }) {
-  const { data, loading, error } = useDashboard(days);
+export default function TopPostsGrid({ onSelect }) {
+  const { data, loading, error } = useDashboard();
+  const { days } = usePeriodComparator();
   const posts = data?.top_posts ?? [];
 
   return (

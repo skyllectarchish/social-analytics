@@ -37,5 +37,18 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:5173"
     log_level: str = "INFO"
 
+    # Tier 2 / F4 — Claude Haiku for sentiment + topic labelling. Optional:
+    # only the batch jobs require this; the API itself starts without it.
+    anthropic_api_key: str = ""
+
+    # Tier 2 — APScheduler-driven batch jobs in the API process.
+    # Set ENABLE_SCHEDULER=false to disable (e.g., when running cron externally
+    # or in a multi-worker deploy where only one worker should schedule jobs).
+    enable_scheduler: bool = True
+    scheduler_competitor_sync_hour: int = 3   # UTC hour for the daily competitor snapshot
+    scheduler_sentiment_batch_minutes: int = 60  # interval in minutes for sentiment batches
+    scheduler_topic_clustering_day: int = 0   # weekday for topic clustering (0=Mon)
+    scheduler_topic_clustering_hour: int = 4  # UTC hour for the weekly topic clustering run
+
 
 settings = Settings()

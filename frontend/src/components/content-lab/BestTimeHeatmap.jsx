@@ -79,8 +79,8 @@ function CellTooltip({ slot }) {
   );
 }
 
-function SlotPostsDrawer({ slot, days, onClose }) {
-  const { data, loading } = useBestTimePosts(slot?.day_of_week, slot?.hour_of_day, days);
+function SlotPostsDrawer({ slot, onClose }) {
+  const { data, loading } = useBestTimePosts(slot?.day_of_week, slot?.hour_of_day);
   if (!slot) return null;
   return (
     <motion.div
@@ -152,8 +152,8 @@ function SlotPostsDrawer({ slot, days, onClose }) {
   );
 }
 
-export default function BestTimeHeatmap({ days = 90 }) {
-  const { data, loading, error } = useBestTime(days, 1);
+export default function BestTimeHeatmap() {
+  const { data, loading, error } = useBestTime(1);
   const [hovered, setHovered] = useState(null);
   const [selected, setSelected] = useState(null);
 
@@ -292,7 +292,6 @@ export default function BestTimeHeatmap({ days = 90 }) {
             {selected && (
               <SlotPostsDrawer
                 slot={selected}
-                days={days}
                 onClose={() => setSelected(null)}
               />
             )}

@@ -1,6 +1,144 @@
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import AnimatedCounter from "../landing/ui/AnimatedCounter";
-import { useMediaInsights } from "../../hooks/useInsights";
+import { UserPlus } from "lucide-react";
+import { useMediaInsights, useMediaConversion } from "../../hooks/useInsights";
+import { useMediaSentiment } from "../../hooks/useSentiment";
+
+const SENTIMENT_COLORS = {
+  positive: "#10b981",
+  neutral: "#94a3b8",
+  negative: "#f43f5e",
+};
+
+const SENTIMENT_LABELS = {
+  positive: "Positive",
+  neutral: "Neutral",
+  negative: "Negative",
+};
+
+function ConversionSection({ mediaId }) {
+  const { data, loading } = useMediaConversion(mediaId);
+  // Hide on load and when the post isn't eligible (404 → data:null). We
+  // never show a skeleton because conversion data is best-effort — better to
+  // render nothing than to imply a slot exists when it doesn't.
+  if (loading || !data) return null;
+  const attributed = data.attributed_follows ?? 0;
+  const conversion = data.conversion_rate_pct ?? 0;
+  const nfr = data.non_follower_reach ?? 0;
+  return (
+    <div
+      className="rounded-xl p-4"
+      style={{ background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.18)" }}
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <UserPlus size={12} className="text-violet-500" />
+        <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.12em", color: "#7C3AED", fontWeight: 600 }}>
+          Follower conversion
+        </p>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <p style={{ fontSize: 18, fontWeight: 700, color: "#0F172A" }}>
+            ~{attributed >= 10 ? Math.round(attributed) : attributed.toFixed(1)}
+          </p>
+          <p style={{ fontSize: 10, color: "#94A3B8" }}>new follows</p>
+        </div>
+        <div>
+          <p style={{ fontSize: 18, fontWeight: 700, color: "#0F172A" }}>
+            {conversion.toFixed(2)}%
+          </p>
+          <p style={{ fontSize: 10, color: "#94A3B8" }}>per non-follower</p>
+        </div>
+        <div>
+          <p style={{ fontSize: 18, fontWeight: 700, color: "#0F172A" }}>
+            {nfr >= 1000 ? `${(nfr / 1000).toFixed(1)}K` : Math.round(nfr).toString()}
+          </p>
+          <p style={{ fontSize: 10, color: "#94A3B8" }}>reach off-followers</p>
+        </div>
+      </div>
+      <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">
+        Rough estimate. Attribution splits the day&apos;s follower gain across
+        same-day and prior-day posts in proportion to non-follower reach —
+        not a causal claim.
+      </p>
+    </div>
+  );
+}
+
+
+function SentimentSection({ mediaId }) {
+  const { data, loading } = useMediaSentiment(mediaId);
+  if (loading) {
+    return (
+      <div className="rounded-xl p-4" style={{ background: "rgba(0,0,0,0.03)" }}>
+        <div className="h-3 w-32 rounded mb-3" style={{ background: "rgba(0,0,0,0.06)" }} />
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          {["positive", "neutral", "negative"].map((s) => (
+            <div key={s} className="h-12 rounded-lg" style={{ background: "rgba(0,0,0,0.04)" }} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (!data) return null;
+  const dist = data.distribution ?? {};
+  const total = (dist.positive ?? 0) + (dist.neutral ?? 0) + (dist.negative ?? 0);
+  if (total === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.12em", color: "#94A3B8" }}>
+        Audience reaction
+      </p>
+      <div className="grid grid-cols-3 gap-2">
+        {["positive", "neutral", "negative"].map((s) => {
+          const v = dist[s] ?? 0;
+          const pct = total > 0 ? Math.round((v / total) * 100) : 0;
+          return (
+            <div
+              key={s}
+              className="rounded-lg p-2.5 text-center"
+              style={{ background: `${SENTIMENT_COLORS[s]}10`, border: `1px solid ${SENTIMENT_COLORS[s]}25` }}
+            >
+              <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: "#94A3B8" }}>
+                {SENTIMENT_LABELS[s]}
+              </p>
+              <p className="font-mono font-semibold mt-1" style={{ color: SENTIMENT_COLORS[s], fontSize: 16 }}>
+                {pct}%
+              </p>
+              <p className="text-[10px] text-slate-400 mt-0.5">{v}</p>
+            </div>
+          );
+        })}
+      </div>
+      {(data.samples ?? []).length > 0 && (
+        <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+          {data.samples.map((c) => (
+            <div
+              key={c.ig_comment_id}
+              className="text-[11px] flex items-start gap-2 p-1.5 rounded"
+              style={{ background: "rgba(0,0,0,0.02)" }}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0"
+                style={{ background: SENTIMENT_COLORS[c.sentiment] ?? "#94a3b8" }}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-slate-700 italic leading-snug">
+                  "{(c.text ?? "").slice(0, 140)}
+                  {(c.text ?? "").length > 140 ? "…" : ""}"
+                </p>
+                {c.username && (
+                  <p className="text-[10px] text-slate-400 mt-0.5">— @{c.username}</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const METRIC_ICONS = {
   likes: (
@@ -254,6 +392,10 @@ export default function PostInsightsDrawer({ media, onClose }) {
                   No insights stored yet — run a sync to populate.
                 </p>
               )}
+
+              <ConversionSection mediaId={media?.ig_media_id} />
+
+              <SentimentSection mediaId={media?.ig_media_id} />
             </div>
           </motion.div>
         </>

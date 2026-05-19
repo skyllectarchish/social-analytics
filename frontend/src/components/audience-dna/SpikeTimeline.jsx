@@ -13,7 +13,6 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle } from "lucide-react";
 import AnimatedCard from "../shared/AnimatedCard";
-import PeriodSelector from "../dashboard/PeriodSelector";
 import { SkeletonChart } from "../shared/Skeleton";
 import { useFollowerSpikes } from "../../hooks/useTier1Insights";
 
@@ -66,15 +65,96 @@ function CustomTooltip({ active, payload }) {
   );
 }
 
-export default function SpikeTimeline({ days: initialDays = 90, onDaysChange }) {
-  const [days, setDays] = useState(initialDays);
-  const [selected, setSelected] = useState(null);
-  const { data, loading, error } = useFollowerSpikes(days, 50);
+function SpikeDetailPanel({ spike, onClose, onSelectPost }) {
+  const drivers = spike.candidate_drivers ?? [];
 
-  const handleDays = (d) => {
-    setDays(d);
-    onDaysChange?.(d);
-  };
+  return (
+    <div className="space-y-3">
+      <div className="flex items-start gap-3">
+        <div
+          className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+            spike.is_suspicious
+              ? "bg-rose-50 border border-rose-200"
+              : "bg-violet-50 border border-violet-200"
+          }`}
+        >
+          {spike.is_suspicious ? (
+            <AlertTriangle size={16} color="#be123c" />
+          ) : (
+            <span className="text-violet-600 text-base">📈</span>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-semibold text-slate-800">
+              {fmtDate(spike.spike_date)} · +
+              {spike.follows_change.toLocaleString()} followers
+            </p>
+            {spike.is_suspicious && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-md">
+                <AlertTriangle size={9} /> SUSPICIOUS
+              </span>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            {spike.interactions.toLocaleString()} interactions · ratio{" "}
+            {spike.interaction_per_follow_ratio.toFixed(2)}
+            {spike.is_suspicious &&
+              " — bot/pod pattern. Healthy organic growth typically lands above 1.0."}
+          </p>
+        </div>
+        <button
+          onClick={onClose}
+          className="text-[11px] text-slate-400 hover:text-slate-600 px-2 py-1 rounded-md hover:bg-slate-50 shrink-0"
+        >
+          Dismiss
+        </button>
+      </div>
+
+      <div>
+        <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-2">
+          Candidate driver posts
+        </p>
+        {drivers.length === 0 ? (
+          <p className="text-[11px] text-slate-400 py-2">
+            No candidate drivers in the 24h window before this spike.
+          </p>
+        ) : (
+          <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
+            {drivers.map((d) => (
+              <button
+                key={d.ig_media_id}
+                onClick={() => onSelectPost?.(d)}
+                className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors text-left"
+              >
+                {d.thumbnail_url ? (
+                  <img
+                    src={d.thumbnail_url}
+                    alt=""
+                    className="w-9 h-9 rounded-lg object-cover shrink-0"
+                    style={{ border: "1px solid rgba(0,0,0,0.06)" }}
+                  />
+                ) : (
+                  <div className="w-9 h-9 rounded-lg bg-slate-100 shrink-0" />
+                )}
+                <p className="flex-1 min-w-0 text-xs text-slate-800 truncate">
+                  {d.caption || "(no caption)"}
+                </p>
+                <p className="text-xs font-mono font-semibold text-emerald-600 shrink-0">
+                  +{Math.round(d.attributed_follows ?? 0)}
+                </p>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function SpikeTimeline({ onSelectPost }) {
+  const [selected, setSelected] = useState(null);
+  const { data, loading, error } = useFollowerSpikes(50);
 
   const { points, maxChange } = useMemo(() => {
     const spikes = data?.spikes ?? [];
@@ -107,7 +187,6 @@ export default function SpikeTimeline({ days: initialDays = 90, onDaysChange }) 
               <AlertTriangle size={11} /> {suspiciousCount} suspicious
             </span>
           )}
-          <PeriodSelector days={days} onChange={handleDays} />
         </div>
       </div>
 
@@ -153,7 +232,7 @@ export default function SpikeTimeline({ days: initialDays = 90, onDaysChange }) 
                 />
                 <Scatter
                   data={points}
-                  onClick={(p) => p?.is_suspicious && setSelected(p)}
+                  onClick={(p) => p && setSelected(p)}
                   cursor="pointer"
                 >
                   {points.map((p, i) => (
@@ -199,36 +278,11 @@ export default function SpikeTimeline({ days: initialDays = 90, onDaysChange }) 
                 transition={{ type: "spring", duration: 0.4, bounce: 0 }}
                 className="overflow-hidden border-t border-slate-100 mt-4 pt-4"
               >
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-rose-50 border border-rose-200 flex items-center justify-center shrink-0">
-                    <AlertTriangle size={16} color="#be123c" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-slate-800">
-                      Advisory: {fmtDate(selected.spike_date)}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1 max-w-xl">
-                      This spike gained{" "}
-                      <strong>{selected.follows_change.toLocaleString()}</strong>{" "}
-                      followers but only{" "}
-                      <strong>{selected.interactions.toLocaleString()}</strong>{" "}
-                      interactions — a ratio of{" "}
-                      <strong>
-                        {selected.interaction_per_follow_ratio.toFixed(2)}
-                      </strong>
-                      . Healthy organic growth typically lands above 1.0. This
-                      pattern is consistent with bot follows or paid growth
-                      services — check your reach in the following week and
-                      consider blocking inactive accounts.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setSelected(null)}
-                    className="text-[11px] text-slate-400 hover:text-slate-600 px-2 py-1 rounded-md hover:bg-slate-50 shrink-0"
-                  >
-                    Dismiss
-                  </button>
-                </div>
+                <SpikeDetailPanel
+                  spike={selected}
+                  onClose={() => setSelected(null)}
+                  onSelectPost={onSelectPost}
+                />
               </motion.div>
             )}
           </AnimatePresence>

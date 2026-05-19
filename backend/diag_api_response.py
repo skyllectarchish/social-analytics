@@ -13,8 +13,18 @@ user_id = str(client.query(
 ig_profile = instagram_repo.find_profile(client, user_id)
 ig_user_id = ig_profile.ig_user_id
 
+from datetime import datetime, timedelta, timezone
+_until = datetime.now(timezone.utc).replace(tzinfo=None)
+_since = _until - timedelta(days=365)
 top_rows = client.query(
-    GET_TOP_PERFORMING_MEDIA, parameters={"user_id": user_id, "limit": 5}
+    GET_TOP_PERFORMING_MEDIA,
+    parameters={
+        "user_id": user_id,
+        "ig_user_id": ig_user_id,
+        "since": _since,
+        "until": _until,
+        "limit": 5,
+    },
 ).result_rows
 
 # Replicate exactly what router.py:get_dashboard does:

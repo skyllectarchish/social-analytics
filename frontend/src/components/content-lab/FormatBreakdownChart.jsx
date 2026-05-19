@@ -110,8 +110,8 @@ function FormatPostRow({ post, index, onSelect }) {
   );
 }
 
-export default function FormatBreakdownChart({ days = 90, onSelectPost }) {
-  const { data, loading, error } = useFormatBreakdown(days);
+export default function FormatBreakdownChart({ onSelectPost }) {
+  const { data, loading, error } = useFormatBreakdown();
 
   return (
     <DrillDownChart
@@ -180,7 +180,6 @@ export default function FormatBreakdownChart({ days = 90, onSelectPost }) {
         return (
           <FormatPostsDrill
             format={state.context}
-            days={days}
             onSelectPost={onSelectPost}
           />
         );
@@ -189,8 +188,8 @@ export default function FormatBreakdownChart({ days = 90, onSelectPost }) {
   );
 }
 
-function FormatPostsDrill({ format, days, onSelectPost }) {
-  const { data, loading, error } = useFormatBreakdownPosts(format, days);
+function FormatPostsDrill({ format, onSelectPost }) {
+  const { data, loading, error } = useFormatBreakdownPosts(format);
   if (loading) return <SkeletonChart height="h-72" />;
   if (error) return <p className="text-xs text-rose-500 py-8">{error}</p>;
   const posts = data?.posts ?? [];

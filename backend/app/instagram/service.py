@@ -150,23 +150,134 @@ async def get_long_lived_token(short_token: str) -> tuple[str, int]:
             raise OAuthError("Invalid response from Instagram token endpoint")
 
 
-async def fetch_profile(ig_user_id: str, token: str) -> dict[str, Any]:
-    """Fetch the Instagram user's profile data.
+# Meta error codes that the platform documents as transient. Worth retrying.
+# 1 = UNKNOWN, 2 = SERVICE temporarily unavailable, 4 = APPLICATION_USER rate
+# limit, 17 = USER rate limit, 32 = PAGE rate limit. See:
+# https://developers.facebook.com/docs/graph-api/guides/error-handling/
+_TRANSIENT_META_ERROR_CODES: frozenset[int] = frozenset({1, 2, 4, 17, 32})
 
-    Raises:
-        InstagramAPIError: If the API call fails.
+
+def _is_transient_meta_error(exc: httpx.HTTPError) -> bool:
+    """Return True when `exc` looks like a transient Graph API failure.
+
+    Covers three categories:
+    1. Network/timeout failures (no response object at all).
+    2. HTTP 5xx and 429 responses.
+    3. 4xx responses whose JSON body carries `error.is_transient: true` or one
+       of Meta's documented transient `error.code` values.
+
+    Non-transient failures (400 with auth error, 403 forbidden, schema-shape
+    errors) return False — those should bubble up to the user as real bugs.
     """
-    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+    resp = getattr(exc, "response", None)
+    if resp is None:
+        return True  # connection error / timeout
+
+    status = resp.status_code
+    if 500 <= status < 600 or status == 429:
+        return True
+
+    # Meta sometimes returns 400 with is_transient=true (e.g., temporary
+    # backend hiccup that surfaced through validation). Inspect the body.
+    try:
+        body = resp.json().get("error", {}) or {}
+    except (ValueError, AttributeError):
+        return False
+    if body.get("is_transient") is True:
+        return True
+    code = body.get("code")
+    if isinstance(code, int) and code in _TRANSIENT_META_ERROR_CODES:
+        return True
+    return False
+
+
+def _short_http_error(exc: httpx.HTTPError) -> str:
+    """One-line summary of an HTTP error for log lines."""
+    resp = getattr(exc, "response", None)
+    if resp is None:
+        return type(exc).__name__
+    body_snippet = ""
+    try:
+        err = resp.json().get("error", {}) or {}
+        msg = err.get("message") or err.get("type") or ""
+        code = err.get("code")
+        body_snippet = f" — {msg}" + (f" (code {code})" if code else "")
+    except (ValueError, AttributeError):
+        pass
+    return f"HTTP {resp.status_code}{body_snippet}"
+
+
+async def _retry_get_json(
+    client: httpx.AsyncClient,
+    url: str,
+    params: dict[str, Any],
+    label: str,
+    max_retries: int = 3,
+) -> dict[str, Any] | None:
+    """GET `url` with exponential backoff on transient Graph API errors.
+
+    Returns the parsed JSON body on success, or None when all retries are
+    exhausted (so the caller can decide between partial-success and failure).
+
+    Raises `InstagramAPIError` for non-transient errors — auth failures,
+    malformed requests, etc. — because retrying those would just waste time.
+
+    Backoff schedule: 1s, 2s, 4s. Honors `Retry-After` on 429 if Meta sends it.
+    """
+    last_exc: httpx.HTTPError | None = None
+    for attempt in range(max_retries):
         try:
-            resp = await client.get(
-                f"{GRAPH_BASE_URL}/{ig_user_id}",
-                params={"fields": INSTAGRAM_PROFILE_FIELDS, "access_token": token},
-            )
+            resp = await client.get(url, params=params)
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPError as exc:
-            logger.error("Failed to fetch Instagram profile: %s", exc)
-            raise InstagramAPIError("Failed to fetch Instagram profile")
+            last_exc = exc
+            if not _is_transient_meta_error(exc):
+                resp = getattr(exc, "response", None)
+                body_text = (resp.text[:500] if resp is not None else "")
+                logger.error(
+                    "Non-transient %s failure: %s — %s", label, exc, body_text,
+                )
+                raise InstagramAPIError(f"Failed to fetch Instagram {label}")
+            if attempt < max_retries - 1:
+                # Use Meta's Retry-After when available (only set on 429s).
+                resp = getattr(exc, "response", None)
+                delay = (
+                    int(resp.headers.get("Retry-After", 2 ** attempt))
+                    if resp is not None and resp.headers.get("Retry-After")
+                    else 2 ** attempt
+                )
+                logger.warning(
+                    "Transient %s error (attempt %d/%d, retry in %ds): %s",
+                    label, attempt + 1, max_retries, delay,
+                    _short_http_error(exc),
+                )
+                await asyncio.sleep(delay)
+    logger.error(
+        "Exhausted %d retries on %s: %s", max_retries, label,
+        _short_http_error(last_exc) if last_exc else "unknown",
+    )
+    return None
+
+
+async def fetch_profile(ig_user_id: str, token: str) -> dict[str, Any]:
+    """Fetch the Instagram user's profile data, with transient-error retry.
+
+    Raises:
+        InstagramAPIError: On non-transient errors or after retries are exhausted.
+    """
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+        payload = await _retry_get_json(
+            client,
+            f"{GRAPH_BASE_URL}/{ig_user_id}",
+            {"fields": INSTAGRAM_PROFILE_FIELDS, "access_token": token},
+            label="profile",
+        )
+    if payload is None:
+        raise InstagramAPIError(
+            "Instagram is temporarily unavailable — please try again in a moment.",
+        )
+    return payload
 
 
 async def fetch_media(
@@ -176,8 +287,11 @@ async def fetch_media(
 ) -> list[dict[str, Any]]:
     """Fetch all media items for an Instagram user (handles pagination).
 
-    Raises:
-        InstagramAPIError: If any API call fails during pagination.
+    Each page is fetched with transient-error retry. If retries on a page are
+    exhausted mid-pagination, returns the items already collected rather than
+    failing the entire refresh — the user gets partial data and a warning log
+    rather than a 502. A non-transient error (auth failure, malformed query)
+    still raises `InstagramAPIError`.
     """
     media_items: list[dict[str, Any]] = []
     url = f"{GRAPH_BASE_URL}/{ig_user_id}/media"
@@ -188,48 +302,127 @@ async def fetch_media(
     }
 
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+        page = 0
         while True:
-            try:
-                logger.info("Fetching media page for %s", ig_user_id)
-                
-                resp = await client.get(url, params=params)
-                resp.raise_for_status()
-                data = resp.json()
-                
-                media_items.extend(data.get("data", []))
-                
-                # Pagination: use the `after` cursor to stay on GRAPH_BASE_URL (v21.0)
-                # Meta's raw `next` URL often forces v25.0 which can trigger #200 errors.
-                paging = data.get("paging", {})
-                after_cursor = paging.get("cursors", {}).get("after")
-                
-                # Only continue if there is a next URL AND an after cursor
-                if not paging.get("next") or not after_cursor:
-                    break
-                    
-                params["after"] = after_cursor
-                
-            except httpx.HTTPError as exc:
-                error_body = getattr(exc, "response", None)
-                if error_body is not None:
-                    logger.error("Failed to fetch media page: %s - Response: %s", exc, error_body.text)
-                else:
-                    logger.error("Failed to fetch media page: %s", exc)
-                raise InstagramAPIError("Failed to fetch Instagram media")
+            page += 1
+            logger.info("Fetching media page %d for %s", page, ig_user_id)
+            data = await _retry_get_json(client, url, params, label="media page")
+            if data is None:
+                # Transient retries exhausted — surface partial success instead
+                # of a 502 so /refresh stays usable during Meta hiccups.
+                logger.warning(
+                    "Media sync incomplete for %s: returning %d partial items "
+                    "after transient errors on page %d",
+                    ig_user_id, len(media_items), page,
+                )
+                return media_items
+
+            media_items.extend(data.get("data", []))
+
+            # Pagination: use the `after` cursor to stay on GRAPH_BASE_URL (v21.0)
+            # Meta's raw `next` URL often forces v25.0 which can trigger #200 errors.
+            paging = data.get("paging", {})
+            after_cursor = paging.get("cursors", {}).get("after")
+            if not paging.get("next") or not after_cursor:
+                break
+            params["after"] = after_cursor
 
     logger.info("Fetched %d media items for ig_user %s", len(media_items), ig_user_id)
     return media_items
+
+
+async def _fetch_reach_follower_breakdown(
+    http: httpx.AsyncClient,
+    media_id: str,
+    token: str,
+) -> list[dict[str, Any]]:
+    """Fetch the reach metric broken down by follower_type for one media.
+
+    Returns a list shaped like Meta's per-media `data` entries so callers can
+    splat the result alongside the main batch response. The synthetic metric
+    names are `follower_reach` and `non_follower_reach` — these are what
+    Tier 2 / F5 (Growth Drivers) and any downstream pivots key off.
+
+    Returns an empty list on any failure (4xx, 5xx, parse error). The
+    aggregate `reach` is already covered by the main batch fetch, so a
+    missing breakdown only degrades F5 accuracy — never breaks Tier 1.
+    """
+    try:
+        resp = await http.get(
+            f"{GRAPH_BASE_URL}/{media_id}/insights",
+            params={
+                "metric": "reach",
+                "breakdown": "follower_type",
+                "access_token": token,
+            },
+        )
+    except httpx.HTTPError as exc:
+        logger.warning("reach breakdown HTTP error for %s: %s", media_id, exc)
+        return []
+    if resp.status_code != 200:
+        # 400 here is common — Meta returns 400 on STORY media because the
+        # breakdown isn't supported there. Don't escalate as an error.
+        logger.debug(
+            "reach breakdown skipped for %s (HTTP %d)", media_id, resp.status_code,
+        )
+        return []
+
+    try:
+        payload = resp.json()
+    except ValueError:
+        return []
+
+    follower_value = 0
+    non_follower_value = 0
+    got_any = False
+    for entry in payload.get("data", []) or []:
+        if entry.get("name") != "reach":
+            continue
+        # Meta puts the breakdown under either `total_value.breakdowns` (newer
+        # metric_type=total_value path) or `values[0]` for some legacy
+        # responses. Try both to stay forward-compatible.
+        breakdowns = (entry.get("total_value") or {}).get("breakdowns") or []
+        if not breakdowns:
+            for v in entry.get("values") or []:
+                bds = v.get("breakdowns") or []
+                if bds:
+                    breakdowns = bds
+                    break
+        for bd in breakdowns:
+            for res in bd.get("results") or []:
+                dim_values = res.get("dimension_values") or []
+                if not dim_values:
+                    continue
+                got_any = True
+                value = int(res.get("value", 0) or 0)
+                if dim_values[-1] == "FOLLOWER":
+                    follower_value += value
+                elif dim_values[-1] == "NON_FOLLOWER":
+                    non_follower_value += value
+
+    if not got_any:
+        return []
+
+    return [
+        {"name": "follower_reach", "values": [{"value": follower_value}]},
+        {"name": "non_follower_reach", "values": [{"value": non_follower_value}]},
+    ]
 
 
 async def fetch_media_insights_batch(
     media_items: list[tuple[str, str]],
     token: str,
     max_retries: int = 3,
+    fetch_reach_breakdown: bool = True,
 ) -> dict[str, list[dict[str, Any]]]:
     """Fetch insights for multiple media items with rate-limit handling.
 
     Args:
         media_items: List of (ig_media_id, media_product_type) tuples.
+        fetch_reach_breakdown: When True (default) and the media isn't a
+            story, also fetches reach by follower_type and appends synthetic
+            `follower_reach` / `non_follower_reach` metric entries. Tier 2
+            F5 attribution uses these.
 
     Returns:
         {ig_media_id: [insight_data, ...]}
@@ -278,6 +471,20 @@ async def fetch_media_insights_batch(
                 except httpx.HTTPError as exc:
                     logger.error("Failed insights for %s: %s", media_id, exc)
                     break
+
+            # Tier 2 / F5: follow-up reach-by-follower_type call. Skipped for
+            # stories because the breakdown isn't supported on STORY media.
+            if (
+                fetch_reach_breakdown
+                and media_id in results
+                and media_product_type != "STORY"
+            ):
+                breakdown_entries = await _fetch_reach_follower_breakdown(
+                    client, media_id, token,
+                )
+                if breakdown_entries:
+                    results[media_id].extend(breakdown_entries)
+                await asyncio.sleep(0.2)
 
     logger.info("Batch fetched insights for %d/%d media items", len(results), len(media_items))
     return results
@@ -449,13 +656,24 @@ async def fetch_account_insights(
             asyncio.gather(*[fetch_follow(s, u) for s, u, _ in day_windows]),
         )
 
+        # Normalise day_end to midnight UTC of its calendar date so two syncs
+        # that run at different clock times produce identical `end_time` values
+        # — otherwise account_insights (deduped on
+        # (user_id, ig_user_id, metric_name, end_time)) accumulates one row per
+        # sync run instead of one row per calendar day.
+        def _day_end_iso(day_end: datetime) -> str:
+            midnight = datetime.combine(
+                day_end.date(), datetime.min.time(), tzinfo=timezone.utc,
+            )
+            return midnight.strftime("%Y-%m-%dT%H:%M:%S+0000")
+
         flat_success = 0
         follow_success = 0
         for (_, _, day_end), entries in zip(day_windows, flat_results):
             if not entries:
                 continue
             flat_success += 1
-            end_time_iso = day_end.strftime("%Y-%m-%dT%H:%M:%S+0000")
+            end_time_iso = _day_end_iso(day_end)
             for entry in entries:
                 name = entry.get("name", "")
                 value = entry.get("total_value", {}).get("value")
@@ -468,7 +686,7 @@ async def fetch_account_insights(
         for (_, _, day_end), entries in zip(day_windows, follow_results):
             if not entries:
                 continue
-            end_time_iso = day_end.strftime("%Y-%m-%dT%H:%M:%S+0000")
+            end_time_iso = _day_end_iso(day_end)
             for entry in entries:
                 if entry.get("name") != "follows_and_unfollows":
                     continue
@@ -560,6 +778,55 @@ async def fetch_demographics(
             raise InstagramAPIError(
                 f"Failed to fetch demographics for {metric_name}/{breakdown}"
             )
+
+
+async def fetch_comments_for_media(
+    media_id: str,
+    token: str,
+    max_pages: int = 5,
+) -> list[dict[str, Any]]:
+    """Fetch up to `max_pages` of comments + their replies for one media item.
+
+    Top-level comments and their replies are flattened into a single list; the
+    repository tags replies with `parent_comment_id` so threading can be
+    reconstructed later.
+    """
+    comments: list[dict[str, Any]] = []
+    url = f"{GRAPH_BASE_URL}/{media_id}/comments"
+    params: dict[str, Any] = {
+        "fields": (
+            "id,text,username,like_count,timestamp,"
+            "replies{id,text,username,like_count,timestamp}"
+        ),
+        "access_token": token,
+        "limit": 50,
+    }
+
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+        for _ in range(max_pages):
+            try:
+                resp = await client.get(url, params=params)
+                resp.raise_for_status()
+            except httpx.HTTPError as exc:
+                logger.warning("Failed to fetch comments for %s: %s", media_id, exc)
+                break
+
+            payload = resp.json()
+            page = payload.get("data", []) or []
+            for c in page:
+                comments.append({**c, "_parent_id": ""})
+                replies = (c.get("replies") or {}).get("data") or []
+                for r in replies:
+                    comments.append({**r, "_parent_id": c.get("id", "")})
+
+            paging = payload.get("paging", {}) or {}
+            next_url = paging.get("next")
+            after = (paging.get("cursors") or {}).get("after")
+            if not next_url or not after:
+                break
+            params["after"] = after
+
+    return comments
 
 
 async def fetch_media_insights(

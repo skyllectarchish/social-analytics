@@ -1,13 +1,21 @@
 import { useMemo } from "react";
 import { Zap, Clock, SkipForward, Repeat } from "lucide-react";
 import AnimatedCard from "../shared/AnimatedCard";
-import MetricPill from "../shared/MetricPill";
+import ComparisonMetricPill from "../shared/ComparisonMetricPill";
 import { SkeletonMetric } from "../shared/Skeleton";
 import { useReelsRetention } from "../../hooks/useTier1Insights";
+import { welchsTTest } from "../../utils/stats";
 
 function avg(arr, key) {
   if (!arr.length) return 0;
   return arr.reduce((sum, r) => sum + (r[key] ?? 0), 0) / arr.length;
+}
+
+function variance(arr, key, mean) {
+  if (arr.length < 2) return 0;
+  return (
+    arr.reduce((s, r) => s + ((r[key] ?? 0) - mean) ** 2, 0) / (arr.length - 1)
+  );
 }
 
 const CARDS = [
@@ -49,17 +57,40 @@ const CARDS = [
   },
 ];
 
-export default function ReelsHeroMetrics({ days = 90 }) {
-  const { data, loading, error } = useReelsRetention(days);
+export default function ReelsHeroMetrics() {
+  const { data, loading, error } = useReelsRetention();
 
   const values = useMemo(() => {
     const reels = data?.reels ?? [];
-    return {
-      hook: avg(reels, "hook_strength_pct"),
-      watch: avg(reels, "avg_watch_time"),
-      skip: avg(reels, "skip_rate"),
-      replay: avg(reels, "estimated_replay_rate"),
+    const priorReels = data?.prior?.reels;
+    const KEY_MAP = {
+      hook: "hook_strength_pct",
+      watch: "avg_watch_time",
+      skip: "skip_rate",
+      replay: "estimated_replay_rate",
     };
+    const compute = (arr) => ({
+      hook: avg(arr, KEY_MAP.hook),
+      watch: avg(arr, KEY_MAP.watch),
+      skip: avg(arr, KEY_MAP.skip),
+      replay: avg(arr, KEY_MAP.replay),
+    });
+    const current = compute(reels);
+    if (!priorReels) return current;
+    const prior = compute(priorReels);
+    // Welch's t on per-Reel samples — significance reflects whether the shift
+    // in mean is bigger than within-period variance, not just nominal delta.
+    return Object.fromEntries(
+      Object.entries(current).map(([k, v]) => {
+        const col = KEY_MAP[k];
+        const vCur = variance(reels, col, v);
+        const vPrior = variance(priorReels, col, prior[k]);
+        const { significant } = welchsTTest(
+          v, vCur, reels.length, prior[k], vPrior, priorReels.length,
+        );
+        return [k, { current: v, prior: prior[k], delta_pct: null, significant }];
+      }),
+    );
   }, [data]);
 
   if (loading) {
@@ -100,9 +131,9 @@ export default function ReelsHeroMetrics({ days = 90 }) {
                 <Icon size={18} color={c.iconColor} strokeWidth={2} />
               </div>
             </div>
-            <MetricPill
+            <ComparisonMetricPill
               label={c.label}
-              value={values[c.key]}
+              data={values[c.key]}
               suffix={c.suffix}
               decimals={c.decimals}
             />

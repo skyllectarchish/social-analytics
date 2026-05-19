@@ -1,6 +1,8 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
+import { TrendingUp, TrendingDown } from "lucide-react";
 import { useDashboard } from "../../hooks/useInsights";
+import { pctDelta, unwrapComparison } from "../../utils/stats";
 
 function fmtNum(v) {
   const abs = Math.abs(v);
@@ -108,8 +110,8 @@ function SkeletonCard() {
   );
 }
 
-export default function HeroCards({ days, sparklines = {} }) {
-  const { data, loading, error } = useDashboard(days);
+export default function HeroCards({ sparklines = {} }) {
+  const { data, loading, error } = useDashboard();
 
   return (
     <AnimatePresence mode="wait" initial={false}>
@@ -135,11 +137,25 @@ export default function HeroCards({ days, sparklines = {} }) {
       ) : (
         <motion.div key="content" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {CARDS.map((card, i) => {
-            const value = data[card.key] ?? 0;
+            const { current: value, prior, deltaPct: rawDelta } = unwrapComparison(data[card.key]);
+            const deltaPct = rawDelta ?? pctDelta(value, prior);
+            const hasCompare = prior != null;
             const isGrowth = card.key === "net_follower_growth";
             const isNegative = isGrowth && value < 0;
             const displayColor = isNegative ? "#F43F5E" : card.color;
             const sparkData = sparklines[card.key] ?? [];
+            const deltaColor = deltaPct == null
+              ? "#94A3B8"
+              : deltaPct > 0
+                ? "#059669"
+                : deltaPct < 0
+                  ? "#DC2626"
+                  : "#94A3B8";
+            const DeltaIcon = deltaPct == null
+              ? null
+              : deltaPct >= 0
+                ? TrendingUp
+                : TrendingDown;
 
             return (
               <motion.div
@@ -207,19 +223,39 @@ export default function HeroCards({ days, sparklines = {} }) {
               {fmtNum(value)}
             </div>
 
-            {/* Label */}
-            <p
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                color: "#94A3B8",
-                position: "relative",
-              }}
-            >
-              {card.label}
-            </p>
+            {/* Label + compare delta */}
+            <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <p
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "#94A3B8",
+                }}
+              >
+                {card.label}
+              </p>
+              {hasCompare && deltaPct != null && DeltaIcon && (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 3,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: deltaColor,
+                    background: `${deltaColor}14`,
+                    border: `1px solid ${deltaColor}26`,
+                    padding: "2px 6px",
+                    borderRadius: 999,
+                  }}
+                >
+                  <DeltaIcon size={9} />
+                  {isFinite(deltaPct) ? `${Math.abs(deltaPct).toFixed(1)}%` : "—"}
+                </span>
+              )}
+            </div>
 
             {/* Sparkline pinned to bottom */}
             <Sparkline data={sparkData} color={displayColor} />

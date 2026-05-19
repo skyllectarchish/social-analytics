@@ -142,9 +142,8 @@ function PostMiniRow({ post, index, onSelect }) {
   );
 }
 
-export default function AlgorithmScorePanel({ days = 30, onSelectPost }) {
-  const limitedDays = Math.min(days, 365);
-  const { data, loading, error } = useAlgorithmMetrics(limitedDays);
+export default function AlgorithmScorePanel({ onSelectPost }) {
+  const { data, loading, error } = useAlgorithmMetrics();
 
   if (loading) return <SkeletonChart height="h-[460px]" />;
   if (error)

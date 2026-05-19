@@ -13,6 +13,7 @@ from .database import close_client, ping
 from .exception_handlers import register_exception_handlers
 from .instagram.router import router as instagram_router
 from .logging_config import setup_logging
+from .scheduler import shutdown_scheduler, start_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +28,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.error("ClickHouse connection failed on startup")
     else:
         logger.info("ClickHouse connection OK")
+    start_scheduler()
     yield
     # --- Shutdown ---
+    shutdown_scheduler()
     close_client()
     logger.info("Social Analytics API shut down")
 

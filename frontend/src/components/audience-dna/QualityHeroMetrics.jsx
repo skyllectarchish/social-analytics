@@ -1,6 +1,6 @@
 import { Gauge, Sparkles, Moon, Users } from "lucide-react";
 import AnimatedCard from "../shared/AnimatedCard";
-import MetricPill from "../shared/MetricPill";
+import ComparisonMetricPill from "../shared/ComparisonMetricPill";
 import { SkeletonMetric } from "../shared/Skeleton";
 import { useFollowerQualitySummary } from "../../hooks/useTier1Insights";
 
@@ -84,9 +84,9 @@ export default function QualityHeroMetrics({ breakdown = "age" }) {
                 <Icon size={18} color={c.iconColor} strokeWidth={2} />
               </div>
             </div>
-            <MetricPill
+            <ComparisonMetricPill
               label={c.label}
-              value={data?.[c.key] ?? 0}
+              data={data?.[c.key] ?? 0}
               suffix={c.suffix}
               decimals={c.decimals}
             />

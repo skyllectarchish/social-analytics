@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useOverview } from "../../hooks/useInsights";
+import { alignSeriesByDate } from "../../utils/series";
 
 function fmtNum(v) {
   const abs = Math.abs(v);
@@ -77,18 +78,21 @@ function ChartSkeleton() {
   );
 }
 
-export default function FollowerGrowthChart({ days }) {
-  const { data: overview, loading } = useOverview(days);
+export default function FollowerGrowthChart() {
+  const { data: overview, loading } = useOverview();
 
   if (loading) return <ChartSkeleton />;
 
   const followsData = overview?.follows_and_unfollows?.data ?? [];
-  const netTotal = followsData.reduce((s, d) => s + d.value, 0);
+  const priorFollows = overview?.prior?.follows_and_unfollows?.data ?? [];
+  const hasPrior = priorFollows.length > 0;
+  const netTotal = followsData.reduce((s, d) => s + (d.value ?? 0), 0);
+  const priorNetTotal = priorFollows.reduce((s, d) => s + (d.value ?? 0), 0);
   const isNetPos = netTotal >= 0;
 
-  const chartData = followsData.map((d) => ({
-    date: fmtDate(d.end_time),
-    value: d.value,
+  const chartData = alignSeriesByDate({ value: followsData }).map((row) => ({
+    ...row,
+    date: fmtDate(row.end_time),
   }));
 
   return (
@@ -108,7 +112,14 @@ export default function FollowerGrowthChart({ days }) {
           >
             {isNetPos ? "+" : ""}{fmtNum(netTotal)}
           </p>
-          <p style={{ color: "#94A3B8", fontSize: 11, marginTop: 3 }}>net this period</p>
+          <p style={{ color: "#94A3B8", fontSize: 11, marginTop: 3 }}>
+            net this period
+            {hasPrior && (
+              <span style={{ marginLeft: 6, color: "#64748B" }}>
+                · prior {priorNetTotal >= 0 ? "+" : ""}{fmtNum(priorNetTotal)}
+              </span>
+            )}
+          </p>
         </div>
 
         {/* Legend */}
@@ -166,7 +177,7 @@ export default function FollowerGrowthChart({ days }) {
               {chartData.map((d, i) => (
                 <Cell
                   key={i}
-                  fill={d.value >= 0 ? "url(#posGrad)" : "url(#negGrad)"}
+                  fill={d.value == null ? "transparent" : d.value >= 0 ? "url(#posGrad)" : "url(#negGrad)"}
                 />
               ))}
             </Bar>

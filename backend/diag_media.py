@@ -73,9 +73,17 @@ async def main():
 
     # 3. Run the actual top-posts query
     print("=== GET_TOP_PERFORMING_MEDIA (limit=5) ===")
+    _until = datetime.now(timezone.utc).replace(tzinfo=None)
+    _since = _until - timedelta(days=365)
     rows = client.query(
         GET_TOP_PERFORMING_MEDIA,
-        parameters={"user_id": user_id, "limit": 5},
+        parameters={
+            "user_id": user_id,
+            "ig_user_id": str(ig_user_id),
+            "since": _since,
+            "until": _until,
+            "limit": 5,
+        },
     ).result_rows
     if not rows:
         print("  (returned 0 rows)\n")

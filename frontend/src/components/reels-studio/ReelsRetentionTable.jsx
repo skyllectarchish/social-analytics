@@ -53,8 +53,8 @@ function adaptForDrawer(reel) {
   };
 }
 
-export default function ReelsRetentionTable({ days = 90, onSelect }) {
-  const { data, loading, error } = useReelsRetention(days);
+export default function ReelsRetentionTable({ onSelect }) {
+  const { data, loading, error } = useReelsRetention();
   const [sortKey, setSortKey] = useState("hook_strength_pct");
   const [sortDir, setSortDir] = useState("desc");
 

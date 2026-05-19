@@ -1,12 +1,13 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { BarChart3, FlaskConical, Film, Users } from "lucide-react";
+import { BarChart3, FlaskConical, Film, Users, LineChart } from "lucide-react";
 
 const NAV_ITEMS = [
   { to: "/dashboard", icon: BarChart3, label: "Overview" },
   { to: "/dashboard/content", icon: FlaskConical, label: "Content Lab" },
   { to: "/dashboard/reels", icon: Film, label: "Reels Studio" },
   { to: "/dashboard/audience", icon: Users, label: "Audience DNA" },
+  { to: "/dashboard/competitors", icon: LineChart, label: "Competitors" },
 ];
 
 export default function DashboardSidebar() {

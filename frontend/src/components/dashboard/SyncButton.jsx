@@ -42,8 +42,8 @@ const labelVariants = {
   exit:    { opacity: 0, x: 6, transition: { duration: 0.12 } },
 };
 
-export default function SyncButton({ days }) {
-  const { syncing, synced, trigger } = useSyncInsights(days);
+export default function SyncButton() {
+  const { syncing, synced, trigger } = useSyncInsights();
   const state = syncing ? "syncing" : synced ? "synced" : "idle";
 
   return (

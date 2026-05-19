@@ -5,9 +5,11 @@ from app.models.queries import GET_TOP_PERFORMING_MEDIA
 
 
 client = get_client()
-user_id = str(client.query(
-    "SELECT user_id FROM instagram_profiles FINAL ORDER BY updated_at DESC LIMIT 1"
-).result_rows[0][0])
+_row = client.query(
+    "SELECT user_id, ig_user_id FROM instagram_profiles FINAL ORDER BY updated_at DESC LIMIT 1"
+).result_rows[0]
+user_id = str(_row[0])
+ig_user_id = str(_row[1])
 
 
 print("=== thumbnail_url coverage by media_type across instagram_media ===")
@@ -29,8 +31,18 @@ for r in rows:
     print(f"  type={r[0]:<14} product={r[1]:<10} total={r[2]:<4} empty_thumb={r[3]:<4} empty_media={r[4]}")
 
 print("\n=== top 10 posts: which URL the frontend will use ===")
+from datetime import datetime, timedelta, timezone
+_until = datetime.now(timezone.utc).replace(tzinfo=None)
+_since = _until - timedelta(days=365)
 top = client.query(
-    GET_TOP_PERFORMING_MEDIA, parameters={"user_id": user_id, "limit": 10}
+    GET_TOP_PERFORMING_MEDIA,
+    parameters={
+        "user_id": user_id,
+        "ig_user_id": ig_user_id,
+        "since": _since,
+        "until": _until,
+        "limit": 10,
+    },
 ).result_rows
 for r in top:
     media_id, media_type, _, thumb, media, _, _, interactions = r
