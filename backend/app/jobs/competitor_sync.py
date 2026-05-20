@@ -153,7 +153,7 @@ async def _run() -> int:
         fetch_failed = False
         snap = None
         try:
-            snap = await fetch_competitor_snapshot(ig_user_id, handle, token)
+            snap, _ = await fetch_competitor_snapshot(ig_user_id, handle, token)
         except Exception:
             logger.exception("competitor_sync: fetch failed for %s/%s", user_id, handle)
             fetch_failed = True

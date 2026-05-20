@@ -71,7 +71,25 @@
       "PowerShell(Start-Sleep -Seconds 2; try { $h = Invoke-RestMethod -Uri \"http://127.0.0.1:8000/api/health\" -TimeoutSec 5; Write-Output \"Health: $\\($h | ConvertTo-Json -Compress\\)\" } catch { Write-Output \"Backend down: $\\($_.Exception.Message\\)\" })",
       "PowerShell($paths = @\\(\"/api/instagram/insights/sentiment/diagnose\",\"/api/instagram/insights/sentiment/seed-demo\",\"/api/instagram/branded-hashtags\"\\); try { $spec = Invoke-RestMethod -Uri \"http://127.0.0.1:8000/openapi.json\" -TimeoutSec 5; foreach \\($p in $paths\\) { $present = $spec.paths.PSObject.Properties.Name -contains $p; $marker = if \\($present\\) {\"OK\"} else {\"MISSING\"}; Write-Output \"$marker  $p\" } } catch { Write-Output \"Backend not reachable: $\\($_.Exception.Message\\)\" })",
       "PowerShell($paths = @\\(\"/api/instagram/insights/sentiment/diagnose\",\"/api/instagram/insights/sentiment/seed-demo\",\"/api/instagram/branded-hashtags\"\\); try { $spec = Invoke-RestMethod -Uri \"http://127.0.0.1:8000/openapi.json\" -TimeoutSec 5; foreach \\($p in $paths\\) { $present = $spec.paths.PSObject.Properties.Name -contains $p; $marker = if \\($present\\) {\"OK\"} else {\"MISSING\"}; Write-Output \"$marker  $p\" } } catch { Write-Output $_.Exception.Message })",
-      "PowerShell(comments_count *)"
+      "PowerShell(comments_count *)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:8000/openapi.json)",
+      "PowerShell($logDir = \\(Get-Location\\).Path; Set-Location backend; $p = Start-Process -FilePath \"C:\\\\Users\\\\Admin\\\\AppData\\\\Roaming\\\\Python\\\\Python311\\\\Scripts\\\\uvicorn.exe\" -ArgumentList \"app.main:app\",\"--host\",\"127.0.0.1\",\"--port\",\"8000\" -RedirectStandardOutput \"$logDir\\\\.uvicorn.out.log\" -RedirectStandardError \"$logDir\\\\.uvicorn.err.log\" -WindowStyle Hidden -PassThru; \"PID=$\\($p.Id\\)\"; Start-Sleep -Seconds 5; if \\(-not $p.HasExited\\) { \"still-running\" } else { \"exited code=$\\($p.ExitCode\\)\" })",
+      "PowerShell(Set-Location *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8000/openapi.json)",
+      "Bash(echo openapi=__TRACKED_VAR__)",
+      "Bash(echo \"---ERR---\")",
+      "Bash(cat .uvicorn.err.log)",
+      "Bash(echo \"---OUT---\")",
+      "PowerShell(& C:\\\\Windows\\\\py.exe -3.11 -c \"import sys; print\\(sys.version\\); import uvicorn, fastapi; print\\('uvicorn', uvicorn.__version__, 'fastapi', fastapi.__version__\\); import app.main; print\\('app loaded ok'\\)\")",
+      "PowerShell(& C:\\\\Windows\\\\py.exe -0)",
+      "PowerShell(Remove-Item *)",
+      "PowerShell(& C:\\\\Windows\\\\py.exe -3.14 -c \"import sys; print\\(sys.executable\\)\")",
+      "PowerShell(netsh int *)",
+      "PowerShell($logDir = \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\"; $p = Start-Process -FilePath \"C:\\\\Users\\\\Admin\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\" -ArgumentList \"-m\",\"uvicorn\",\"app.main:app\",\"--host\",\"127.0.0.1\",\"--port\",\"8001\" -WorkingDirectory \"$logDir\\\\backend\" -RedirectStandardOutput \"$logDir\\\\.uvicorn.out.log\" -RedirectStandardError \"$logDir\\\\.uvicorn.err.log\" -WindowStyle Hidden -PassThru; \"PID=$\\($p.Id\\)\"; Start-Sleep -Seconds 5; if \\($p.HasExited\\) { \"exited code=$\\($p.ExitCode\\)\" } else { \"running\" })",
+      "PowerShell(\"--- no auth ---\"; try { Invoke-WebRequest \"http://127.0.0.1:8001/api/instagram/competitors/lookup?handle=natgeo\" -ErrorAction Stop } catch { \"$\\($_.Exception.Response.StatusCode.value__\\) $\\($_.ErrorDetails.Message\\)\" }; \"--- invalid handle ---\"; try { Invoke-WebRequest \"http://127.0.0.1:8001/api/instagram/competitors/lookup?handle=BAD!HANDLE\" -ErrorAction Stop } catch { \"$\\($_.Exception.Response.StatusCode.value__\\) $\\($_.ErrorDetails.Message\\)\" }; \"--- missing handle ---\"; try { Invoke-WebRequest \"http://127.0.0.1:8001/api/instagram/competitors/lookup\" -ErrorAction Stop } catch { \"$\\($_.Exception.Response.StatusCode.value__\\) $\\($_.ErrorDetails.Message\\)\" })",
+      "PowerShell($logDir = \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\"; $p = Start-Process -FilePath \"C:\\\\Users\\\\Admin\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\" -ArgumentList \"-m\",\"uvicorn\",\"app.main:app\",\"--reload\",\"--host\",\"127.0.0.1\",\"--port\",\"8000\" -WorkingDirectory \"$logDir\\\\backend\" -RedirectStandardOutput \"$logDir\\\\.uvicorn.out.log\" -RedirectStandardError \"$logDir\\\\.uvicorn.err.log\" -WindowStyle Hidden -PassThru; \"PID=$\\($p.Id\\)\"; Start-Sleep -Seconds 7; if \\($p.HasExited\\) { \"exited code=$\\($p.ExitCode\\)\" } else { \"running\" })",
+      "Bash(cat .uvicorn.out.log)",
+      "PowerShell($logDir = \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\"; $p = Start-Process -FilePath \"C:\\\\Users\\\\Admin\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\" -ArgumentList \"-m\",\"uvicorn\",\"app.main:app\",\"--host\",\"127.0.0.1\",\"--port\",\"8001\" -WorkingDirectory \"$logDir\\\\backend\" -RedirectStandardOutput \"$logDir\\\\.uvicorn.out.log\" -RedirectStandardError \"$logDir\\\\.uvicorn.err.log\" -WindowStyle Hidden -PassThru; \"PID=$\\($p.Id\\)\"; Start-Sleep -Seconds 4)"
     ]
   }
 }

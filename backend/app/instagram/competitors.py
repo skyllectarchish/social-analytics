@@ -29,11 +29,13 @@ async def fetch_competitor_snapshot(
     my_ig_user_id: str,
     handle: str,
     token: str,
-) -> dict[str, Any] | None:
+) -> tuple[dict[str, Any] | None, str | None]:
     """Fetch one public business-discovery snapshot.
 
-    Returns the inner `business_discovery` dict on success, or None if Meta
-    rejects the lookup (handle missing / private / personal account).
+    Returns `(business_discovery_dict, None)` on success. On failure returns
+    `(None, error_message)` where `error_message` is Meta's own error string
+    when available, or a synthesized one for network / non-200 cases. Callers
+    that only care about success can ignore the second element.
     """
     url = f"{GRAPH_BASE_URL}/{my_ig_user_id}"
     params = {
@@ -47,27 +49,35 @@ async def fetch_competitor_snapshot(
             resp = await client.get(url, params=params)
         except httpx.HTTPError as exc:
             logger.warning("business_discovery network error for %s: %s", handle, exc)
-            return None
+            return None, "Couldn't reach Instagram. Try again in a moment."
 
     if resp.status_code == 400:
-        # Meta returns 400 for handle-not-found, private, or personal accounts.
+        # Meta returns 400 for handle-not-found, private, or personal accounts,
+        # plus a separate class of "your own IG account isn't eligible for
+        # business_discovery" errors that need to be surfaced to the user.
         try:
             body = resp.json()
         except ValueError:
             body = {}
+        meta_msg = (body.get("error") or {}).get("message")
         logger.info(
-            "business_discovery 400 for %s: %s", handle, body.get("error", {}).get("message"),
+            "business_discovery 400 for %s: %s", handle, meta_msg,
         )
-        return None
+        return None, meta_msg or "Instagram rejected this handle."
     if resp.status_code != 200:
         logger.warning(
             "business_discovery HTTP %d for %s: %s",
             resp.status_code, handle, resp.text[:300],
         )
-        return None
+        return None, f"Instagram returned HTTP {resp.status_code}."
 
     payload = resp.json()
-    return payload.get("business_discovery")
+    snap = payload.get("business_discovery")
+    if not snap:
+        # Some misconfigurations return 200 with no business_discovery key —
+        # treat as not-found so the FE can render a clear message.
+        return None, "Instagram returned no profile for this handle."
+    return snap, None
 
 
 def _parse_timestamp(ts: str | None) -> datetime | None:

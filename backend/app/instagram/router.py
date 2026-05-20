@@ -58,6 +58,7 @@ from .schemas import (
     CallbackResponse,
     CompetitorItem,
     CompetitorListResponse,
+    CompetitorLookupPreview,
     CompetitorSnapshot,
     ComparisonValue,
     CompetitorTimelinePoint,
@@ -1838,6 +1839,55 @@ def _compute_self_snapshot(client, user_id: str) -> SelfSnapshot | None:
     )
 
 
+@router.get("/competitors/lookup", response_model=CompetitorLookupPreview)
+async def lookup_competitor(
+    handle: str = Query(..., min_length=1, max_length=30, pattern=r"^[A-Za-z0-9._]+$"),
+    current_user: User = Depends(get_current_user),
+):
+    """Live Instagram lookup for the add-competitor preview.
+
+    Hits Meta's Business Discovery API using the authenticated user's token and
+    returns a profile preview *without* writing to ClickHouse. Returns 404 if
+    Instagram rejects the lookup (handle not found, private, or personal
+    account). Used by the AddCompetitorDialog to confirm the handle exists on
+    Instagram before the user commits to tracking it via POST /competitors.
+    """
+    client = get_client()
+    user_id = str(current_user.id)
+
+    token_data = instagram_repo.find_token(client, user_id)
+    if token_data is None:
+        raise InstagramNotConnectedError()
+
+    handle_clean = handle.lower()
+    token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
+
+    try:
+        snap, err = await competitors.fetch_competitor_snapshot(
+            token_data.ig_user_id, handle_clean, token,
+        )
+    except Exception as exc:
+        raise InstagramAPIError(
+            "Failed to look up the handle on Instagram"
+        ) from exc
+
+    if not snap:
+        raise HTTPException(
+            status_code=404,
+            detail=err or "Account not found, or not a public Business or Creator account.",
+        )
+
+    return CompetitorLookupPreview(
+        handle=handle_clean,
+        ig_user_id=str(snap.get("id", "")),
+        display_name=snap.get("name") or snap.get("username") or handle_clean,
+        username=snap.get("username") or handle_clean,
+        profile_picture_url=snap.get("profile_picture_url", "") or "",
+        followers_count=int(snap.get("followers_count") or 0),
+        media_count=int(snap.get("media_count") or 0),
+    )
+
+
 @router.get("/competitors", response_model=CompetitorListResponse)
 def list_competitors(current_user: User = Depends(get_current_user)):
     """List the user's tracked competitor handles + their latest snapshots.
@@ -1897,7 +1947,7 @@ async def add_competitor(
     token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
 
     try:
-        snap = await competitors.fetch_competitor_snapshot(
+        snap, err = await competitors.fetch_competitor_snapshot(
             token_data.ig_user_id, handle, token,
         )
     except Exception as exc:
@@ -1908,7 +1958,7 @@ async def add_competitor(
     if not snap:
         raise HTTPException(
             status_code=400,
-            detail="Account is not a public Business or Creator account.",
+            detail=err or "Account is not a public Business or Creator account.",
         )
 
     metrics = competitors.derive_snapshot_metrics(snap)

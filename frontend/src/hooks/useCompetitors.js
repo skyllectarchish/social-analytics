@@ -66,6 +66,14 @@ export function useCompetitors() {
   return { data, loading, error, refresh, add, remove };
 }
 
+export async function lookupCompetitor(handle, { signal } = {}) {
+  const res = await api.get("/instagram/competitors/lookup", {
+    params: { handle },
+    signal,
+  });
+  return res.data;
+}
+
 export function useCompetitorTimeline() {
   const { days, compareTo } = usePeriodComparator();
   const url = buildUrl("/instagram/competitors/timeline", {

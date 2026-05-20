@@ -636,6 +636,23 @@ class AddCompetitorRequest(BaseModel):
     handle: str = Field(..., min_length=1, max_length=30, pattern=r"^[A-Za-z0-9._]+$")
 
 
+class CompetitorLookupPreview(BaseModel):
+    """Live Instagram lookup result for the add-competitor preview.
+
+    Returned by GET /competitors/lookup. Sourced from Meta Business Discovery,
+    not from ClickHouse — used to confirm the handle exists and is a public
+    Business/Creator account before the user commits to tracking it.
+    """
+
+    handle: str
+    ig_user_id: str
+    display_name: str
+    username: str
+    profile_picture_url: str
+    followers_count: int
+    media_count: int
+
+
 class CompetitorSnapshot(BaseModel):
     handle: str
     snapshot_date: date
