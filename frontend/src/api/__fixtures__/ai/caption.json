@@ -1,0 +1,30 @@
+{
+  "draft": "5 things I learned from posting daily for a year. Thread below.",
+  "scores": {
+    "hook_strength": 72,
+    "cta_presence": 28,
+    "length_fit": 58,
+    "overall": 53
+  },
+  "variants": [
+    {
+      "id": "v1",
+      "label": "Punchier hook",
+      "caption": "Posting daily for a year almost broke me. Here are 5 things I'd do differently. ↓",
+      "rationale": "Stronger emotional lead; replaces a generic numeric hook with a vulnerability angle."
+    },
+    {
+      "id": "v2",
+      "label": "Stronger CTA",
+      "caption": "5 things I learned from posting daily for a year. Which surprised you? Drop a number in comments.",
+      "rationale": "Comment prompt with a low-friction reply mechanic."
+    },
+    {
+      "id": "v3",
+      "label": "Shorter",
+      "caption": "5 lessons from a year of posting daily. The last one cost me $9k.",
+      "rationale": "Tightens copy and ends on a specific dollar figure to bait swipes."
+    }
+  ],
+  "notes_md": "Your hook reads as a familiar 'X things I learned' pattern — fine, but the **CTA is missing**. Captions on your account with explicit comment prompts get 1.8× more replies."
+}

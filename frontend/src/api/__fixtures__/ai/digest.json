@@ -1,0 +1,43 @@
+{
+  "week_of": "2026-05-12",
+  "generated_at": "2026-05-19T08:14:00Z",
+  "status": "ready",
+  "cached": true,
+  "narrative_md": "Your **save rate dropped 18%** this week, driven by carousel posts about [productivity tips](route:/dashboard/content). On the upside, your Reel on [morning routines](route:/dashboard/reels) outperformed your average reach by **3.2×** — strong candidate for a series.\n\nFollower quality stayed flat. Posting cadence drifted to 11pm — earlier in the day still wins on reach for your audience.",
+  "bullets": [
+    {
+      "kind": "win",
+      "headline": "Morning Routine Reel hit 3.2× avg reach",
+      "detail_md": "Reach 42.1k vs your 60-day median of 13.2k. Hook was a direct question; replicate the framing.",
+      "link": { "route": "/dashboard/reels", "query": {} }
+    },
+    {
+      "kind": "warning",
+      "headline": "Carousel save rate ↓ 18% WoW",
+      "detail_md": "Your save rate on carousels was 0.9% (vs 1.1% prior week). Topic shift from tactical → motivational correlates with the drop.",
+      "link": { "route": "/dashboard/content", "query": { "format": "CAROUSEL" } }
+    },
+    {
+      "kind": "trend",
+      "headline": "Audience time-of-day shifting later",
+      "detail_md": "Engagement peak moved from 8pm to 9:30pm. Consider testing later slots.",
+      "link": null
+    },
+    {
+      "kind": "experiment",
+      "headline": "Try a 3-part Reel series on morning routines",
+      "detail_md": "Your top post this week was on this theme. A series will compound retention.",
+      "link": null
+    }
+  ],
+  "metrics_snapshot": {
+    "save_rate_pct_delta": -18.0,
+    "reach_pct_delta": 12.3,
+    "follows_delta": 247,
+    "posts_count": 6
+  },
+  "followups": [
+    "Pin the morning-routine Reel to your grid",
+    "Cut the carousel topic that flopped from this week's plan"
+  ]
+}

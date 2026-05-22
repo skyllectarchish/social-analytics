@@ -1,0 +1,31 @@
+{
+  "name": "weak-cta-draft",
+  "inputs": {
+    "format": "REELS",
+    "draft": "5 things I learned from posting daily for a year. Thread below.",
+    "topic_hint": "lessons from consistency",
+    "top_captions": [
+      {"caption": "Posting daily for a year almost broke me — here's what saved me.",
+       "ts": "2026-03-01T11:00:00", "reach": 42100, "saves": 720, "shares": 340,
+       "likes": 4200, "comments": 120, "interactions": 5380,
+       "algorithm_score_pct": 92.0, "length_chars": 64},
+      {"caption": "Which one of these would actually help you most? Comment a number.",
+       "ts": "2026-03-15T10:30:00", "reach": 31000, "saves": 540, "shares": 220,
+       "likes": 3500, "comments": 95, "interactions": 4260,
+       "algorithm_score_pct": 84.0, "length_chars": 66},
+      {"caption": "5 minutes that changed my morning forever. Save this for tomorrow.",
+       "ts": "2026-04-02T08:30:00", "reach": 28000, "saves": 410, "shares": 180,
+       "likes": 3100, "comments": 80, "interactions": 3770,
+       "algorithm_score_pct": 79.0, "length_chars": 66}
+    ]
+  },
+  "golden": {
+    "variant_count": 3,
+    "label_subset_of": [
+      "Punchier hook", "Stronger CTA", "Shorter",
+      "Question hook", "Listicle", "Story arc", "Direct ask"
+    ],
+    "max_caption_chars": 2200,
+    "expect_length_fit_at_least": 70
+  }
+}

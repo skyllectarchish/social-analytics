@@ -946,3 +946,466 @@ INNER JOIN instagram_media m FINAL
 WHERE h.user_id = {user_id:UUID}
   AND h.hashtag = {hashtag:String}
 """
+
+
+# --- Tier 4: AI Copilot ---
+
+# Read the cached weekly digest for (user_id, week_of). Returns one row or none.
+GET_AI_DIGEST = """
+SELECT week_of, status, cached, narrative_md, bullets_json, followups_json,
+       metrics_snapshot, generated_at
+FROM ai_digests FINAL
+WHERE user_id = {user_id:UUID}
+  AND week_of = {week_of:Date}
+LIMIT 1
+"""
+
+# Aggregate AI calls in the current calendar month (UTC). 'digest_auto' is
+# excluded because the scheduled weekly digest is system-charged, not
+# user-charged.
+GET_AI_QUOTA_USED_THIS_MONTH = """
+SELECT count() AS used
+FROM ai_quota_usage
+WHERE user_id = {user_id:UUID}
+  AND called_at >= toStartOfMonth(now())
+  AND feature != 'digest_auto'
+"""
+
+# Idempotent on (user_id, feature, ref_id) thanks to ReplacingMergeTree —
+# repeat submits collapse to the latest row at merge time.
+GET_AI_FEEDBACK = """
+SELECT rating, note, updated_at
+FROM ai_feedback FINAL
+WHERE user_id = {user_id:UUID}
+  AND feature = {feature:String}
+  AND ref_id = {ref_id:String}
+LIMIT 1
+"""
+
+# Inserts use the client.insert(table, rows, column_names=[...]) helper
+# from clickhouse-connect — see ai/quota.py, ai/feedback.py, ai/telemetry.py.
+# No raw INSERT strings here, matching the project convention.
+
+# Cached weekly digest read (Phase B). Returns one row or none.
+GET_AI_DIGEST = """
+SELECT
+    week_of,
+    status,
+    cached,
+    narrative_md,
+    bullets_json,
+    followups_json,
+    metrics_snapshot,
+    generated_at
+FROM ai_digests FINAL
+WHERE user_id = {user_id:UUID}
+  AND week_of = {week_of:Date}
+LIMIT 1
+"""
+
+# Posts published in the digest week, with per-post metric aggregates
+# from media_insights. Caption is truncated to 200 chars in Python (we
+# don't trim in SQL because ClickHouse Strings can be long-ish; trimming
+# saves token spend, not query cost).
+GET_DIGEST_WEEK_POSTS = """
+SELECT
+    m.ig_media_id,
+    m.media_type,
+    m.permalink,
+    m.caption,
+    m.timestamp,
+    m.like_count,
+    m.comments_count,
+    toInt64(sumIf(mi.metric_value, mi.metric_name = 'reach')) AS reach,
+    toInt64(sumIf(mi.metric_value, mi.metric_name = 'views')) AS views,
+    toInt64(sumIf(mi.metric_value, mi.metric_name = 'saved')) AS saves,
+    toInt64(sumIf(mi.metric_value, mi.metric_name = 'shares')) AS shares,
+    toInt64(sumIf(mi.metric_value, mi.metric_name = 'total_interactions')) AS interactions
+FROM instagram_media m FINAL
+LEFT JOIN media_insights mi FINAL
+    ON mi.ig_media_id = m.ig_media_id AND mi.user_id = m.user_id
+WHERE m.user_id = {user_id:UUID}
+  AND m.ig_user_id = {ig_user_id:String}
+  AND m.timestamp >= {since:DateTime}
+  AND m.timestamp < {until:DateTime}
+GROUP BY m.ig_media_id, m.media_type, m.permalink, m.caption,
+         m.timestamp, m.like_count, m.comments_count
+ORDER BY m.timestamp DESC
+"""
+
+# Aggregate engagement signals over a single window. Used twice in the
+# digest loader — once for the requested week, once for the prior week —
+# so we can compute period-over-period deltas.
+GET_DIGEST_WINDOW_AGGREGATES = """
+SELECT
+    count(DISTINCT m.ig_media_id) AS posts_count,
+    sumIf(mi.metric_value, mi.metric_name = 'reach') AS total_reach,
+    sumIf(mi.metric_value, mi.metric_name = 'saved') AS total_saves,
+    sumIf(mi.metric_value, mi.metric_name = 'shares') AS total_shares,
+    sumIf(mi.metric_value, mi.metric_name = 'total_interactions') AS total_interactions
+FROM instagram_media m FINAL
+LEFT JOIN media_insights mi FINAL
+    ON mi.ig_media_id = m.ig_media_id AND mi.user_id = m.user_id
+WHERE m.user_id = {user_id:UUID}
+  AND m.ig_user_id = {ig_user_id:String}
+  AND m.timestamp >= {since:DateTime}
+  AND m.timestamp < {until:DateTime}
+"""
+
+# Net follower change inside a date window. Reads from `account_insights`
+# follows_and_unfollows series — same source the dashboard uses.
+GET_DIGEST_FOLLOWER_DELTA = """
+SELECT
+    toInt64(sum(metric_value)) AS net_change
+FROM account_insights FINAL
+WHERE user_id = {user_id:UUID}
+  AND ig_user_id = {ig_user_id:String}
+  AND metric_name = 'follows_and_unfollows'
+  AND end_time >= {since:DateTime}
+  AND end_time < {until:DateTime}
+"""
+
+# Best (peak-engagement) hour over a window. Used twice — week + prior
+# 60d baseline — to detect cadence drift.
+GET_DIGEST_PEAK_HOUR = """
+SELECT
+    toHour(m.timestamp) AS hour,
+    sum(mi.metric_value) AS total_interactions,
+    count(DISTINCT m.ig_media_id) AS posts
+FROM instagram_media m FINAL
+INNER JOIN media_insights mi FINAL
+    ON mi.ig_media_id = m.ig_media_id AND mi.user_id = m.user_id
+WHERE m.user_id = {user_id:UUID}
+  AND m.ig_user_id = {ig_user_id:String}
+  AND mi.metric_name = 'total_interactions'
+  AND m.timestamp >= {since:DateTime}
+  AND m.timestamp < {until:DateTime}
+GROUP BY hour
+HAVING posts > 0
+ORDER BY total_interactions DESC
+LIMIT 1
+"""
+
+# Average save_rate per media_type over a window. Used to detect format
+# regressions ("carousel save rate dropped 18%"). We compute the rate
+# per post then average — matches how the dashboard renders it.
+GET_DIGEST_FORMAT_RATES = """
+SELECT
+    m.media_type,
+    avgIf(metrics.saved / metrics.reach, metrics.reach > 0) AS avg_save_rate,
+    avgIf(metrics.shares / metrics.reach, metrics.reach > 0) AS avg_share_rate,
+    avgIf(metrics.total_interactions / metrics.reach, metrics.reach > 0) AS avg_engagement_rate,
+    count(DISTINCT m.ig_media_id) AS posts
+FROM instagram_media m FINAL
+INNER JOIN (
+    SELECT
+        ig_media_id, user_id,
+        sumIf(metric_value, metric_name = 'reach') AS reach,
+        sumIf(metric_value, metric_name = 'saved') AS saved,
+        sumIf(metric_value, metric_name = 'shares') AS shares,
+        sumIf(metric_value, metric_name = 'total_interactions') AS total_interactions
+    FROM media_insights FINAL
+    WHERE user_id = {user_id:UUID}
+    GROUP BY ig_media_id, user_id
+) metrics ON m.ig_media_id = metrics.ig_media_id AND m.user_id = metrics.user_id
+WHERE m.user_id = {user_id:UUID}
+  AND m.ig_user_id = {ig_user_id:String}
+  AND m.timestamp >= {since:DateTime}
+  AND m.timestamp < {until:DateTime}
+GROUP BY m.media_type
+HAVING posts > 0
+"""
+
+# Sample-size gate. Used to short-circuit the digest with
+# status='not_enough_data' instead of charging an LLM call for a creator
+# who has barely posted.
+GET_DIGEST_POSTS_COUNT_SINCE = """
+SELECT count(DISTINCT ig_media_id) AS posts
+FROM instagram_media FINAL
+WHERE user_id = {user_id:UUID}
+  AND ig_user_id = {ig_user_id:String}
+  AND timestamp >= {since:DateTime}
+"""
+
+# Scheduled weekly digest job — list every (user_id, ig_user_id) with at
+# least one post in the trailing 30 days. The job loops over these and
+# synthesizes per-user digests; the sufficiency check inside
+# digest.has_enough_data() then filters out anyone too thin.
+LIST_USERS_WITH_RECENT_ACTIVITY = """
+SELECT
+    p.user_id,
+    p.ig_user_id
+FROM instagram_profiles p FINAL
+INNER JOIN (
+    SELECT DISTINCT user_id, ig_user_id
+    FROM instagram_media FINAL
+    WHERE timestamp >= {since:DateTime}
+) m ON m.user_id = p.user_id AND m.ig_user_id = p.ig_user_id
+"""
+
+# Admin cost dashboard — daily/feature/model breakdown of LLM spend
+# from ai_quota_usage. Used by GET /api/admin/ai-cost (Phase F).
+GET_AI_COST_BREAKDOWN = """
+SELECT
+    toDate(called_at) AS day,
+    feature,
+    model,
+    count() AS calls,
+    sum(input_tokens) AS input_tokens,
+    sum(output_tokens) AS output_tokens,
+    sum(cache_read_tokens) AS cache_read_tokens,
+    sum(cache_write_tokens) AS cache_write_tokens,
+    sum(cost_usd_micros) AS cost_usd_micros
+FROM ai_quota_usage
+WHERE called_at >= {since:DateTime}
+  AND called_at < {until:DateTime}
+GROUP BY day, feature, model
+ORDER BY day DESC, cost_usd_micros DESC
+"""
+
+# --- Phase C: Content Ideas ---
+
+# Cache read. The 6h freshness check happens in Python — this just
+# returns the latest row (or none).
+GET_AI_IDEAS_CACHE = """
+SELECT response_json, themes_json, generated_at
+FROM ai_ideas FINAL
+WHERE user_id = {user_id:UUID}
+  AND period_days = {period_days:UInt16}
+  AND limit_n = {limit_n:UInt16}
+LIMIT 1
+"""
+
+# Top-N posts ranked by algorithm score over a trailing window. We
+# inline the same algorithm-score formula used elsewhere
+# (shares * 0.4 + saves * 0.35 + likes * 0.15 + comments * 0.10) / reach.
+GET_IDEAS_TOP_POSTS = """
+SELECT
+    m.ig_media_id,
+    m.media_type,
+    m.permalink,
+    m.thumbnail_url,
+    substring(m.caption, 1, 240) AS caption_preview,
+    m.timestamp,
+    toInt64(metrics.reach) AS reach,
+    toInt64(metrics.likes) AS likes,
+    toInt64(metrics.saved) AS saves,
+    toInt64(metrics.shares) AS shares,
+    toInt64(metrics.total_interactions) AS interactions,
+    round(if(metrics.reach > 0,
+        (metrics.shares * 0.4 + metrics.saved * 0.35
+         + metrics.likes * 0.15 + metrics.comments * 0.10)
+        / metrics.reach * 100, 0), 2) AS algorithm_score_pct
+FROM instagram_media m FINAL
+INNER JOIN (""" + PIVOTED_MEDIA_METRICS + """) metrics
+    ON m.ig_media_id = metrics.ig_media_id AND m.user_id = metrics.user_id
+WHERE m.user_id = {user_id:UUID}
+  AND m.ig_user_id = {ig_user_id:String}
+  AND m.timestamp >= {since:DateTime}
+ORDER BY algorithm_score_pct DESC
+LIMIT {limit:UInt32}
+"""
+
+# Hashtag distribution across all of the user's posts in the trailing
+# window. Powers the adjacency check — themes the user already uses are
+# "in-distribution"; themes that appear only in newly-proposed ideas
+# become adjacent flags.
+GET_IDEAS_HISTORICAL_HASHTAGS = """
+SELECT
+    h.hashtag,
+    count(DISTINCT h.ig_media_id) AS post_count
+FROM post_hashtags h FINAL
+INNER JOIN instagram_media m FINAL
+    ON m.ig_media_id = h.ig_media_id AND m.user_id = h.user_id
+WHERE h.user_id = {user_id:UUID}
+  AND m.ig_user_id = {ig_user_id:String}
+  AND m.timestamp >= {since:DateTime}
+GROUP BY h.hashtag
+ORDER BY post_count DESC
+LIMIT {limit:UInt32}
+"""
+
+# --- Phase D: Post Diagnostic ---
+
+# Cache read. The 5-minute freshness check happens in Python.
+GET_AI_DIAGNOSTIC_CACHE = """
+SELECT response_json, generated_at
+FROM ai_diagnostics FINAL
+WHERE user_id = {user_id:UUID}
+  AND ig_media_id = {ig_media_id:String}
+LIMIT 1
+"""
+
+# Pull the target post + its pivoted metrics. Single-row read used to
+# (a) check eligibility (≥24h old) and (b) populate the `observed` half
+# of the response.
+GET_DIAGNOSTIC_TARGET_POST = """
+SELECT
+    m.ig_media_id,
+    m.media_type,
+    m.permalink,
+    m.thumbnail_url,
+    m.caption,
+    m.timestamp,
+    toInt64(metrics.reach) AS reach,
+    toInt64(metrics.likes) AS likes,
+    toInt64(metrics.saved) AS saves,
+    toInt64(metrics.shares) AS shares,
+    toInt64(metrics.comments) AS comments,
+    toInt64(metrics.total_interactions) AS interactions,
+    toFloat64(metrics.avg_watch_time) AS avg_watch_time
+FROM instagram_media m FINAL
+INNER JOIN (""" + PIVOTED_MEDIA_METRICS + """) metrics
+    ON m.ig_media_id = metrics.ig_media_id AND m.user_id = metrics.user_id
+WHERE m.user_id = {user_id:UUID}
+  AND m.ig_media_id = {ig_media_id:String}
+LIMIT 1
+"""
+
+# Rolling 60-post baseline for the user, EXCLUDING the target post.
+# Median rather than mean because Instagram engagement is heavy-tailed.
+# We use quantileExact so the values are stable across calls — important
+# for the prompt cache (any drift here breaks the cached prefix).
+GET_DIAGNOSTIC_BASELINE = """
+SELECT
+    quantileExact(0.5)(toFloat64(reach)) AS median_reach,
+    quantileExact(0.5)(if(reach > 0, total_interactions / reach * 100, 0)) AS median_er_pct,
+    quantileExact(0.5)(if(reach > 0, saved / reach * 100, 0)) AS median_save_rate_pct,
+    quantileExact(0.5)(if(reach > 0, shares / reach * 100, 0)) AS median_share_rate_pct,
+    count() AS sample_size
+FROM (
+    SELECT
+        m.ig_media_id,
+        metrics.reach AS reach,
+        metrics.saved AS saved,
+        metrics.shares AS shares,
+        metrics.total_interactions AS total_interactions
+    FROM instagram_media m FINAL
+    INNER JOIN (""" + PIVOTED_MEDIA_METRICS + """) metrics
+        ON m.ig_media_id = metrics.ig_media_id AND m.user_id = metrics.user_id
+    WHERE m.user_id = {user_id:UUID}
+      AND m.ig_user_id = {ig_user_id:String}
+      AND m.ig_media_id != {target_ig_media_id:String}
+    ORDER BY m.timestamp DESC
+    LIMIT 60
+)
+"""
+
+# Same shape as the all-format baseline but scoped to one media_type —
+# powers the "Reels outperform Carousels 2.1x for this account" factor.
+GET_DIAGNOSTIC_FORMAT_BASELINE = """
+SELECT
+    quantileExact(0.5)(toFloat64(reach)) AS median_reach,
+    quantileExact(0.5)(if(reach > 0, total_interactions / reach * 100, 0)) AS median_er_pct,
+    quantileExact(0.5)(if(reach > 0, saved / reach * 100, 0)) AS median_save_rate_pct,
+    count() AS sample_size
+FROM (
+    SELECT
+        m.ig_media_id,
+        metrics.reach AS reach,
+        metrics.saved AS saved,
+        metrics.total_interactions AS total_interactions
+    FROM instagram_media m FINAL
+    INNER JOIN (""" + PIVOTED_MEDIA_METRICS + """) metrics
+        ON m.ig_media_id = metrics.ig_media_id AND m.user_id = metrics.user_id
+    WHERE m.user_id = {user_id:UUID}
+      AND m.ig_user_id = {ig_user_id:String}
+      AND m.media_type = {media_type:String}
+      AND m.ig_media_id != {target_ig_media_id:String}
+    ORDER BY m.timestamp DESC
+    LIMIT 60
+)
+"""
+
+# Hour-of-day distribution across the user's last 60 posts. The
+# diagnostic uses this to detect "posted at 3am vs your 11am sweet spot"
+# style observations.
+GET_DIAGNOSTIC_HOUR_DISTRIBUTION = """
+SELECT
+    toHour(m.timestamp) AS hour,
+    count(DISTINCT m.ig_media_id) AS posts,
+    avg(if(metrics.reach > 0, metrics.total_interactions / metrics.reach * 100, 0)) AS avg_er_pct,
+    avg(metrics.reach) AS avg_reach
+FROM instagram_media m FINAL
+INNER JOIN (""" + PIVOTED_MEDIA_METRICS + """) metrics
+    ON m.ig_media_id = metrics.ig_media_id AND m.user_id = metrics.user_id
+WHERE m.user_id = {user_id:UUID}
+  AND m.ig_user_id = {ig_user_id:String}
+  AND m.ig_media_id != {target_ig_media_id:String}
+GROUP BY hour
+HAVING posts > 0
+ORDER BY hour
+"""
+
+# Hashtags used on the target post, joined with the user's overall
+# usage frequency. Powers "5 of 8 hashtags are over-used / broad" type
+# observations.
+GET_DIAGNOSTIC_POST_HASHTAGS = """
+SELECT
+    h.hashtag,
+    countIf(h2.ig_media_id IS NOT NULL) AS user_uses
+FROM post_hashtags h FINAL
+LEFT JOIN post_hashtags h2 FINAL
+    ON h2.hashtag = h.hashtag
+   AND h2.user_id = h.user_id
+   AND h2.ig_media_id != h.ig_media_id
+WHERE h.user_id = {user_id:UUID}
+  AND h.ig_media_id = {ig_media_id:String}
+GROUP BY h.hashtag
+ORDER BY user_uses DESC
+"""
+
+# Optional — sentiment summary if the comment_sentiment table has rows
+# for this post. Returns one row at most (or empty if no comments yet).
+GET_DIAGNOSTIC_SENTIMENT_SUMMARY = """
+SELECT
+    countIf(sentiment = 'positive') AS positive,
+    countIf(sentiment = 'neutral') AS neutral,
+    countIf(sentiment = 'negative') AS negative,
+    countIf(is_question = 1) AS questions,
+    count() AS total
+FROM comment_sentiment FINAL
+WHERE user_id = {user_id:UUID}
+  AND ig_media_id = {ig_media_id:String}
+"""
+
+# --- Phase E: Caption Studio ---
+
+# Top-N captions for a given format, ranked by algorithm score over the
+# user's full posting history. The format → media_type/media_product_type
+# predicate is inlined here so callers pass a single {format:String}.
+# Captions are returned untruncated; the service layer redacts PII and
+# truncates per token budget.
+GET_CAPTION_TOP_CAPTIONS = """
+SELECT
+    m.ig_media_id,
+    m.media_type,
+    m.media_product_type,
+    m.caption,
+    m.timestamp,
+    toInt64(metrics.reach) AS reach,
+    toInt64(metrics.saved) AS saves,
+    toInt64(metrics.shares) AS shares,
+    toInt64(metrics.likes) AS likes,
+    toInt64(metrics.comments) AS comments,
+    toInt64(metrics.total_interactions) AS interactions,
+    round(if(metrics.reach > 0,
+        (metrics.shares * 0.4 + metrics.saved * 0.35
+         + metrics.likes * 0.15 + metrics.comments * 0.10)
+        / metrics.reach * 100, 0), 2) AS algorithm_score_pct
+FROM instagram_media m FINAL
+INNER JOIN (""" + PIVOTED_MEDIA_METRICS + """) metrics
+    ON m.ig_media_id = metrics.ig_media_id AND m.user_id = metrics.user_id
+WHERE m.user_id = {user_id:UUID}
+  AND m.ig_user_id = {ig_user_id:String}
+  AND m.caption != ''
+  AND (
+        ({format:String} = 'REELS'    AND m.media_product_type = 'REELS')
+     OR ({format:String} = 'CAROUSEL' AND m.media_type = 'CAROUSEL_ALBUM')
+     OR ({format:String} = 'IMAGE'    AND m.media_type = 'IMAGE'
+                                       AND m.media_product_type != 'STORY')
+     OR ({format:String} = 'STORY'    AND m.media_product_type = 'STORY')
+  )
+ORDER BY algorithm_score_pct DESC
+LIMIT {limit:UInt32}
+"""

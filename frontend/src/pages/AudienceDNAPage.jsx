@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { motion } from "framer-motion";
 import DashboardLayout from "../components/DashboardLayout";
 import PageHeader from "../components/shared/PageHeader";
@@ -15,6 +15,10 @@ import SentimentTrendChart from "../components/audience-dna/SentimentTrendChart"
 import QuestionPostsCard from "../components/audience-dna/QuestionPostsCard";
 import PostInsightsDrawer from "../components/dashboard/PostInsightsDrawer";
 import SyncButton from "../components/dashboard/SyncButton";
+
+const PostDiagnosticDrawer = lazy(() =>
+  import("../components/copilot/PostDiagnosticDrawer"),
+);
 
 const BREAKDOWN_OPTIONS = [
   { value: "age", label: "Age" },
@@ -53,6 +57,7 @@ function adaptDriver(p) {
 export default function AudienceDNAPage() {
   const [breakdown, setBreakdown] = useState("age");
   const [selectedMedia, setSelectedMedia] = useState(null);
+  const [diagnosticMedia, setDiagnosticMedia] = useState(null);
 
   return (
     <DashboardLayout>
@@ -148,7 +153,14 @@ export default function AudienceDNAPage() {
       <PostInsightsDrawer
         media={selectedMedia}
         onClose={() => setSelectedMedia(null)}
+        onDiagnose={(m) => {
+          setSelectedMedia(null);
+          setDiagnosticMedia(m);
+        }}
       />
+      <Suspense fallback={null}>
+        <PostDiagnosticDrawer media={diagnosticMedia} onClose={() => setDiagnosticMedia(null)} />
+      </Suspense>
     </DashboardLayout>
   );
 }

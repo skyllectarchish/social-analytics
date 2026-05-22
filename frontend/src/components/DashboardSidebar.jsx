@@ -1,8 +1,9 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { BarChart3, FlaskConical, Film, Users, LineChart } from "lucide-react";
+import { BarChart3, FlaskConical, Film, Users, LineChart, Sparkles } from "lucide-react";
+import { anyAIOn } from "../utils/featureFlags";
 
-const NAV_ITEMS = [
+const BASE_NAV_ITEMS = [
   { to: "/dashboard", icon: BarChart3, label: "Overview" },
   { to: "/dashboard/content", icon: FlaskConical, label: "Content Lab" },
   { to: "/dashboard/reels", icon: Film, label: "Reels Studio" },
@@ -10,12 +11,19 @@ const NAV_ITEMS = [
   { to: "/dashboard/competitors", icon: LineChart, label: "Competitors" },
 ];
 
+const NAV_ITEMS = anyAIOn()
+  ? [
+      ...BASE_NAV_ITEMS,
+      { to: "/dashboard/copilot", icon: Sparkles, label: "Copilot", beta: true },
+    ]
+  : BASE_NAV_ITEMS;
+
 export default function DashboardSidebar() {
   const { pathname } = useLocation();
 
   return (
     <aside className="hidden lg:flex flex-col w-[220px] shrink-0 h-[calc(100dvh-56px)] sticky top-[56px] py-5 px-3 gap-1">
-      {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
+      {NAV_ITEMS.map(({ to, icon: Icon, label, beta }) => {
         const isActive = pathname === to;
         return (
           <NavLink key={to} to={to} className="relative">
@@ -40,6 +48,17 @@ export default function DashboardSidebar() {
             >
               <Icon size={18} strokeWidth={isActive ? 2.2 : 1.8} />
               <span>{label}</span>
+              {beta && (
+                <span
+                  className="ml-auto text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md"
+                  style={{
+                    background: "rgba(139,92,246,0.12)",
+                    color: "#7c3aed",
+                  }}
+                >
+                  Beta
+                </span>
+              )}
             </div>
           </NavLink>
         );

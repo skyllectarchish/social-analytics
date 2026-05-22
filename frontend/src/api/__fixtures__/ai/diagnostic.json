@@ -1,0 +1,39 @@
+{
+  "ig_media_id": "17891234567890",
+  "baseline": {
+    "avg_reach": 9100,
+    "avg_engagement_rate_pct": 3.4,
+    "avg_save_rate_pct": 1.1
+  },
+  "observed": {
+    "avg_reach": 4280,
+    "avg_engagement_rate_pct": 1.8,
+    "avg_save_rate_pct": 0.4
+  },
+  "underperformed": true,
+  "verdict_md": "**Timing was the dominant factor.** Posted at 3:14am, which is your weakest window — your audience is 73% USA-based and skews 9am–11am.",
+  "factors": [
+    {
+      "key": "timing",
+      "severity": "high",
+      "headline": "Posted at 3am — your audience's worst window",
+      "detail_md": "Posts published 2–5am have averaged 38% of your median reach over the last 60 posts.",
+      "evidence": { "metric": "reach_pct_vs_median", "value": 38, "comparison": "median window 100%" }
+    },
+    {
+      "key": "hashtags",
+      "severity": "medium",
+      "headline": "Hashtag mix skewed broad",
+      "detail_md": "5 of 8 hashtags have a >2M post count — your reach correlates better with 200k–2M tags.",
+      "evidence": { "metric": "avg_hashtag_size", "value": 3400000, "comparison": "best-performing band" }
+    },
+    {
+      "key": "format",
+      "severity": "low",
+      "headline": "Carousel — slightly suboptimal here",
+      "detail_md": "For this topic, your Reels outperform Carousels 2.1×; not the main issue, but worth noting.",
+      "evidence": { "metric": "format_lift_vs_reel", "value": 0.47, "comparison": "1.0 = reel baseline" }
+    }
+  ],
+  "recommendations_md": "- Repost the core idea as a Reel during your 10am window.\n- Trade 2-3 of the largest hashtags for niche tags in the 200k–1M range.\n- Lead with the conclusion in the cover slide; viewers swipe further when they're hooked first."
+}

@@ -1,8 +1,9 @@
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import AnimatedCounter from "../landing/ui/AnimatedCounter";
-import { UserPlus } from "lucide-react";
+import { UserPlus, Sparkles } from "lucide-react";
 import { useMediaInsights, useMediaConversion } from "../../hooks/useInsights";
 import { useMediaSentiment } from "../../hooks/useSentiment";
+import { flagOn } from "../../utils/featureFlags";
 
 const SENTIMENT_COLORS = {
   positive: "#10b981",
@@ -221,7 +222,7 @@ function InsightMiniCard({ name, value, icon, index = 0 }) {
   );
 }
 
-export default function PostInsightsDrawer({ media, onClose }) {
+export default function PostInsightsDrawer({ media, onClose, onDiagnose }) {
   const { data, loading } = useMediaInsights(media?.ig_media_id);
 
   const insightsMap = {};
@@ -316,6 +317,23 @@ export default function PostInsightsDrawer({ media, onClose }) {
                     )}
                   </div>
                 </div>
+                {onDiagnose && flagOn("ai_diagnostic") && (
+                  <button
+                    onClick={() => onDiagnose(media)}
+                    className="shrink-0 inline-flex items-center gap-1.5 px-3 h-8 rounded-full text-[12px] font-medium transition-colors"
+                    style={{
+                      background: "rgba(139,92,246,0.10)",
+                      color: "#7c3aed",
+                      border: "1px solid rgba(139,92,246,0.20)",
+                      cursor: "pointer",
+                    }}
+                    aria-label="Diagnose this post"
+                    title="Run AI diagnostic"
+                  >
+                    <Sparkles size={12} />
+                    Diagnose
+                  </button>
+                )}
                 <button
                   onClick={onClose}
                   className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
@@ -379,7 +397,7 @@ export default function PostInsightsDrawer({ media, onClose }) {
                         <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.12em", color: "#94A3B8", marginBottom: 4 }}>
                           {m.label}
                         </p>
-                        <p className="metric-value" style={{ fontSize: 20, color: "#F1F5F9" }}>
+                        <p className="metric-value" style={{ fontSize: 20, color: "#0F172A" }}>
                           {m.fmt ? m.fmt(insightsMap[m.key]) : Math.round(insightsMap[m.key]).toLocaleString()}
                         </p>
                       </div>

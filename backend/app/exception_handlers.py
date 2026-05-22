@@ -7,6 +7,9 @@ from fastapi.responses import JSONResponse
 
 from .exceptions import (
     AccountDisabledError,
+    AICircuitOpenError,
+    AINotConfiguredError,
+    AIProviderError,
     AppError,
     AuthenticationError,
     DatabaseError,
@@ -15,12 +18,16 @@ from .exceptions import (
     InstagramAPIError,
     InstagramNotConnectedError,
     InstagramSetupError,
+    MediaNotEligibleError,
     OAuthError,
+    QuotaExhaustedError,
 )
 
 logger = logging.getLogger(__name__)
 
-# Map exception types to HTTP status codes
+# Map exception types to HTTP status codes. AI exceptions map to status
+# codes the frontend's error taxonomy (see frontend plan §26) already
+# branches on — 429 for quota, 422 for not-eligible, 502 for upstream.
 _STATUS_MAP: dict[type[AppError], int] = {
     AuthenticationError: 401,
     AccountDisabledError: 403,
@@ -31,6 +38,11 @@ _STATUS_MAP: dict[type[AppError], int] = {
     InstagramSetupError: 400,
     InstagramAPIError: 502,
     DatabaseError: 503,
+    AINotConfiguredError: 503,
+    QuotaExhaustedError: 429,
+    MediaNotEligibleError: 422,
+    AIProviderError: 502,
+    AICircuitOpenError: 502,
 }
 
 

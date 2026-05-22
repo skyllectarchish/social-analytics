@@ -89,6 +89,37 @@ body {
 .animate-fade-in { animation: fadeIn 0.4s ease forwards; }
 .animate-count   { animation: countUp 0.5s ease forwards; }
 
+/* ---------- AI Copilot (Tier 4) ---------- */
+@keyframes aiShimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+.ai-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(139,92,246,0.06) 0%,
+    rgba(139,92,246,0.18) 50%,
+    rgba(139,92,246,0.06) 100%
+  );
+  background-size: 200% 100%;
+  animation: aiShimmer 2.4s linear infinite;
+}
+@keyframes aiCaretBlink {
+  0%, 50%  { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+.ai-caret {
+  display: inline-block;
+  width: 0.5ch;
+  margin-left: 1px;
+  animation: aiCaretBlink 1s steps(1) infinite;
+  color: #7c3aed;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-shimmer { animation: none; }
+  .ai-caret   { animation: none; opacity: 1; }
+}
+
 /* ---------- Landing animations ---------- */
 @keyframes meshShift {
   0%   { transform: translate(0%, 0%) scale(1); }

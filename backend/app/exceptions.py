@@ -85,3 +85,64 @@ class EntityNotFoundError(AppError):
 
     def __init__(self, entity: str = "Entity") -> None:
         super().__init__(f"{entity} not found")
+
+
+# --- AI / Tier 4 ---
+
+class AIError(AppError):
+    """Base for all AI-feature errors. Routes raise these and the global
+    handler translates them to HTTP status codes + the documented `code`
+    field in `detail` that the frontend's error taxonomy consumes."""
+
+    code: str = "unknown"
+
+    def __init__(self, message: str = "AI request failed") -> None:
+        super().__init__(message)
+
+
+class AINotConfiguredError(AIError):
+    """ANTHROPIC_API_KEY is unset. Routes that need the LLM return 503."""
+
+    code = "not_configured"
+
+    def __init__(self) -> None:
+        super().__init__("AI features are not configured")
+
+
+class QuotaExhaustedError(AIError):
+    """User has reached their monthly AI call quota."""
+
+    code = "quota_exhausted"
+
+    def __init__(self, resets_at: str | None = None) -> None:
+        suffix = f" Resets {resets_at}." if resets_at else ""
+        super().__init__(f"Monthly AI call limit reached.{suffix}")
+
+
+class MediaNotEligibleError(AIError):
+    """Media target is ineligible for diagnostics (typically < 24h old)."""
+
+    code = "media_not_eligible"
+
+    def __init__(self, message: str = "Media not eligible for diagnostic") -> None:
+        super().__init__(message)
+
+
+class AIProviderError(AIError):
+    """Anthropic API hit an error (5xx, timeout, or upstream issue)."""
+
+    code = "upstream_error"
+
+    def __init__(self, message: str = "AI provider request failed",
+                 code: str = "upstream_error") -> None:
+        self.code = code
+        super().__init__(message)
+
+
+class AICircuitOpenError(AIError):
+    """Circuit breaker is tripped — short-circuit instead of calling the provider."""
+
+    code = "upstream_error"
+
+    def __init__(self) -> None:
+        super().__init__("AI provider temporarily unavailable")

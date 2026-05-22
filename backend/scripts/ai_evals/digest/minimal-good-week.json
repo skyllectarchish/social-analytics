@@ -1,0 +1,46 @@
+{
+  "name": "minimal-good-week",
+  "inputs": {
+    "week_of": "2026-05-12",
+    "posts": [
+      {"id": "media_a", "type": "VIDEO", "ts": "2026-05-13T11:00:00",
+       "caption": "Morning routine for content creators",
+       "likes": 4200, "comments": 120, "reach": 42100,
+       "views": 78000, "saves": 720, "shares": 340, "interactions": 5380},
+      {"id": "media_b", "type": "CAROUSEL_ALBUM", "ts": "2026-05-14T18:00:00",
+       "caption": "5 productivity tools I actually use",
+       "likes": 2200, "comments": 80, "reach": 18900,
+       "views": 22000, "saves": 290, "shares": 110, "interactions": 2680},
+      {"id": "media_c", "type": "VIDEO", "ts": "2026-05-15T12:00:00",
+       "caption": "Behind the scenes of yesterday's shoot",
+       "likes": 3100, "comments": 95, "reach": 28400,
+       "views": 41000, "saves": 410, "shares": 180, "interactions": 3785}
+    ],
+    "totals": {"reach": 89400, "saves": 1420, "shares": 630, "interactions": 11845},
+    "deltas": {
+      "save_rate_pct_delta": -18.0,
+      "reach_pct_delta": 12.3,
+      "follows_delta": 247,
+      "posts_count": 3
+    },
+    "format_rates": [
+      {"media_type": "VIDEO",
+       "save_rate_pct_this_week": 1.6, "share_rate_pct_this_week": 0.7,
+       "engagement_rate_pct_this_week": 12.7, "posts_this_week": 2,
+       "save_rate_pct_prior_week": 1.4, "share_rate_pct_prior_week": 0.6,
+       "engagement_rate_pct_prior_week": 11.1, "posts_prior_week": 1},
+      {"media_type": "CAROUSEL_ALBUM",
+       "save_rate_pct_this_week": 1.5, "share_rate_pct_this_week": 0.6,
+       "engagement_rate_pct_this_week": 14.2, "posts_this_week": 1,
+       "save_rate_pct_prior_week": 1.8, "share_rate_pct_prior_week": 0.6,
+       "engagement_rate_pct_prior_week": 13.5, "posts_prior_week": 2}
+    ],
+    "peak_hour": {"this_week": 11, "trailing_60d": 10}
+  },
+  "golden": {
+    "bullets_count": 4,
+    "kinds_subset_of": ["win", "warning", "trend", "experiment"],
+    "min_followups": 1,
+    "narrative_min_chars": 60
+  }
+}

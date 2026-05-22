@@ -73,6 +73,22 @@ async def _run_branded_hashtag_sync() -> None:
         logger.exception("Scheduled branded_hashtag_sync failed")
 
 
+async def _run_weekly_digest() -> None:
+    # Tier 4 / Phase F — async because digest synthesis is async (Anthropic
+    # SDK is awaited). Per-user errors are isolated inside the job; this
+    # wrapper just catches truly catastrophic failures.
+    if not settings.anthropic_api_key:
+        # Don't even attempt — the loop would discover this and skip every
+        # user, but logging it here is cleaner.
+        logger.info("Scheduled weekly_digest skipped — ANTHROPIC_API_KEY not set")
+        return
+    from .jobs import weekly_digest
+    try:
+        await weekly_digest._run()
+    except Exception:
+        logger.exception("Scheduled weekly_digest failed")
+
+
 def start_scheduler() -> None:
     """Start the in-process scheduler if `ENABLE_SCHEDULER` is true.
 
@@ -147,16 +163,33 @@ def start_scheduler() -> None:
         replace_existing=True,
     )
 
+    # Tier 4 / Phase F — Weekly AI digest synthesis. Charges under
+    # feature='digest_auto' so it doesn't burn the user's monthly cap.
+    sch.add_job(
+        _run_weekly_digest,
+        CronTrigger(
+            day_of_week=settings.scheduler_weekly_digest_day,
+            hour=settings.scheduler_weekly_digest_hour,
+            minute=0,
+        ),
+        id="weekly_digest",
+        name="Weekly AI digest synthesis",
+        replace_existing=True,
+    )
+
     sch.start()
     _scheduler = sch
     logger.info(
         "Scheduler started: competitor_sync @ %02d:00 UTC daily, "
         "sentiment_batch every %d min, "
-        "topic_clustering weekday=%d @ %02d:00 UTC",
+        "topic_clustering weekday=%d @ %02d:00 UTC, "
+        "weekly_digest weekday=%d @ %02d:00 UTC",
         settings.scheduler_competitor_sync_hour,
         settings.scheduler_sentiment_batch_minutes,
         settings.scheduler_topic_clustering_day,
         settings.scheduler_topic_clustering_hour,
+        settings.scheduler_weekly_digest_day,
+        settings.scheduler_weekly_digest_hour,
     )
 
 

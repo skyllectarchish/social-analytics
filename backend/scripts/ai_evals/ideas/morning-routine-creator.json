@@ -1,0 +1,33 @@
+{
+  "name": "morning-routine-creator",
+  "inputs": {
+    "period_days": 90,
+    "limit": 5,
+    "top_posts": [
+      {"id": "p1", "type": "VIDEO", "ts": "2026-03-01T11:00:00",
+       "caption": "My morning routine before content production",
+       "reach": 42100, "likes": 4200, "saves": 720, "shares": 340,
+       "interactions": 5380, "algorithm_score_pct": 92},
+      {"id": "p2", "type": "VIDEO", "ts": "2026-03-15T10:30:00",
+       "caption": "5 minutes that changed my morning forever",
+       "reach": 31000, "likes": 3500, "saves": 540, "shares": 220,
+       "interactions": 4260, "algorithm_score_pct": 84},
+      {"id": "p3", "type": "CAROUSEL_ALBUM", "ts": "2026-03-22T19:00:00",
+       "caption": "5 productivity tools I actually use",
+       "reach": 18900, "likes": 2200, "saves": 290, "shares": 110,
+       "interactions": 2680, "algorithm_score_pct": 78}
+    ],
+    "historical_hashtags": [
+      {"tag": "morningroutine", "post_count": 12},
+      {"tag": "productivity", "post_count": 9},
+      {"tag": "creator", "post_count": 7},
+      {"tag": "behindthescenes", "post_count": 5}
+    ]
+  },
+  "golden": {
+    "min_ideas": 3,
+    "max_ideas": 5,
+    "format_subset_of": ["REELS", "CAROUSEL", "IMAGE", "STORY"],
+    "min_themes": 2
+  }
+}

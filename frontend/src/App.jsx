@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { useAuth } from "./hooks/useAuth";
@@ -12,6 +13,10 @@ import ContentLabPage from "./pages/ContentLabPage";
 import ReelsStudioPage from "./pages/ReelsStudioPage";
 import AudienceDNAPage from "./pages/AudienceDNAPage";
 import CompetitorsPage from "./pages/CompetitorsPage";
+
+// Lazy-load the Copilot route — pulls react-markdown + plugins (~150 KB
+// gzipped) into a separate chunk so non-Copilot pages stay lean.
+const AICopilotPage = lazy(() => import("./pages/AICopilotPage"));
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -47,6 +52,16 @@ function AppRoutes() {
       <Route path="/dashboard/reels" element={<ProtectedRoute><ReelsStudioPage /></ProtectedRoute>} />
       <Route path="/dashboard/audience" element={<ProtectedRoute><AudienceDNAPage /></ProtectedRoute>} />
       <Route path="/dashboard/competitors" element={<ProtectedRoute><CompetitorsPage /></ProtectedRoute>} />
+      <Route
+        path="/dashboard/copilot"
+        element={
+          <ProtectedRoute>
+            <Suspense fallback={null}>
+              <AICopilotPage />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
       <Route path="/insta-dashboard" element={<ProtectedRoute><InstaDashboardPage /></ProtectedRoute>} />
     </Routes>
   );

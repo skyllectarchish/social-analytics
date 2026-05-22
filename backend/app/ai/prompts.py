@@ -1,0 +1,382 @@
+"""Prompt templates for Tier 4 AI Copilot.
+
+Two responsibilities:
+
+1. Provide the **static system blocks** used by each feature. These are
+   frozen across all users — they sit at the front of the prefix so
+   Anthropic's prompt cache reuses them across calls.
+
+2. Render the **per-call user context** as deterministic
+   (sorted-key, no-whitespace) JSON, so the byte sequence is stable
+   across calls with the same input data → high cache reuse.
+
+Anti-patterns that will silently invalidate the cache:
+  - `datetime.now()` anywhere in the cached prefix
+  - `json.dumps(...)` without `sort_keys=True`
+  - String formatting that varies by Python random hash seed
+  - PII redaction that drops characters non-deterministically
+
+See `shared/prompt-caching.md` from the `claude-api` skill for the
+audit checklist.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from datetime import date
+from typing import Any
+
+# --- PII redaction -------------------------------------------------------
+#
+# Best-effort regex pack applied to caption + comment text before
+# prompting. Patterns must be deterministic — same input → same output
+# every time, so the cached prefix doesn't drift between calls.
+
+_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+_PHONE_RE = re.compile(r"\+?\d[\d\-\(\)\s]{7,}\d")
+_HANDLE_MENTION_RE = re.compile(r"(?<!\w)@[A-Za-z0-9._]{2,30}")
+
+
+def redact_pii(text: str) -> str:
+    """Apply the documented redaction pack. Idempotent."""
+    if not text:
+        return ""
+    out = _EMAIL_RE.sub("[redacted]", text)
+    out = _PHONE_RE.sub("[redacted]", out)
+    out = _HANDLE_MENTION_RE.sub("[redacted]", out)
+    return out
+
+
+def truncate_caption(text: str, limit: int = 200) -> str:
+    """Truncate a caption to `limit` chars with an ellipsis. Token spend."""
+    if not text:
+        return ""
+    text = text.replace("\r\n", "\n").strip()
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "…"
+
+
+# --- Weekly digest -------------------------------------------------------
+
+# Static — frozen across users + weeks. cache_control marker goes on the
+# block that wraps this in client.py-side payloads.
+DIGEST_SYSTEM = """\
+You are an Instagram analytics advisor. You are reviewing one creator's
+performance over a single calendar week.
+
+Output a JSON object — and ONLY a JSON object, no prose — with exactly
+this shape:
+
+{
+  "narrative_md": "<3-4 short paragraphs of plain markdown synthesis>",
+  "bullets": [
+    {
+      "kind": "win" | "warning" | "trend" | "experiment",
+      "headline": "<= 80 chars, no markdown",
+      "detail_md": "<1-2 sentences of markdown>",
+      "link": {"route": "/dashboard/<page>", "query": {}} | null
+    }
+  ],
+  "followups": ["<short actionable suggestion>", "..."]
+}
+
+Rules:
+- Tie every observation to a specific metric or post from the supplied
+  data. Do not invent numbers. Do not reference posts that are not in
+  the input.
+- Save rate, share rate, reach, follower delta, and posting cadence
+  are the relevant signals. Engagement rate alone is not enough.
+- Use `route:/dashboard/...` paths in `link.route` only when the
+  observation maps to one of: /dashboard/content, /dashboard/reels,
+  /dashboard/audience, /dashboard/competitors. Otherwise set link to
+  null.
+- Provide exactly 4 bullets, in this order: one "win", one "warning"
+  (or "trend" if no warning fits), one "trend", one "experiment".
+- followups: 2-4 short, concrete next actions tied to this week's
+  observations. Do not include generic creator advice.
+- Tone: direct, specific, no hedging, no emoji, no exclamation marks.
+- Numbers in the narrative MUST appear (within ±5%) in the supplied
+  data — a downstream guard will reject the response otherwise.
+- Do not include any commentary outside the JSON object.
+"""
+
+
+def render_digest_user_block(ctx: dict[str, Any]) -> str:
+    """Render the per-user weekly context as deterministic JSON.
+
+    `ctx` is the dict produced by `digest._load_context()` — see that
+    function for the field contract. We re-encode with sorted keys and
+    tight separators so the byte sequence is stable across calls.
+    """
+    return _stable_json(ctx)
+
+
+# --- Content Ideas ------------------------------------------------------
+
+IDEAS_SYSTEM = """\
+You are a content strategist for an Instagram creator. You have a list
+of the creator's recent top-performing posts and a list of the themes
+they have historically posted about.
+
+Output a JSON object — and ONLY a JSON object, no prose — with exactly
+this shape:
+
+{
+  "themes_detected": ["<short kebab-case theme>", "..."],
+  "ideas": [
+    {
+      "title": "<= 80 chars, no markdown",
+      "body_md": "<1-3 short paragraphs of plain markdown — what to make>",
+      "suggested_format": "REELS" | "CAROUSEL" | "IMAGE" | "STORY",
+      "rationale": "<1 sentence referencing the specific posts or signals that motivate this idea>",
+      "adjacent": true | false
+    }
+  ]
+}
+
+Rules:
+- Mine themes from the supplied top posts only — do not invent themes
+  the creator hasn't engaged with.
+- `themes_detected` is a flat list of 3-6 short kebab-case strings
+  (e.g. "morning-routines", "carousel-tips"). No leading "#".
+- Each idea must be specific and actionable — not a category
+  ("post more about cooking") but a concrete piece of content
+  ("3-part Reel series on prepping breakfast the night before").
+- Use `suggested_format` to pick the format most likely to perform for
+  this idea based on the source posts.
+- `adjacent: true` means the idea explores a theme the creator hasn't
+  posted about but that is proximate to their existing themes. Mark
+  no more than 2 ideas as adjacent.
+- `rationale` must cite a specific source post or signal (e.g.
+  "Your top 2 posts in the period are morning-routine Reels with
+  reach > 3x your median").
+- Generate exactly the number of ideas requested in the input
+  (`limit`). If the data is too thin for that many distinct ideas,
+  produce fewer rather than padding with low-quality suggestions.
+- Tone: direct, specific, no hedging, no emoji.
+- Do not include any commentary outside the JSON object.
+"""
+
+
+def render_ideas_user_block(ctx: dict[str, Any]) -> str:
+    """Render the per-user context for the ideas prompt as deterministic JSON."""
+    return _stable_json(ctx)
+
+
+# --- Post Diagnostic ----------------------------------------------------
+
+DIAGNOSTIC_SYSTEM = """\
+You are an Instagram analytics advisor diagnosing why ONE specific post
+performed the way it did. You are given:
+- The target post's observed metrics
+- The creator's 60-post rolling baseline (median, not mean)
+- The same baseline filtered to the same media_type
+- The creator's hour-of-day engagement distribution
+- The hashtags used on the post + how many other posts of theirs use each tag
+- (Optional) comment sentiment summary
+
+Your task: produce a structured diagnosis. The factors you may consider
+are limited to: "format", "timing", "hashtags", "topic", "duration",
+"hook". Do not invent factor keys.
+
+Rules:
+- Each factor's `evidence` must cite a real number from the supplied
+  data. Do not invent metric values.
+- Severity reflects how much the factor explains the under/over-
+  performance: "high" = primary driver, "medium" = contributing,
+  "low" = minor, "neutral" = the factor was fine (use only when noting
+  that something didn't go wrong).
+- Order factors by severity descending. Provide 2-5 factors total —
+  fewer if the post is clearly explained by one or two signals.
+- `underperformed`: true when the observed reach OR engagement rate is
+  meaningfully below the baseline (>15% below median). false when the
+  post matched or beat the baseline.
+- `verdict_md`: one short paragraph (≤ 60 words) of plain markdown
+  identifying the dominant factor.
+- `recommendations_md`: 2-4 specific, actionable bullet points in
+  plain markdown. Tie each recommendation to a factor's finding.
+- "topic" should only be cited when comment sentiment data is in the
+  input and supports it — never speculate on topic without evidence.
+- Tone: direct, specific, no hedging, no emoji.
+"""
+
+# JSON schema enforced via output_config.format. The Anthropic API
+# validates the response against this — out-of-spec keys / missing
+# required fields cause a regenerate. See claude-api skill §Structured
+# Outputs.
+DIAGNOSTIC_OUTPUT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "underperformed", "verdict_md", "factors", "recommendations_md",
+    ],
+    "properties": {
+        "underperformed": {"type": "boolean"},
+        "verdict_md": {"type": "string"},
+        "recommendations_md": {"type": "string"},
+        "factors": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["key", "severity", "headline", "detail_md", "evidence"],
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "enum": ["format", "timing", "hashtags",
+                                 "topic", "duration", "hook"],
+                    },
+                    "severity": {
+                        "type": "string",
+                        "enum": ["high", "medium", "low", "neutral"],
+                    },
+                    "headline": {"type": "string"},
+                    "detail_md": {"type": "string"},
+                    "evidence": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["metric", "value", "comparison"],
+                        "properties": {
+                            "metric": {"type": "string"},
+                            "value": {"type": "number"},
+                            "comparison": {"type": "string"},
+                        },
+                    },
+                },
+            },
+        },
+    },
+}
+
+
+def render_diagnostic_user_block(ctx: dict[str, Any]) -> str:
+    """Render the per-post diagnostic context as deterministic JSON."""
+    return _stable_json(ctx)
+
+
+# --- Caption Studio -----------------------------------------------------
+
+CAPTION_SYSTEM = """\
+You are an Instagram caption editor for one creator. You receive:
+- The creator's draft caption
+- An optional topic hint
+- The 10 highest-performing captions they've written for this format
+  (ranked by algorithm score), with their reach + save/share numbers
+
+Your task: score the draft and propose 3 distinct rewrites.
+
+Rules:
+- Output is a strict JSON object matching the supplied schema. No prose
+  outside the JSON.
+- `scores.hook_strength` (0-100): how compelling the first line is.
+  90+ requires a specific stake, a vulnerability, or a concrete number.
+- `scores.cta_presence` (0-100): how clearly the caption asks the
+  reader to do something (comment, save, follow, click bio). A pure
+  story with no ask scores below 30.
+- `scores.overall` (0-100): your gestalt judgment. Approximately the
+  average of hook + cta + your sense of how this would land with this
+  specific creator's audience based on their top captions.
+- DO NOT score `length_fit` — leave it as 0. The server computes it
+  from the draft length vs the creator's median top-caption length.
+- `variants` MUST contain exactly 3 entries, each with a distinct
+  `label` chosen from:
+    "Punchier hook" | "Stronger CTA" | "Shorter" | "Question hook" |
+    "Listicle" | "Story arc" | "Direct ask"
+- Variant `caption` text MUST stay under 2,200 characters (Instagram's
+  hard limit). Stay under 1,500 unless the original draft is longer.
+- Variant `id` MUST be the placeholder string "PENDING" — the server
+  assigns stable IDs.
+- `rationale`: one short sentence per variant, tying the rewrite to a
+  specific signal from the top-caption corpus.
+- `notes_md`: one paragraph (≤ 80 words) of plain markdown — what the
+  draft does well and what the rewrites are trying to fix. Reference
+  the creator's top captions, not generic advice.
+- Tone: direct, specific, no emoji, no hedging.
+"""
+
+# JSON schema enforced via output_config.format. The Anthropic API
+# validates the response shape — out-of-spec keys, wrong types, missing
+# required fields cause a regenerate. Per claude-api skill §Structured
+# Outputs: `additionalProperties: false` required on every object.
+CAPTION_OUTPUT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["scores", "variants", "notes_md"],
+    "properties": {
+        "scores": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["hook_strength", "cta_presence",
+                         "length_fit", "overall"],
+            "properties": {
+                "hook_strength": {"type": "integer", "minimum": 0, "maximum": 100},
+                "cta_presence": {"type": "integer", "minimum": 0, "maximum": 100},
+                "length_fit": {"type": "integer", "minimum": 0, "maximum": 100},
+                "overall": {"type": "integer", "minimum": 0, "maximum": 100},
+            },
+        },
+        "variants": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["id", "label", "caption", "rationale"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "label": {
+                        "type": "string",
+                        "enum": [
+                            "Punchier hook", "Stronger CTA", "Shorter",
+                            "Question hook", "Listicle", "Story arc",
+                            "Direct ask",
+                        ],
+                    },
+                    "caption": {"type": "string"},
+                    "rationale": {"type": "string"},
+                },
+            },
+        },
+        "notes_md": {"type": "string"},
+    },
+}
+
+
+def render_caption_user_block(ctx: dict[str, Any]) -> str:
+    """Render the caption-studio context as deterministic JSON."""
+    return _stable_json(ctx)
+
+
+# --- Helpers -------------------------------------------------------------
+
+def _stable_json(obj: Any) -> str:
+    """JSON-encode with sorted keys, no whitespace, ISO dates."""
+    return json.dumps(
+        obj,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=_default,
+    )
+
+
+def _default(value: Any) -> Any:
+    if isinstance(value, date):
+        return value.isoformat()
+    raise TypeError(f"Unsupported type for prompt JSON: {type(value).__name__}")
+
+
+__all__ = [
+    "DIGEST_SYSTEM",
+    "IDEAS_SYSTEM",
+    "DIAGNOSTIC_SYSTEM",
+    "DIAGNOSTIC_OUTPUT_SCHEMA",
+    "CAPTION_SYSTEM",
+    "CAPTION_OUTPUT_SCHEMA",
+    "redact_pii",
+    "truncate_caption",
+    "render_digest_user_block",
+    "render_ideas_user_block",
+    "render_diagnostic_user_block",
+    "render_caption_user_block",
+]

@@ -1,0 +1,90 @@
+{
+  "period_days": 90,
+  "generated_at": "2026-05-19T08:14:00Z",
+  "source_posts": [
+    {
+      "ig_media_id": "17891234567890",
+      "permalink": "https://instagram.com/p/abc",
+      "thumbnail_url": "",
+      "caption_preview": "Morning routine for content creators…",
+      "algorithm_score_pct": 92
+    },
+    {
+      "ig_media_id": "17891234567891",
+      "permalink": "https://instagram.com/p/def",
+      "thumbnail_url": "",
+      "caption_preview": "Carousel: 5 productivity tools I actually use",
+      "algorithm_score_pct": 78
+    },
+    {
+      "ig_media_id": "17891234567892",
+      "permalink": "https://instagram.com/p/ghi",
+      "thumbnail_url": "",
+      "caption_preview": "Behind the scenes of yesterday's shoot",
+      "algorithm_score_pct": 71
+    },
+    {
+      "ig_media_id": "17891234567893",
+      "permalink": "https://instagram.com/p/jkl",
+      "thumbnail_url": "",
+      "caption_preview": "My current productivity stack — links in bio",
+      "algorithm_score_pct": 66
+    },
+    {
+      "ig_media_id": "17891234567894",
+      "permalink": "https://instagram.com/p/mno",
+      "thumbnail_url": "",
+      "caption_preview": "Why I quit my 9-to-5 to do this",
+      "algorithm_score_pct": 64
+    }
+  ],
+  "themes_detected": [
+    "morning-routines",
+    "carousel-tips",
+    "behind-the-scenes",
+    "productivity-stack",
+    "creator-economy"
+  ],
+  "ideas": [
+    {
+      "id": "idea_01",
+      "title": "Series: 'My 5am Routine, Honestly'",
+      "body_md": "A 3-part Reel series breaking your morning into Hour 1 / Hour 2 / Hour 3. Lean into the contradictions — viewers reward honesty over aspiration.",
+      "suggested_format": "REELS",
+      "rationale": "Your top 2 posts in the last 90 days were morning-routine Reels with average reach 3.2× baseline.",
+      "adjacent": false
+    },
+    {
+      "id": "idea_02",
+      "title": "Carousel: 'Why I quit X productivity tool'",
+      "body_md": "Frame it as a teardown, slide by slide. Strong save bait because viewers will revisit.",
+      "suggested_format": "CAROUSEL",
+      "rationale": "Carousel saves spike when the topic is opinionated and granular.",
+      "adjacent": false
+    },
+    {
+      "id": "idea_03",
+      "title": "Reel: 'I tried [creator]'s schedule for a week'",
+      "body_md": "Borrowed-authority hook; you've never posted this format.",
+      "suggested_format": "REELS",
+      "rationale": "Adjacent theme: experiment / lifestyle borrow. Underrepresented in your feed but rewards the productivity audience.",
+      "adjacent": true
+    },
+    {
+      "id": "idea_04",
+      "title": "Behind-the-scenes: how you edit a Reel in 12 minutes",
+      "body_md": "Screen-record your editor with a voiceover. Process content travels well and saves rate is consistently high for tutorials.",
+      "suggested_format": "REELS",
+      "rationale": "Your behind-the-scenes posts have above-median save rate but you only post one every ~6 weeks.",
+      "adjacent": false
+    },
+    {
+      "id": "idea_05",
+      "title": "Carousel: '5 audios I'd use if I started over'",
+      "body_md": "Each slide pairs an audio with one line of why. Mention the audio's typical use-case.",
+      "suggested_format": "CAROUSEL",
+      "rationale": "Adjacent theme: audio strategy. Productivity-stack viewers consume process content.",
+      "adjacent": true
+    }
+  ]
+}

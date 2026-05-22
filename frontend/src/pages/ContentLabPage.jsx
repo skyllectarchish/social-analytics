@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import DashboardLayout from "../components/DashboardLayout";
 import PageHeader from "../components/shared/PageHeader";
 import FormatBreakdownChart from "../components/content-lab/FormatBreakdownChart";
@@ -10,6 +10,10 @@ import HashtagComboHeatmap from "../components/content-lab/HashtagComboHeatmap";
 import BrandedHashtagsPanel from "../components/content-lab/BrandedHashtagsPanel";
 import SyncButton from "../components/dashboard/SyncButton";
 import PostInsightsDrawer from "../components/dashboard/PostInsightsDrawer";
+
+const PostDiagnosticDrawer = lazy(() =>
+  import("../components/copilot/PostDiagnosticDrawer"),
+);
 
 function adaptAlgoPost(p) {
   if (!p) return null;
@@ -39,6 +43,7 @@ function adaptFormatPost(p) {
 
 export default function ContentLabPage() {
   const [selectedMedia, setSelectedMedia] = useState(null);
+  const [diagnosticMedia, setDiagnosticMedia] = useState(null);
   const [selectedTag, setSelectedTag] = useState(null);
 
   return (
@@ -91,7 +96,14 @@ export default function ContentLabPage() {
       <PostInsightsDrawer
         media={selectedMedia}
         onClose={() => setSelectedMedia(null)}
+        onDiagnose={(m) => {
+          setSelectedMedia(null);
+          setDiagnosticMedia(m);
+        }}
       />
+      <Suspense fallback={null}>
+        <PostDiagnosticDrawer media={diagnosticMedia} onClose={() => setDiagnosticMedia(null)} />
+      </Suspense>
     </DashboardLayout>
   );
 }

@@ -1,0 +1,54 @@
+{
+  "name": "flopped-carousel",
+  "inputs": {
+    "post": {
+      "ig_media_id": "17891234567890",
+      "media_type": "CAROUSEL_ALBUM",
+      "caption": "Quick thoughts on productivity",
+      "timestamp": "2026-05-10T03:14:00",
+      "posted_hour": 3,
+      "observed": {
+        "reach": 4280,
+        "likes": 220,
+        "saves": 17,
+        "shares": 8,
+        "comments": 12,
+        "interactions": 257,
+        "engagement_rate_pct": 6.00,
+        "save_rate_pct": 0.40,
+        "share_rate_pct": 0.19,
+        "avg_watch_time_s": 0
+      }
+    },
+    "baseline_60_posts": {
+      "median_reach": 9100,
+      "median_engagement_rate_pct": 11.20,
+      "median_save_rate_pct": 1.10,
+      "median_share_rate_pct": 0.55,
+      "sample_size": 60
+    },
+    "format_baseline_60_posts": {
+      "median_reach": 7800,
+      "median_engagement_rate_pct": 12.50,
+      "median_save_rate_pct": 1.05,
+      "median_share_rate_pct": 0.50,
+      "sample_size": 22
+    },
+    "peak_hours_top3": [
+      {"hour": 10, "posts": 9, "avg_er_pct": 14.2, "avg_reach": 11500},
+      {"hour": 11, "posts": 7, "avg_er_pct": 13.8, "avg_reach": 10800},
+      {"hour": 19, "posts": 6, "avg_er_pct": 12.1, "avg_reach": 9700}
+    ],
+    "hashtags": [
+      {"tag": "productivity", "user_other_uses": 9},
+      {"tag": "instagood", "user_other_uses": 2},
+      {"tag": "explore", "user_other_uses": 1}
+    ],
+    "comment_sentiment": null
+  },
+  "golden": {
+    "min_factors": 2,
+    "max_factors": 5,
+    "underperformed": true
+  }
+}

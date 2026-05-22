@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import DashboardLayout from "../components/DashboardLayout";
 import PageHeader from "../components/shared/PageHeader";
 import HeroCards from "../components/dashboard/HeroCards";
@@ -11,8 +11,13 @@ import StoriesPanel from "../components/dashboard/StoriesPanel";
 import PostInsightsDrawer from "../components/dashboard/PostInsightsDrawer";
 import { useOverview } from "../hooks/useInsights";
 
+const PostDiagnosticDrawer = lazy(() =>
+  import("../components/copilot/PostDiagnosticDrawer"),
+);
+
 export default function DashboardPage() {
   const [selectedMedia, setSelectedMedia] = useState(null);
+  const [diagnosticMedia, setDiagnosticMedia] = useState(null);
   const { data: overview } = useOverview();
 
   const sparklines = {
@@ -54,7 +59,17 @@ export default function DashboardPage() {
         <StoriesPanel />
       </div>
 
-      <PostInsightsDrawer media={selectedMedia} onClose={() => setSelectedMedia(null)} />
+      <PostInsightsDrawer
+        media={selectedMedia}
+        onClose={() => setSelectedMedia(null)}
+        onDiagnose={(m) => {
+          setSelectedMedia(null);
+          setDiagnosticMedia(m);
+        }}
+      />
+      <Suspense fallback={null}>
+        <PostDiagnosticDrawer media={diagnosticMedia} onClose={() => setDiagnosticMedia(null)} />
+      </Suspense>
     </DashboardLayout>
   );
 }

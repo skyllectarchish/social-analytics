@@ -7,6 +7,8 @@ from collections.abc import AsyncIterator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .ai.admin import router as ai_admin_router
+from .ai.router import router as ai_router
 from .auth.router import router as auth_router
 from .config import settings
 from .database import close_client, ping
@@ -54,6 +56,13 @@ register_exception_handlers(app)
 
 app.include_router(auth_router)
 app.include_router(instagram_router)
+app.include_router(ai_router)
+
+# Tier 4 / Phase F — admin endpoints. Mounted only when ADMIN_API_KEY is
+# set, so a forgotten/blank key isn't a footgun.
+if settings.admin_api_key:
+    app.include_router(ai_admin_router)
+    logger.info("Admin router mounted at /api/admin/*")
 
 
 @app.get("/api/health")
