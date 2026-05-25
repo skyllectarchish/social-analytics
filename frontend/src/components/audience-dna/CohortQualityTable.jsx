@@ -163,7 +163,7 @@ export default function CohortQualityTable({ breakdown = "age" }) {
                 <div className="w-32 shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-[11px] text-slate-700 w-12">
-                      {r.follower_count.toLocaleString()}
+                      {(r.follower_count ?? 0).toLocaleString()}
                     </span>
                     <MiniBar
                       value={r.follower_count}
@@ -174,13 +174,13 @@ export default function CohortQualityTable({ breakdown = "age" }) {
                 </div>
                 <div className="w-24 shrink-0">
                   <span className="font-mono text-[11px] text-slate-700">
-                    {r.engaged_count.toLocaleString()}
+                    {(r.engaged_count ?? 0).toLocaleString()}
                   </span>
                 </div>
                 <div className="w-32 shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-[11px] text-slate-700 w-10">
-                      {r.engagement_rate_pct.toFixed(1)}%
+                      {(r.engagement_rate_pct ?? 0).toFixed(1)}%
                     </span>
                     <MiniBar
                       value={r.engagement_rate_pct}

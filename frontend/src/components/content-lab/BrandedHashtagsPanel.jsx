@@ -47,32 +47,34 @@ function AddRow({ onAdd, disabled }) {
   }
 
   return (
-    <form onSubmit={submit} className="flex items-center gap-2 mb-3">
-      <div className="relative flex-1">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-          #
-        </span>
-        <input
-          type="text"
-          placeholder="e.g. mybrand"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          disabled={disabled || submitting}
-          maxLength={60}
-          className="w-full text-xs pl-7 pr-3 py-2 rounded-lg border border-slate-200 focus:border-violet-400 focus:outline-none disabled:bg-slate-50 disabled:cursor-not-allowed"
-        />
-      </div>
-      <button
-        type="submit"
-        disabled={disabled || submitting || !value.trim()}
-        className="text-xs px-3 py-2 rounded-lg bg-violet-600 text-white font-medium hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed flex items-center gap-1"
-      >
-        <Plus size={12} /> Track
-      </button>
+    <div className="mb-3">
+      <form onSubmit={submit} className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+            #
+          </span>
+          <input
+            type="text"
+            placeholder="e.g. mybrand"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            disabled={disabled || submitting}
+            maxLength={60}
+            className="w-full text-xs pl-7 pr-3 py-2 rounded-lg border border-slate-200 focus:border-violet-400 focus:outline-none disabled:bg-slate-50 disabled:cursor-not-allowed"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={disabled || submitting || !value.trim()}
+          className="text-xs px-3 py-2 rounded-lg bg-violet-600 text-white font-medium hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed flex items-center gap-1"
+        >
+          <Plus size={12} /> Track
+        </button>
+      </form>
       {error && (
-        <p className="absolute mt-12 text-[10px] text-rose-500">{error}</p>
+        <p className="mt-1 text-[10px] text-rose-500">{error}</p>
       )}
-    </form>
+    </div>
   );
 }
 

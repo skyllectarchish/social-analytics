@@ -24,13 +24,17 @@ function EyeIcon() {
 }
 
 function fmtNum(v) {
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`;
-  return String(v);
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "0";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
 }
 
 export default function MediaCard({ media, onInsightsClick }) {
   const imgSrc = media.media_type === "VIDEO" ? media.thumbnail_url : media.media_url;
+  const likes = Number(media.like_count) || 0;
+  const comments = Number(media.comments_count) || 0;
 
   return (
     <div
@@ -59,10 +63,10 @@ export default function MediaCard({ media, onInsightsClick }) {
         >
           <div className="flex items-center gap-4 text-white text-sm font-semibold mt-auto mb-3">
             <span className="flex items-center gap-1.5">
-              <EyeIcon /> {fmtNum(media.like_count + media.comments_count)}
+              <EyeIcon /> {fmtNum(likes + comments)}
             </span>
             <span className="flex items-center gap-1.5">
-              <HeartIcon /> {fmtNum(media.like_count)}
+              <HeartIcon /> {fmtNum(likes)}
             </span>
           </div>
         </div>
@@ -92,14 +96,16 @@ export default function MediaCard({ media, onInsightsClick }) {
         )}
         <div className="flex items-center gap-4 text-xs text-slate-400">
           <span className="flex items-center gap-1.5 text-rose-500">
-            <HeartIcon /> {media.like_count.toLocaleString()}
+            <HeartIcon /> {likes.toLocaleString()}
           </span>
           <span className="flex items-center gap-1.5 text-violet-500">
-            <CommentIcon /> {media.comments_count.toLocaleString()}
+            <CommentIcon /> {comments.toLocaleString()}
           </span>
-          <span className="ml-auto text-slate-400">
-            {new Date(media.timestamp).toLocaleDateString()}
-          </span>
+          {media.timestamp && (
+            <span className="ml-auto text-slate-400">
+              {new Date(media.timestamp).toLocaleDateString()}
+            </span>
+          )}
         </div>
       </div>
     </div>

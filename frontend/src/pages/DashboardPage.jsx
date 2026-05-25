@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import DashboardLayout from "../components/DashboardLayout";
 import PageHeader from "../components/shared/PageHeader";
 import HeroCards from "../components/dashboard/HeroCards";
@@ -20,12 +20,17 @@ export default function DashboardPage() {
   const [diagnosticMedia, setDiagnosticMedia] = useState(null);
   const { data: overview } = useOverview();
 
-  const sparklines = {
-    total_views: (overview?.views?.data ?? []).map((d) => ({ v: d.value })),
-    total_reach: (overview?.reach?.data ?? []).map((d) => ({ v: d.value })),
-    total_interactions: (overview?.total_interactions?.data ?? []).map((d) => ({ v: d.value })),
-    net_follower_growth: (overview?.follows_and_unfollows?.data ?? []).map((d) => ({ v: d.value })),
-  };
+  // Memoize so a parent re-render doesn't hand HeroCards fresh array refs and
+  // cascade re-renders through every memoized card child.
+  const sparklines = useMemo(
+    () => ({
+      total_views: (overview?.views?.data ?? []).map((d) => ({ v: d.value })),
+      total_reach: (overview?.reach?.data ?? []).map((d) => ({ v: d.value })),
+      total_interactions: (overview?.total_interactions?.data ?? []).map((d) => ({ v: d.value })),
+      net_follower_growth: (overview?.follows_and_unfollows?.data ?? []).map((d) => ({ v: d.value })),
+    }),
+    [overview],
+  );
 
   return (
     <DashboardLayout>
@@ -67,9 +72,13 @@ export default function DashboardPage() {
           setDiagnosticMedia(m);
         }}
       />
-      <Suspense fallback={null}>
-        <PostDiagnosticDrawer media={diagnosticMedia} onClose={() => setDiagnosticMedia(null)} />
-      </Suspense>
+      {/* Only mount the lazy drawer once the user actually triggers it, so
+          the chunk fetch waits until the click rather than on every page mount. */}
+      {diagnosticMedia && (
+        <Suspense fallback={null}>
+          <PostDiagnosticDrawer media={diagnosticMedia} onClose={() => setDiagnosticMedia(null)} />
+        </Suspense>
+      )}
     </DashboardLayout>
   );
 }

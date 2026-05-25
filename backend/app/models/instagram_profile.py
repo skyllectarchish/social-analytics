@@ -9,10 +9,15 @@ from uuid import UUID
 
 @dataclass(frozen=True, slots=True)
 class IGProfile:
-    """Represents a row in the `instagram_profiles` table."""
+    """Represents a row in the `instagram_profiles` table.
+
+    `user_id` and `access_token` are populated only by from_token_row / direct
+    construction; from_profile_row leaves them as Optional/empty because
+    GET_INSTAGRAM_PROFILE doesn't select them. Callers must use `find_token`
+    when they actually need the encrypted token.
+    """
 
     id: UUID
-    user_id: UUID
     ig_user_id: str
     username: str
     name: str
@@ -21,7 +26,8 @@ class IGProfile:
     followers_count: int
     follows_count: int
     media_count: int
-    access_token: str  # encrypted ciphertext
+    access_token: str = ""  # encrypted ciphertext, "" when only profile fetched
+    user_id: UUID | None = None
     token_expires_at: datetime | None = None
     connected_at: datetime | None = None
     updated_at: datetime | None = None
@@ -37,7 +43,6 @@ class IGProfile:
         """
         return cls(
             id=row[0] if isinstance(row[0], UUID) else UUID(str(row[0])),
-            user_id=UUID(int=0),  # not in this query
             ig_user_id=row[1],
             username=row[2],
             name=row[3],
@@ -46,7 +51,6 @@ class IGProfile:
             followers_count=row[6],
             follows_count=row[7],
             media_count=row[8],
-            access_token="",  # not in this query
             connected_at=row[9] if len(row) > 9 else None,
         )
 
@@ -58,7 +62,6 @@ class IGProfile:
         """
         return cls(
             id=UUID(int=0),
-            user_id=UUID(int=0),
             ig_user_id=row[0],
             username="",
             name="",

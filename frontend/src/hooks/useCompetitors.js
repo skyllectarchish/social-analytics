@@ -10,42 +10,48 @@ function buildUrl(base, params) {
   return qs ? `${base}?${qs}` : base;
 }
 
-function useGet(url, deps) {
+function useGet(url) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Bump a tick to force refresh() to re-run the effect even when url is
+  // unchanged (e.g. after mutating the underlying resource).
+  const [refreshTick, setRefreshTick] = useState(0);
 
-  const fetchOnce = useCallback(() => {
+  useEffect(() => {
     if (!url) {
       setData(null);
       setLoading(false);
-      return;
+      return undefined;
     }
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
     api
-      .get(url)
-      .then((res) => setData(res.data))
+      .get(url, { signal: controller.signal })
+      .then((res) => {
+        if (!controller.signal.aborted) setData(res.data);
+      })
       .catch((err) => {
+        if (controller.signal.aborted) return;
         if (err.response?.status === 404) {
           setData(null);
         } else {
           setError(err.response?.data?.detail || "Request failed");
         }
       })
-      .finally(() => setLoading(false));
-  }, [url]);
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [url, refreshTick]);
 
-  useEffect(() => {
-    fetchOnce();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-
-  return { data, loading, error, refresh: fetchOnce };
+  const refresh = useCallback(() => setRefreshTick((t) => t + 1), []);
+  return { data, loading, error, refresh };
 }
 
 export function useCompetitors() {
-  const { data, loading, error, refresh } = useGet("/instagram/competitors", []);
+  const { data, loading, error, refresh } = useGet("/instagram/competitors");
 
   const add = useCallback(
     async (handle) => {
@@ -80,11 +86,11 @@ export function useCompetitorTimeline() {
     days,
     compare_to: compareTo,
   });
-  return useGet(url, [days, compareTo]);
+  return useGet(url);
 }
 
 export function useContentMix() {
   const { days } = usePeriodComparator();
   const url = buildUrl("/instagram/competitors/content-mix", { days });
-  return useGet(url, [days]);
+  return useGet(url);
 }

@@ -10,11 +10,25 @@ export default function ConnectInstagramPage() {
   const [error, setError] = useState("");
 
   const handleConnect = async () => {
+    if (loading) return;
     setLoading(true);
     setError("");
     try {
       const { data } = await api.get("/instagram/connect");
-      window.location.href = data.oauth_url;
+      // Defense-in-depth: confirm the backend handed us a real Instagram
+      // OAuth URL before navigating. If the response is malformed (or a
+      // future regression points it elsewhere), refuse to redirect rather
+      // than open-redirect into an attacker-controlled page.
+      const url = data?.oauth_url;
+      if (
+        typeof url !== "string" ||
+        !url.startsWith("https://www.instagram.com/oauth/authorize")
+      ) {
+        setError("Got an unexpected response from the server. Try again.");
+        setLoading(false);
+        return;
+      }
+      window.location.href = url;
     } catch (err) {
       setError(err.response?.data?.detail || "Failed to initiate connection");
       setLoading(false);

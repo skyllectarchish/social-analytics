@@ -64,9 +64,12 @@ export default function CompetitorMetricsTable() {
   }
 
   const rows = [];
-  if (you) rows.push({ handle: "You", _isSelf: true, ...you });
+  // Spread the snapshot first so explicit handle/_isSelf override any
+  // matching keys (a stray `handle` field on the backend payload otherwise
+  // silently mislabels the "You" row).
+  if (you) rows.push({ ...you, handle: "You", _isSelf: true });
   competitors.forEach((c) =>
-    rows.push({ handle: c.handle, _isSelf: false, ...(c.latest_snapshot ?? {}) }),
+    rows.push({ ...(c.latest_snapshot ?? {}), handle: c.handle, _isSelf: false }),
   );
 
   const medians = Object.fromEntries(

@@ -47,9 +47,6 @@ ACCOUNT_TIME_SERIES_METRICS: str = "reach"
 # Account-level total-value metrics (metric_type=total_value) — incompatible with time_series
 ACCOUNT_TOTAL_VALUE_METRICS: str = "views"
 
-# Combined — kept for backward compat if needed
-ACCOUNT_INTERACTION_METRICS: str = "views,reach,follows_and_unfollows,total_interactions,accounts_engaged"
-
 # Account-level demographic metrics (GET /{ig-user-id}/insights)
 ACCOUNT_DEMOGRAPHIC_METRICS: list[str] = [
     "follower_demographics",

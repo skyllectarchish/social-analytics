@@ -10,52 +10,48 @@ function buildUrl(base, params) {
   return qs ? `${base}?${qs}` : base;
 }
 
-export function useGrowthDrivers(limit = 10) {
-  const { days } = usePeriodComparator();
+function useGet(url) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    if (!url) {
+      setData(null);
+      setLoading(false);
+      return undefined;
+    }
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
     api
-      .get(buildUrl("/instagram/insights/growth-drivers", { days, limit }))
-      .then((res) => setData(res.data))
+      .get(url, { signal: controller.signal })
+      .then((res) => {
+        if (!controller.signal.aborted) setData(res.data);
+      })
       .catch((err) => {
+        if (controller.signal.aborted) return;
         if (err.response?.status === 404) {
           setData(null);
         } else {
           setError(err.response?.data?.detail || "Request failed");
         }
       })
-      .finally(() => setLoading(false));
-  }, [days, limit]);
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [url]);
 
   return { data, loading, error };
 }
 
+export function useGrowthDrivers(limit = 10) {
+  const { days } = usePeriodComparator();
+  return useGet(buildUrl("/instagram/insights/growth-drivers", { days, limit }));
+}
+
 export function useGrowthCorrelation() {
   const { days } = usePeriodComparator();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    setLoading(true);
-    setError(null);
-    api
-      .get(buildUrl("/instagram/insights/growth-correlation", { days }))
-      .then((res) => setData(res.data))
-      .catch((err) => {
-        if (err.response?.status === 404) {
-          setData(null);
-        } else {
-          setError(err.response?.data?.detail || "Request failed");
-        }
-      })
-      .finally(() => setLoading(false));
-  }, [days]);
-
-  return { data, loading, error };
+  return useGet(buildUrl("/instagram/insights/growth-correlation", { days }));
 }

@@ -19,7 +19,7 @@ const SANITIZE_SCHEMA = {
   ],
   attributes: {
     "*": ["className"],
-    a: ["href", "title", "dataRoute", "dataQuery"],
+    a: ["href", "title"],
     code: ["className"],
     pre: ["className"],
     span: ["className"], // style stripped — see plan §17 (we don't pass through inline color)
@@ -32,11 +32,27 @@ const SANITIZE_SCHEMA = {
   },
 };
 
+// Internal routes must start with "/" and not "//" so AI-generated markdown
+// can't smuggle protocol-relative URLs or chained schemes into navigate().
+function isSafeRoute(route) {
+  return (
+    typeof route === "string" &&
+    route.startsWith("/") &&
+    !route.startsWith("//") &&
+    // Guard against `route:javascript:foo` or `route:data:...` if anyone ever
+    // tries to chain protocols through the route: scheme.
+    !/^\/[a-z][a-z0-9+.-]*:/i.test(route)
+  );
+}
+
 function AIAnchor({ href, children, ...rest }) {
   const navigate = useNavigate();
 
   if (typeof href === "string" && href.startsWith("route:")) {
     const route = href.slice("route:".length);
+    if (!isSafeRoute(route)) {
+      return <span className="text-slate-500">{children}</span>;
+    }
     return (
       <button
         type="button"

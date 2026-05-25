@@ -15,8 +15,11 @@ so the user's monthly budget isn't burned by automation.
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import threading
 import uuid
+from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any
 
@@ -28,6 +31,20 @@ from ..models.queries import GET_AI_QUOTA_USED_THIS_MONTH
 from . import client as ai_client
 
 logger = logging.getLogger(__name__)
+
+# Per-user serialization so concurrent requests from the same user can't both
+# pass the `used < limit` check between the read and the eventual `record_call`
+# write. One lock per user; concurrent users still parallelize. Cross-process
+# (multi-worker) races aren't covered — at worst limit can be exceeded by N
+# workers, which is acceptable for a soft per-user cap.
+_user_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+_user_locks_mu = threading.Lock()
+
+
+def user_lock(user_id: str) -> asyncio.Lock:
+    """Return a process-wide asyncio.Lock for one user's quota window."""
+    with _user_locks_mu:
+        return _user_locks[user_id]
 
 
 def effective_limit() -> int:
@@ -55,7 +72,12 @@ def next_reset() -> datetime:
 
 
 def enforce(client: Client, user_id: str) -> None:
-    """Raise QuotaExhaustedError when the user has hit their monthly cap."""
+    """Raise QuotaExhaustedError when the user has hit their monthly cap.
+
+    Callers handling cost-incurring routes should also wrap the
+    check + LLM call + record_call sequence in ``async with user_lock(user_id):``
+    so two concurrent requests can't both slip past the check on the same window.
+    """
     limit = effective_limit()
     used = used_this_month(client, user_id)
     if used >= limit:

@@ -37,7 +37,20 @@ api.interceptors.response.use(
     }
     if (err.response?.status === 401) {
       localStorage.removeItem("access_token");
-      window.location.href = "/login";
+      // Don't bounce if we're already on /login — otherwise a 401 from any API
+      // call made while sitting on the login page (e.g. a stray telemetry POST
+      // before login completes) would full-page-reload us in a tight loop.
+      if (!window.location.pathname.startsWith("/login")) {
+        // Preserve the page the user was on so login can send them back.
+        // Validate the path-only `next` value (must start with `/` but not
+        // `//`) so a stray query-param injection can't open-redirect to a
+        // different origin.
+        const here = window.location.pathname + window.location.search;
+        const safeNext =
+          here.startsWith("/") && !here.startsWith("//") ? here : "/";
+        const target = safeNext === "/" ? "/login" : `/login?next=${encodeURIComponent(safeNext)}`;
+        window.location.assign(target);
+      }
     }
     return Promise.reject(err);
   }

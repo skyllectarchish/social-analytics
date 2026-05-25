@@ -81,7 +81,9 @@ function todayMondayUTC() {
 }
 
 function shiftWeek(weekOfISO, deltaDays) {
+  if (!weekOfISO) return null;
   const d = new Date(`${weekOfISO}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return null;
   d.setUTCDate(d.getUTCDate() + deltaDays);
   return d.toISOString().slice(0, 10);
 }
@@ -210,28 +212,31 @@ export default function WeeklyDigestCard({ weekOf, onWeekChange }) {
     });
   }, [digest, loading, isStreaming]);
 
-  // Fire success/failure once the stream settles.
+  // Fire success/failure once the stream settles. The ref captures the
+  // weekOf at regen-start so a user navigating to a different week mid-stream
+  // doesn't emit a spurious success event tagged with the wrong week.
   useEffect(() => {
-    if (!regenStartRef.current) return;
+    const inflight = regenStartRef.current;
+    if (!inflight) return;
     if (isStreaming) return;
-    const elapsed = Date.now() - regenStartRef.current;
+    const elapsed = Date.now() - inflight.startedAt;
     if (error) {
       trackAI("digest", "regenerate_failed", {
-        refId: weekOf,
+        refId: inflight.weekOf,
         meta: { error_code: "unknown" },
         latency_ms: elapsed,
       });
     } else {
       trackAI("digest", "regenerate_succeeded", {
-        refId: weekOf,
+        refId: inflight.weekOf,
         latency_ms: elapsed,
       });
     }
     regenStartRef.current = null;
-  }, [isStreaming, error, weekOf]);
+  }, [isStreaming, error]);
 
   const handleRegenerate = () => {
-    regenStartRef.current = Date.now();
+    regenStartRef.current = { startedAt: Date.now(), weekOf };
     trackAI("digest", "regenerate_clicked", {
       refId: weekOf,
       meta: { quota_remaining: limit - used },

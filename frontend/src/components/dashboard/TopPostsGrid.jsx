@@ -4,9 +4,11 @@ import { useDashboard } from "../../hooks/useInsights";
 import { usePeriodComparator } from "../../context/PeriodComparatorContext";
 
 function fmtNum(v) {
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`;
-  return String(v);
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "0";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
 }
 
 const TYPE_STYLES = {

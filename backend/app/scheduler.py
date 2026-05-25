@@ -77,10 +77,10 @@ async def _run_weekly_digest() -> None:
     # Tier 4 / Phase F — async because digest synthesis is async (Anthropic
     # SDK is awaited). Per-user errors are isolated inside the job; this
     # wrapper just catches truly catastrophic failures.
-    if not settings.anthropic_api_key:
+    if not settings.ollama_api_key:
         # Don't even attempt — the loop would discover this and skip every
         # user, but logging it here is cleaner.
-        logger.info("Scheduled weekly_digest skipped — ANTHROPIC_API_KEY not set")
+        logger.info("Scheduled weekly_digest skipped — OLLAMA_API_KEY not set")
         return
     from .jobs import weekly_digest
     try:

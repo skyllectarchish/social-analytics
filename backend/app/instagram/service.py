@@ -301,9 +301,14 @@ async def fetch_media(
         "limit": limit,
     }
 
+    # Hard cap on pagination iterations — defensive against a malformed Meta
+    # response that returns both `paging.next` and a stable `after` cursor
+    # forever. At MAX_PAGES * limit items, no realistic account is unfetched.
+    MAX_PAGES = 200
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
         page = 0
-        while True:
+        seen_cursors: set[str] = set()
+        while page < MAX_PAGES:
             page += 1
             logger.info("Fetching media page %d for %s", page, ig_user_id)
             data = await _retry_get_json(client, url, params, label="media page")
@@ -325,7 +330,22 @@ async def fetch_media(
             after_cursor = paging.get("cursors", {}).get("after")
             if not paging.get("next") or not after_cursor:
                 break
+            # Guard against cursor cycles (Meta has historically returned the
+            # same cursor twice during outages — without this, fetch_media
+            # would loop until MAX_PAGES, wasting quota).
+            if after_cursor in seen_cursors:
+                logger.warning(
+                    "Media pagination cursor repeated for %s — stopping at page %d",
+                    ig_user_id, page,
+                )
+                break
+            seen_cursors.add(after_cursor)
             params["after"] = after_cursor
+        else:
+            logger.warning(
+                "Media pagination hit MAX_PAGES=%d for %s — returning %d items",
+                MAX_PAGES, ig_user_id, len(media_items),
+            )
 
     logger.info("Fetched %d media items for ig_user %s", len(media_items), ig_user_id)
     return media_items
@@ -607,10 +627,14 @@ async def fetch_account_insights(
             day_windows.append((int(cur.timestamp()), int(nxt.timestamp()), nxt))
             cur = nxt
 
-        sem = asyncio.Semaphore(5)
+        # Cap concurrency at 3 — Meta's per-user rate limit is tight on the
+        # insights endpoints. Going wider trips 429s under load.
+        sem = asyncio.Semaphore(3)
         flat_metrics = "views,total_interactions,accounts_engaged,saves,shares"
+        auth_fail_count = 0  # tracks 401/403 across both batches
 
         async def fetch_flat(d_since: int, d_until: int) -> list[dict[str, Any]]:
+            nonlocal auth_fail_count
             async with sem:
                 try:
                     r = await client.get(
@@ -624,6 +648,9 @@ async def fetch_account_insights(
                             "access_token": token,
                         },
                     )
+                    if r.status_code in (401, 403):
+                        auth_fail_count += 1
+                        return []
                     if r.status_code != 200:
                         return []
                     return r.json().get("data", [])
@@ -631,6 +658,7 @@ async def fetch_account_insights(
                     return []
 
         async def fetch_follow(d_since: int, d_until: int) -> list[dict[str, Any]]:
+            nonlocal auth_fail_count
             async with sem:
                 try:
                     r = await client.get(
@@ -645,6 +673,9 @@ async def fetch_account_insights(
                             "access_token": token,
                         },
                     )
+                    if r.status_code in (401, 403):
+                        auth_fail_count += 1
+                        return []
                     if r.status_code != 200:
                         return []
                     return r.json().get("data", [])
@@ -655,6 +686,15 @@ async def fetch_account_insights(
             asyncio.gather(*[fetch_flat(s, u) for s, u, _ in day_windows]),
             asyncio.gather(*[fetch_follow(s, u) for s, u, _ in day_windows]),
         )
+
+        # If every single sub-request hit 401/403, the token is dead and the
+        # user needs to reconnect. Raise so the route surfaces a real error
+        # instead of silently storing empty insights.
+        total_attempts = 2 * len(day_windows)
+        if total_attempts and auth_fail_count == total_attempts:
+            raise OAuthError(
+                "Instagram token rejected by Meta — please reconnect your account.",
+            )
 
         # Normalise day_end to midnight UTC of its calendar date so two syncs
         # that run at different clock times produce identical `end_time` values
@@ -761,8 +801,12 @@ async def fetch_demographics(
             except Exception:
                 err = {}
             if err.get("code") == 3006 or "not enough users" in body.lower():
-                logger.info(
-                    "Demographics (%s/%s) skipped: not enough users",
+                # WARN (not INFO) so this stays visible in default log configs —
+                # users repeatedly seeing empty demographics deserve a paper
+                # trail that explains why.
+                logger.warning(
+                    "Demographics (%s/%s) skipped by Meta: not enough users "
+                    "(error code 3006) — privacy threshold not met yet.",
                     metric_name, breakdown,
                 )
                 return {}

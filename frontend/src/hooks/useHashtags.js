@@ -10,7 +10,7 @@ function buildUrl(base, params) {
   return qs ? `${base}?${qs}` : base;
 }
 
-function useGet(url, deps) {
+function useGet(url) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -19,14 +19,18 @@ function useGet(url, deps) {
     if (!url) {
       setData(null);
       setLoading(false);
-      return;
+      return undefined;
     }
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
     api
-      .get(url)
-      .then((res) => setData(res.data))
+      .get(url, { signal: controller.signal })
+      .then((res) => {
+        if (!controller.signal.aborted) setData(res.data);
+      })
       .catch((err) => {
+        if (controller.signal.aborted) return;
         // Endpoint may not exist yet — treat 404 as empty data instead of an error.
         if (err.response?.status === 404) {
           setData(null);
@@ -34,22 +38,25 @@ function useGet(url, deps) {
           setError(err.response?.data?.detail || "Request failed");
         }
       })
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [url]);
 
   return { data, loading, error };
 }
 
 export function useTopHashtags(limit = 30, minUses = 2) {
   const { days, compareTo } = usePeriodComparator();
-  const url = buildUrl("/instagram/insights/hashtags", {
-    days,
-    limit,
-    min_uses: minUses,
-    compare_to: compareTo,
-  });
-  return useGet(url, [days, limit, minUses, compareTo]);
+  return useGet(
+    buildUrl("/instagram/insights/hashtags", {
+      days,
+      limit,
+      min_uses: minUses,
+      compare_to: compareTo,
+    }),
+  );
 }
 
 export function useHashtagTrend(tag) {
@@ -61,15 +68,16 @@ export function useHashtagTrend(tag) {
         compare_to: compareTo,
       })
     : null;
-  return useGet(url, [tag, days, compareTo]);
+  return useGet(url);
 }
 
 export function useHashtagCombos(minUses = 2) {
   const { days, compareTo } = usePeriodComparator();
-  const url = buildUrl("/instagram/insights/hashtags/combos", {
-    days,
-    min_uses: minUses,
-    compare_to: compareTo,
-  });
-  return useGet(url, [days, minUses, compareTo]);
+  return useGet(
+    buildUrl("/instagram/insights/hashtags/combos", {
+      days,
+      min_uses: minUses,
+      compare_to: compareTo,
+    }),
+  );
 }

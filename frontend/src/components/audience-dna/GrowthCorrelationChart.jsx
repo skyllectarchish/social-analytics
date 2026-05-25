@@ -63,7 +63,7 @@ export default function GrowthCorrelationChart() {
         </div>
         <div className="text-right shrink-0">
           <p className={`text-xs font-mono ${interpretation.tone}`}>
-            {r == null ? "—" : `r = ${r.toFixed(2)}`}
+            {r == null || !Number.isFinite(r) ? "—" : `r = ${r.toFixed(2)}`}
           </p>
           <p className={`text-[10px] ${interpretation.tone}`}>
             {interpretation.label}

@@ -1,21 +1,34 @@
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Resolve .env relative to the backend/ directory (parent of app/)
 _ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
+
+# Minimum JWT_SECRET_KEY length (bytes). HS256 is comfortable with 32+ bytes;
+# we require 32 chars as a defensive floor. The .env.example placeholder is
+# explicitly rejected so a fresh checkout can't accidentally ship with it.
+_JWT_SECRET_MIN_LEN = 32
+_JWT_SECRET_PLACEHOLDER = "CHANGE-ME-generate-with-secrets-token-urlsafe"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=str(_ENV_PATH),
         env_file_encoding="utf-8",
-        extra="ignore",
+        # forbid catches .env typos (e.g. JWT_SECRET vs JWT_SECRET_KEY) at
+        # startup instead of letting the missing-required error mask them.
+        extra="forbid",
     )
 
     # ClickHouse
     clickhouse_host: str
     clickhouse_port: int = 8443
+    # Native (secure) TCP port — only used by run_migrations.py via the
+    # clickhouse-migrations library. Not consumed by Settings, but declared
+    # here so extra="forbid" tolerates it being present in .env.
+    clickhouse_native_port: int = 9440
     clickhouse_user: str
     clickhouse_password: str
     clickhouse_database: str = "social_analytics"
@@ -75,6 +88,22 @@ class Settings(BaseSettings):
     # Tier 4 — admin endpoints. Header-keyed (X-Admin-Key) — leave blank
     # to disable admin routes entirely.
     admin_api_key: str = ""
+
+    @field_validator("jwt_secret_key")
+    @classmethod
+    def _validate_jwt_secret(cls, v: str) -> str:
+        if v.startswith(_JWT_SECRET_PLACEHOLDER):
+            raise ValueError(
+                "JWT_SECRET_KEY is still the .env.example placeholder — "
+                "generate one with: python -c \"import secrets; "
+                "print(secrets.token_urlsafe(48))\""
+            )
+        if len(v) < _JWT_SECRET_MIN_LEN:
+            raise ValueError(
+                f"JWT_SECRET_KEY must be at least {_JWT_SECRET_MIN_LEN} "
+                "characters (recommended: 64+)."
+            )
+        return v
 
 
 settings = Settings()

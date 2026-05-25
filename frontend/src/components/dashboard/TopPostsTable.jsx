@@ -30,8 +30,9 @@ function SkeletonRow() {
   );
 }
 
-export default function TopPostsTable({ days, onSelect }) {
-  const { data, loading, error } = useDashboard(days);
+export default function TopPostsTable({ onSelect }) {
+  // useDashboard reads `days`/`compareTo` from PeriodComparatorContext; no arg needed.
+  const { data, loading, error } = useDashboard();
 
   return (
     <div

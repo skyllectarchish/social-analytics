@@ -76,15 +76,18 @@ export default function LandingFooter() {
               community — all engineered for the next decade of social.
             </p>
             <div className="mt-6 flex items-center gap-2">
+              {/* Social handles aren't published yet — render as disabled
+                  glyphs (not anchors) so clicks don't scroll-to-top and
+                  screen readers don't announce them as navigable links. */}
               {SOCIALS.map(({ Icon, label }) => (
-                <a
+                <span
                   key={label}
-                  href="#"
                   aria-label={label}
-                  className="grid h-10 w-10 place-items-center rounded-full glass text-slate-700 transition hover:text-[#0a0e27]"
+                  role="img"
+                  className="grid h-10 w-10 place-items-center rounded-full glass text-slate-400"
                 >
                   <Icon width={15} height={15} />
-                </a>
+                </span>
               ))}
             </div>
           </div>
@@ -96,14 +99,15 @@ export default function LandingFooter() {
                   {col.title}
                 </div>
                 <ul className="mt-4 space-y-2.5">
+                  {/* Marketing footer nav links don't have destinations yet —
+                      rendered as styled text rather than href="#" so a click
+                      doesn't scroll-to-top and screen readers don't surface
+                      them as navigable. */}
                   {col.links.map((l) => (
                     <li key={l}>
-                      <a
-                        href="#"
-                        className="text-sm text-slate-600 transition hover:text-[#0a0e27]"
-                      >
+                      <span className="text-sm text-slate-600 select-none">
                         {l}
-                      </a>
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -116,9 +120,11 @@ export default function LandingFooter() {
         <div className="mt-6 flex flex-col items-start justify-between gap-4 text-xs text-slate-500 sm:flex-row sm:items-center">
           <span>© {new Date().getFullYear()} Lumen Labs. Crafted for creators.</span>
           <div className="flex items-center gap-5">
-            <a href="#" className="transition hover:text-[#0a0e27]">Privacy</a>
-            <a href="#" className="transition hover:text-[#0a0e27]">Terms</a>
-            <a href="#" className="transition hover:text-[#0a0e27]">Cookies</a>
+            {/* Policy pages aren't authored yet — same treatment as the
+                column links above. */}
+            <span className="select-none">Privacy</span>
+            <span className="select-none">Terms</span>
+            <span className="select-none">Cookies</span>
           </div>
         </div>
       </div>

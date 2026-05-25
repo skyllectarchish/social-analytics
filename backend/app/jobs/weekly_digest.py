@@ -115,8 +115,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     week_of = date.fromisoformat(args.week_of) if args.week_of else None
-    if not settings.anthropic_api_key:
-        print("ANTHROPIC_API_KEY not configured — aborting.", file=sys.stderr)
+    if not settings.ollama_api_key:
+        print("OLLAMA_API_KEY not configured — aborting.", file=sys.stderr)
         return 2
     asyncio.run(_run(week_of=week_of, only_user_id=args.user_id))
     return 0

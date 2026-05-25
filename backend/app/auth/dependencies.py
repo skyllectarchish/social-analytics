@@ -29,11 +29,21 @@ def get_current_user(
     token = credentials.credentials
     try:
         payload = decode_token(token)
-        user_id: str | None = payload.get("sub")
-        if not user_id:
+        sub = payload.get("sub")
+        # Enforce sub-type: a forged token with `sub=[...]`/`sub={...}` would
+        # otherwise be passed through to find_by_id as a non-string.
+        if not isinstance(sub, str) or not sub:
             raise AuthenticationError("Token missing subject claim")
+        user_id: str = sub
     except JWTError as exc:
         logger.warning("JWT decode failed: %s", exc)
+        raise AuthenticationError("Invalid or expired token")
+    except AuthenticationError:
+        raise
+    except Exception as exc:
+        # Catch malformed-token cases (binascii errors, KeyError on missing
+        # required claim, etc.) and surface as auth failure instead of 500.
+        logger.warning("JWT processing failed: %s", exc)
         raise AuthenticationError("Invalid or expired token")
 
     client = get_client()

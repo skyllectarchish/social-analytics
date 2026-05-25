@@ -27,6 +27,19 @@ export default function AICopilotPage() {
   const [diagnosticMedia, setDiagnosticMedia] = useState(null);
   const [weekOf, setWeekOf] = useState(() => todayMondayUTC());
 
+  // Recompute the current Monday when the tab regains focus so a long-lived
+  // session crossing midnight UTC doesn't stay stuck on last week's digest.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        const fresh = todayMondayUTC();
+        setWeekOf((prev) => (prev === fresh ? prev : fresh));
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
   // Page view — gated on disclosure ack so the first event after acking
   // reflects the actual page render, not a still-modal view.
   useEffect(() => {

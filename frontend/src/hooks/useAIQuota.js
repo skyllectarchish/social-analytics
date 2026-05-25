@@ -46,7 +46,9 @@ export function useAIQuota() {
 
   const used = data?.used ?? 0;
   const limit = data?.limit ?? 0;
-  const percentUsed = limit > 0 ? (used / limit) * 100 : 0;
+  // Cap at 100 so a counting bug or a multi-worker race that lets `used`
+  // briefly exceed `limit` doesn't fill the badge bar past its track.
+  const percentUsed = limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
   const exhausted = limit > 0 && used >= limit;
 
   return {

@@ -57,7 +57,7 @@ function CustomTooltip({ active, payload }) {
         <div className="flex items-center justify-between gap-4 pt-1 border-t border-slate-100 mt-1">
           <span className="text-slate-500">Interaction / Follow</span>
           <span className="font-mono font-semibold text-slate-800">
-            {d.interaction_per_follow_ratio.toFixed(2)}
+            {(d.interaction_per_follow_ratio ?? 0).toFixed(2)}
           </span>
         </div>
       </div>

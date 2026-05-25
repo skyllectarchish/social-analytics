@@ -7,37 +7,43 @@ export function useBrandedHashtags() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [refreshTick, setRefreshTick] = useState(0);
 
-  const load = useCallback(() => {
+  useEffect(() => {
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
     api
-      .get(`/instagram/branded-hashtags?days=${encodeURIComponent(days)}`)
-      .then((res) => setData(res.data))
+      .get("/instagram/branded-hashtags", { params: { days }, signal: controller.signal })
+      .then((res) => {
+        if (!controller.signal.aborted) setData(res.data);
+      })
       .catch((err) => {
+        if (controller.signal.aborted) return;
         if (err.response?.status === 404) {
           setData(null);
         } else {
           setError(err.response?.data?.detail || "Request failed");
         }
       })
-      .finally(() => setLoading(false));
-  }, [days]);
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [days, refreshTick]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const refresh = useCallback(() => setRefreshTick((t) => t + 1), []);
 
   const add = useCallback(
     async (hashtag) => {
       try {
         await api.post("/instagram/branded-hashtags", { hashtag });
-        load();
+        refresh();
       } catch (err) {
         throw new Error(err.response?.data?.detail || "Add failed");
       }
     },
-    [load],
+    [refresh],
   );
 
   const remove = useCallback(
@@ -46,15 +52,15 @@ export function useBrandedHashtags() {
         await api.delete(
           `/instagram/branded-hashtags/${encodeURIComponent(hashtag)}`,
         );
-        load();
+        refresh();
       } catch (err) {
         throw new Error(err.response?.data?.detail || "Remove failed");
       }
     },
-    [load],
+    [refresh],
   );
 
-  return { data, loading, error, add, remove, refresh: load };
+  return { data, loading, error, add, remove, refresh };
 }
 
 export function useBrandedHashtagMentions(hashtag) {
@@ -67,25 +73,31 @@ export function useBrandedHashtagMentions(hashtag) {
     if (!hashtag) {
       setData(null);
       setLoading(false);
-      return;
+      return undefined;
     }
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
     api
       .get(
-        `/instagram/branded-hashtags/${encodeURIComponent(
-          hashtag,
-        )}/mentions?days=${encodeURIComponent(days)}`,
+        `/instagram/branded-hashtags/${encodeURIComponent(hashtag)}/mentions`,
+        { params: { days }, signal: controller.signal },
       )
-      .then((res) => setData(res.data))
+      .then((res) => {
+        if (!controller.signal.aborted) setData(res.data);
+      })
       .catch((err) => {
+        if (controller.signal.aborted) return;
         if (err.response?.status === 404) {
           setData(null);
         } else {
           setError(err.response?.data?.detail || "Request failed");
         }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, [hashtag, days]);
 
   return { data, loading, error };

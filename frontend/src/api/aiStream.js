@@ -16,7 +16,9 @@ function buildUrl(path, params) {
 // stream helper produce identical logout-redirect behavior.
 function handleAuthExpired() {
   localStorage.removeItem("access_token");
-  if (typeof window !== "undefined") window.location.href = "/login";
+  if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+    window.location.assign("/login");
+  }
 }
 
 // Parses one buffered SSE block into a { event, data } event. SSE blocks are
@@ -71,6 +73,9 @@ export async function* openAIStream(path, { params, signal, method = "GET", body
   }
 
   if (res.status === 401) {
+    // Yield an error before redirecting so callers can react in case the
+    // navigation is cancelled (e.g. user clicked away before it landed).
+    yield { event: "error", data: { code: "unauthorized", message: "Session expired." } };
     handleAuthExpired();
     return;
   }

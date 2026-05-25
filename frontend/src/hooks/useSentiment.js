@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import api from "../api/client";
 import { usePeriodComparator } from "../context/PeriodComparatorContext";
 
@@ -10,7 +10,7 @@ function buildUrl(base, params) {
   return qs ? `${base}?${qs}` : base;
 }
 
-function useGet(url, deps) {
+function useGet(url) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -19,61 +19,67 @@ function useGet(url, deps) {
     if (!url) {
       setData(null);
       setLoading(false);
-      return;
+      return undefined;
     }
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
     api
-      .get(url)
-      .then((res) => setData(res.data))
+      .get(url, { signal: controller.signal })
+      .then((res) => {
+        if (!controller.signal.aborted) setData(res.data);
+      })
       .catch((err) => {
+        if (controller.signal.aborted) return;
         if (err.response?.status === 404) {
           setData(null);
         } else {
           setError(err.response?.data?.detail || "Request failed");
         }
       })
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [url]);
 
   return { data, loading, error };
 }
 
 export function useSentimentSummary() {
   const { days, compareTo } = usePeriodComparator();
-  const url = buildUrl("/instagram/insights/sentiment", {
-    days,
-    compare_to: compareTo,
-  });
-  return useGet(url, [days, compareTo]);
+  return useGet(
+    buildUrl("/instagram/insights/sentiment", { days, compare_to: compareTo }),
+  );
 }
 
 export function useTopics() {
   const { days } = usePeriodComparator();
-  const url = buildUrl("/instagram/insights/sentiment/topics", { days });
-  return useGet(url, [days]);
+  return useGet(buildUrl("/instagram/insights/sentiment/topics", { days }));
 }
 
 export function useQuestionPosts(limit = 10) {
   const { days } = usePeriodComparator();
-  const url = buildUrl("/instagram/insights/sentiment/questions", {
-    days,
-    limit,
-  });
-  return useGet(url, [days, limit]);
+  return useGet(
+    buildUrl("/instagram/insights/sentiment/questions", { days, limit }),
+  );
 }
 
 export function useMediaSentiment(mediaId) {
   const url = mediaId
     ? `/instagram/insights/sentiment/media/${encodeURIComponent(mediaId)}`
     : null;
-  return useGet(url, [mediaId]);
+  return useGet(url);
 }
 
 export function useSentimentDiagnose(refreshKey = 0) {
-  // refreshKey lets the parent force a re-fetch after seeding demo data.
-  return useGet("/instagram/insights/sentiment/diagnose", [refreshKey]);
+  // Use refreshKey as a URL-level cache buster so callers can force a re-fetch
+  // (e.g. after seeding demo data) by bumping it — the useGet effect re-runs
+  // whenever the URL string changes.
+  const url = refreshKey
+    ? `/instagram/insights/sentiment/diagnose?_=${refreshKey}`
+    : "/instagram/insights/sentiment/diagnose";
+  return useGet(url);
 }
 
 export function useSeedSentimentDemo() {
@@ -81,7 +87,7 @@ export function useSeedSentimentDemo() {
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
 
-  const trigger = async () => {
+  const trigger = useCallback(async () => {
     setSeeding(true);
     setError(null);
     try {
@@ -95,7 +101,7 @@ export function useSeedSentimentDemo() {
     } finally {
       setSeeding(false);
     }
-  };
+  }, []);
 
   return { trigger, seeding, error, result };
 }

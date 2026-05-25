@@ -122,10 +122,10 @@ function PostMiniRow({ post, index, onSelect }) {
         </div>
         <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-400">
           <span className="flex items-center gap-0.5">
-            <Bookmark size={9} /> {post.save_rate.toFixed(1)}%
+            <Bookmark size={9} /> {(post.save_rate ?? 0).toFixed(1)}%
           </span>
           <span className="flex items-center gap-0.5">
-            <Share2 size={9} /> {post.share_rate.toFixed(1)}%
+            <Share2 size={9} /> {(post.share_rate ?? 0).toFixed(1)}%
           </span>
         </div>
       </div>
@@ -136,7 +136,7 @@ function PostMiniRow({ post, index, onSelect }) {
           color: "#7c3aed",
         }}
       >
-        {post.algorithm_score.toFixed(1)}
+        {(post.algorithm_score ?? 0).toFixed(1)}
       </div>
     </motion.button>
   );

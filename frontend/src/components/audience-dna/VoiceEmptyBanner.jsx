@@ -33,11 +33,10 @@ export default function VoiceEmptyBanner() {
   async function onSeed() {
     try {
       await trigger();
+      // Reload to refresh page-level data hooks that don't expose a refetch
+      // handle. Heavy but predictable; better than leaving stale empty-state.
       setRefreshKey((k) => k + 1);
-      // Reload the page-level data hooks. Simplest path: full reload.
-      // Audience Voice hooks don't expose a refetch handle, so we lean on
-      // the browser cache + router to refresh.
-      window.setTimeout(() => window.location.reload(), 400);
+      window.location.reload();
     } catch {
       // error already captured by the hook
     }
@@ -84,7 +83,7 @@ export default function VoiceEmptyBanner() {
                 </code>
                 ) needs Meta App Review approval before it works on accounts
                 that aren&apos;t registered test users. We see{" "}
-                <strong>{data.ig_comments_total.toLocaleString()}</strong>{" "}
+                <strong>{(data.ig_comments_total ?? 0).toLocaleString()}</strong>{" "}
                 comments on your posts via the count endpoint, but the
                 content endpoint is returning empty pages. Two fixes:
               </p>

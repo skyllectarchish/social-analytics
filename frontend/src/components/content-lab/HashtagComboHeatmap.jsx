@@ -10,9 +10,20 @@ export default function HashtagComboHeatmap() {
   if (loading) return <SkeletonChart height="h-44" />;
 
   const combos = (data?.data ?? []).slice(0, 12);
-  const median = combos.length
-    ? combos[Math.floor(combos.length / 2)].avg_engagement_pct
-    : 0;
+  // Real median of avg_engagement_pct across the top combos, used to decide
+  // which combos earn the "above-average" badge. The previous implementation
+  // indexed combos[len/2] directly which is just an arbitrary mid-rank value,
+  // not the median, making the badge thresholds essentially random.
+  const median = (() => {
+    if (!combos.length) return 0;
+    const sorted = [...combos]
+      .map((c) => Number(c.avg_engagement_pct) || 0)
+      .sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0
+      ? (sorted[mid - 1] + sorted[mid]) / 2
+      : sorted[mid];
+  })();
 
   return (
     <AnimatedCard className="p-5" delay={0.15}>

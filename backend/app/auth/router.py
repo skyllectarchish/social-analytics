@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
+# A bcrypt hash of a random throwaway password used to equalize verify_password
+# latency when no user is found, so the response time on /login doesn't reveal
+# whether an email is registered.
+_BOGUS_PASSWORD_HASH = hash_password("not-a-real-password")
+
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(body: UserRegister):
@@ -47,6 +52,10 @@ def login(body: UserLogin):
 
     user = user_repo.find_by_email(client, body.email)
     if user is None:
+        # Run a dummy verify_password so the response time matches the
+        # found-user branch — otherwise the latency delta leaks which emails
+        # are registered.
+        verify_password(body.password, _BOGUS_PASSWORD_HASH)
         raise AuthenticationError()
 
     if not verify_password(body.password, user.hashed_password):

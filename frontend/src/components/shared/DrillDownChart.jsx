@@ -62,7 +62,7 @@ export default function DrillDownChart({
 
       <AnimatePresence mode="wait">
         <motion.div
-          key={current.level + JSON.stringify(current.context)}
+          key={`${current.level}|${JSON.stringify(current.context)}`}
           initial={{ opacity: 0, y: 6, filter: "blur(3px)" }}
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           exit={{ opacity: 0, y: -4, filter: "blur(3px)" }}

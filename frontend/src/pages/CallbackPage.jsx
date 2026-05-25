@@ -16,9 +16,15 @@ export default function CallbackPage() {
     const code = searchParams.get("code");
     const state = searchParams.get("state");
     const errorParam = searchParams.get("error");
+    const errorDescription = searchParams.get("error_description");
 
     if (errorParam) {
-      setError("Instagram authorization was denied.");
+      setError(
+        errorDescription ||
+        (errorParam === "access_denied"
+          ? "Instagram authorization was denied."
+          : `Instagram authorization failed: ${errorParam}`),
+      );
       return;
     }
     if (!code) {
@@ -30,16 +36,23 @@ export default function CallbackPage() {
       return;
     }
 
+    let redirectTimer = null;
     (async () => {
       try {
         setStatus("Exchanging authorization code...");
         await api.get(`/instagram/callback`, { params: { code, state } });
         setStatus("Account connected! Redirecting...");
-        setTimeout(() => navigate("/dashboard"), 1000);
+        // Brief pause for the success state to register visually before
+        // bouncing to the dashboard — 1s felt sluggish; 350ms is enough.
+        redirectTimer = setTimeout(() => navigate("/dashboard"), 350);
       } catch (err) {
         setError(err.response?.data?.detail || "Failed to connect Instagram account");
       }
     })();
+
+    return () => {
+      if (redirectTimer) clearTimeout(redirectTimer);
+    };
   }, [searchParams, navigate]);
 
   return (

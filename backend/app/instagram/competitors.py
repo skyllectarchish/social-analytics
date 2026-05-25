@@ -8,6 +8,7 @@ quota, not the competitor's.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -24,6 +25,12 @@ BUSINESS_DISCOVERY_FIELDS: str = (
     "like_count,comments_count,permalink,thumbnail_url,media_url}"
 )
 
+# Defense-in-depth: the router-level Pydantic schema already validates the
+# handle, but interpolating it into Meta's Graph DSL means a regression in
+# that validation could let an attacker chain extra `username(...)` clauses.
+# Reject anything that doesn't match Instagram's actual handle character set.
+_HANDLE_RE = re.compile(r"^[A-Za-z0-9._]{1,30}$")
+
 
 async def fetch_competitor_snapshot(
     my_ig_user_id: str,
@@ -37,6 +44,12 @@ async def fetch_competitor_snapshot(
     when available, or a synthesized one for network / non-200 cases. Callers
     that only care about success can ignore the second element.
     """
+    if not _HANDLE_RE.match(handle):
+        # Should never reach here if the router validation is intact, but the
+        # interpolation below is part of Meta's Graph DSL — refuse anything
+        # weird rather than send it.
+        return None, "Invalid Instagram handle format."
+
     url = f"{GRAPH_BASE_URL}/{my_ig_user_id}"
     params = {
         "fields": (

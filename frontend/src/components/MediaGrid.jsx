@@ -1,6 +1,6 @@
 import MediaCard from "./MediaCard";
 
-export default function MediaGrid({ items, total, page, pageSize, onPageChange }) {
+export default function MediaGrid({ items = [], total = 0, page, pageSize, onPageChange }) {
   const totalPages = Math.ceil(total / pageSize);
 
   if (!items.length) {

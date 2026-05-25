@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart,
@@ -74,11 +74,14 @@ export default function DemographicsPanel() {
 
   const { data, loading, error } = useDemographics(metric, breakdown);
 
-  const sorted = [...(data?.data ?? [])].sort((a, b) => b.value - a.value).slice(0, 8);
-  const chartData = sorted.map((d) => ({
-    name: d.dimension_value ?? "",
-    value: d.value,
-  }));
+  const chartData = useMemo(
+    () =>
+      [...(data?.data ?? [])]
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8)
+        .map((d) => ({ name: d.dimension_value ?? "", value: d.value })),
+    [data],
+  );
 
   return (
     <div

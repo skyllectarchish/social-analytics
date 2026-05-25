@@ -179,13 +179,13 @@ export default function ReelsRetentionTable({ onSelect }) {
                       r.hook_strength_pct,
                     )}`}
                   >
-                    {r.hook_strength_pct.toFixed(1)}%
+                    {(r.hook_strength_pct ?? 0).toFixed(1)}%
                   </span>
                 </div>
                 <div className="w-28 shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-[11px] text-slate-700">
-                      {r.avg_watch_time.toFixed(1)}s
+                      {(r.avg_watch_time ?? 0).toFixed(1)}s
                     </span>
                     <MiniBar value={r.avg_watch_time} max={maxWatch} color="#06b6d4" />
                   </div>
@@ -193,14 +193,14 @@ export default function ReelsRetentionTable({ onSelect }) {
                 <div className="w-24 shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-[11px] text-slate-700">
-                      {r.skip_rate.toFixed(1)}%
+                      {(r.skip_rate ?? 0).toFixed(1)}%
                     </span>
                     <MiniBar value={r.skip_rate} max={maxSkip} color="#ec4899" />
                   </div>
                 </div>
                 <div className="w-20 shrink-0">
                   <span className="font-mono text-[11px] text-slate-700">
-                    {r.estimated_replay_rate.toFixed(2)}%
+                    {(r.estimated_replay_rate ?? 0).toFixed(2)}%
                   </span>
                 </div>
               </motion.button>

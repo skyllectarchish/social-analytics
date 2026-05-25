@@ -12,14 +12,18 @@ function StoryCard({ story }) {
   const views = story.insights?.find((i) => i.metric_name === "views")?.value ?? 0;
   const reach = story.insights?.find((i) => i.metric_name === "reach")?.value ?? 0;
   const displayCount = views || reach;
+  // Render as a plain div when we don't have a permalink — otherwise `href="#"`
+  // opens an empty popup on click.
+  const Wrapper = story.permalink ? "a" : "div";
+  const wrapperProps = story.permalink
+    ? { href: story.permalink, target: "_blank", rel: "noopener noreferrer" }
+    : {};
 
   return (
-    <a
-      href={story.permalink || "#"}
-      target="_blank"
-      rel="noopener noreferrer"
+    <Wrapper
+      {...wrapperProps}
       className="shrink-0 group flex flex-col items-center gap-2.5"
-      style={{ textDecoration: "none", cursor: "pointer" }}
+      style={{ textDecoration: "none", cursor: story.permalink ? "pointer" : "default" }}
     >
       {/* Story ring with glow */}
       <div
@@ -87,7 +91,7 @@ function StoryCard({ story }) {
         </p>
         <p style={{ fontSize: 10, color: "#94A3B8", marginTop: 1 }}>views</p>
       </div>
-    </a>
+    </Wrapper>
   );
 }
 

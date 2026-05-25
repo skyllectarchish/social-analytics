@@ -296,22 +296,49 @@ ORDER BY algorithm_score DESC
 LIMIT {limit:UInt32}
 """
 
+#: Account-wide save/share rates over a date window.
+#:
+#: `saved` and `shares` are per-media metrics in Meta's API (NOT
+#: account-level), so we aggregate them from media_insights joined to
+#: instagram_media for window-scoping. The denominator (`reach`) IS available
+#: at the account level — sum it from account_insights so the percentage
+#: doesn't double-count viewers who saw multiple of the user's posts.
 GET_ALGORITHM_METRICS_SUMMARY = """
+WITH
+    media_totals AS (
+        SELECT
+            sumIf(mi.metric_value, mi.metric_name = 'saved') AS total_saves,
+            sumIf(mi.metric_value, mi.metric_name = 'shares') AS total_shares
+        FROM media_insights mi FINAL
+        INNER JOIN (
+            SELECT ig_media_id
+            FROM instagram_media FINAL
+            WHERE user_id = {user_id:UUID}
+              AND ig_user_id = {ig_user_id:String}
+              AND timestamp >= {since:DateTime}
+              AND timestamp <= {until:DateTime}
+        ) m ON mi.ig_media_id = m.ig_media_id
+        WHERE mi.user_id = {user_id:UUID}
+    ),
+    account_totals AS (
+        SELECT sumIf(metric_value, metric_name = 'reach') AS total_reach
+        FROM account_insights FINAL
+        WHERE user_id = {user_id:UUID}
+          AND ig_user_id = {ig_user_id:String}
+          AND end_time >= {since:DateTime}
+          AND end_time <= {until:DateTime}
+    )
 SELECT
-    sumIf(metric_value, metric_name = 'saves') AS total_saves,
-    sumIf(metric_value, metric_name = 'shares') AS total_shares,
-    sumIf(metric_value, metric_name = 'reach') AS total_reach,
-    if(sumIf(metric_value, metric_name = 'reach') > 0,
-       sumIf(metric_value, metric_name = 'saves') / sumIf(metric_value, metric_name = 'reach') * 100, 0
+    media_totals.total_saves AS total_saves,
+    media_totals.total_shares AS total_shares,
+    account_totals.total_reach AS total_reach,
+    if(account_totals.total_reach > 0,
+       media_totals.total_saves / account_totals.total_reach * 100, 0
     ) AS account_save_rate,
-    if(sumIf(metric_value, metric_name = 'reach') > 0,
-       sumIf(metric_value, metric_name = 'shares') / sumIf(metric_value, metric_name = 'reach') * 100, 0
+    if(account_totals.total_reach > 0,
+       media_totals.total_shares / account_totals.total_reach * 100, 0
     ) AS account_share_rate
-FROM account_insights FINAL
-WHERE user_id = {user_id:UUID}
-  AND ig_user_id = {ig_user_id:String}
-  AND end_time >= {since:DateTime}
-  AND end_time <= {until:DateTime}
+FROM media_totals, account_totals
 """
 
 # --- Phase 0.3: Shared pivot subquery (embedded via string concat) ---
@@ -329,8 +356,9 @@ PIVOTED_MEDIA_METRICS = """
         sumIf(metric_value, metric_name = 'ig_reels_avg_watch_time') AS avg_watch_time,
         sumIf(metric_value, metric_name = 'ig_reels_video_view_total_time') AS total_view_time,
         sumIf(metric_value, metric_name = 'reels_skip_rate') AS skip_rate,
-        sumIf(metric_value, metric_name = 'profile_visits') AS profile_visits,
-        sumIf(metric_value, metric_name = 'reposts') AS reposts
+        sumIf(metric_value, metric_name = 'profile_visits') AS profile_visits
+        -- `reposts` was dropped from Meta's media insights API (see constants.py)
+        -- so the aggregation is also removed here; no caller reads it.
     FROM media_insights FINAL
     WHERE user_id = {user_id:UUID}
     GROUP BY ig_media_id, user_id
@@ -927,6 +955,8 @@ LEFT JOIN instagram_media m FINAL
     ON m.ig_media_id = c.ig_media_id AND m.user_id = c.user_id
 WHERE c.user_id = {user_id:UUID}
   AND positionCaseInsensitive(c.text, {needle:String}) > 0
+ORDER BY c.timestamp DESC
+LIMIT 5000
 """
 
 # Posts (captions) where the authenticated user themselves used the brand
@@ -985,23 +1015,6 @@ LIMIT 1
 # Inserts use the client.insert(table, rows, column_names=[...]) helper
 # from clickhouse-connect — see ai/quota.py, ai/feedback.py, ai/telemetry.py.
 # No raw INSERT strings here, matching the project convention.
-
-# Cached weekly digest read (Phase B). Returns one row or none.
-GET_AI_DIGEST = """
-SELECT
-    week_of,
-    status,
-    cached,
-    narrative_md,
-    bullets_json,
-    followups_json,
-    metrics_snapshot,
-    generated_at
-FROM ai_digests FINAL
-WHERE user_id = {user_id:UUID}
-  AND week_of = {week_of:Date}
-LIMIT 1
-"""
 
 # Posts published in the digest week, with per-post metric aggregates
 # from media_insights. Caption is truncated to 200 chars in Python (we
@@ -1137,8 +1150,11 @@ SELECT
     p.ig_user_id
 FROM instagram_profiles p FINAL
 INNER JOIN (
+    -- DISTINCT already dedupes (user_id, ig_user_id); FINAL would force a
+    -- full table merge of instagram_media first which gets expensive on
+    -- multi-million-row corpora and is unnecessary for this read.
     SELECT DISTINCT user_id, ig_user_id
-    FROM instagram_media FINAL
+    FROM instagram_media
     WHERE timestamp >= {since:DateTime}
 ) m ON m.user_id = p.user_id AND m.ig_user_id = p.ig_user_id
 """
@@ -1341,17 +1357,23 @@ ORDER BY hour
 # usage frequency. Powers "5 of 8 hashtags are over-used / broad" type
 # observations.
 GET_DIAGNOSTIC_POST_HASHTAGS = """
+WITH per_tag AS (
+    -- Pre-aggregate the user's total post count per hashtag once, then join
+    -- onto the target-post's tags. O(N) instead of the prior LEFT-JOIN self-
+    -- cross which is O(N^2) for heavy hashtag corpora.
+    SELECT hashtag, countDistinct(ig_media_id) AS uses
+    FROM post_hashtags FINAL
+    WHERE user_id = {user_id:UUID}
+    GROUP BY hashtag
+)
 SELECT
     h.hashtag,
-    countIf(h2.ig_media_id IS NOT NULL) AS user_uses
+    -- Subtract this post's single use so "user_uses" measures *other* posts.
+    greatest(per_tag.uses - 1, 0) AS user_uses
 FROM post_hashtags h FINAL
-LEFT JOIN post_hashtags h2 FINAL
-    ON h2.hashtag = h.hashtag
-   AND h2.user_id = h.user_id
-   AND h2.ig_media_id != h.ig_media_id
+LEFT JOIN per_tag ON per_tag.hashtag = h.hashtag
 WHERE h.user_id = {user_id:UUID}
   AND h.ig_media_id = {ig_media_id:String}
-GROUP BY h.hashtag
 ORDER BY user_uses DESC
 """
 
@@ -1408,4 +1430,34 @@ WHERE m.user_id = {user_id:UUID}
   )
 ORDER BY algorithm_score_pct DESC
 LIMIT {limit:UInt32}
+"""
+
+# --- Phase F (Tier 2): sentiment-pipeline diagnostics ---
+# Used by GET /api/instagram/insights/sentiment/diagnose to explain why the
+# Audience Voice section may be empty (most often: Meta hasn't approved
+# Advanced Access for instagram_business_manage_comments).
+
+COUNT_IG_COMMENTS_FROM_MEDIA = """
+SELECT toInt64(sum(comments_count))
+FROM instagram_media FINAL
+WHERE user_id = {user_id:UUID}
+  AND ig_user_id = {ig_user_id:String}
+"""
+
+COUNT_STORED_COMMENTS = """
+SELECT count()
+FROM instagram_comments FINAL
+WHERE user_id = {user_id:UUID}
+"""
+
+COUNT_STORED_COMMENT_SENTIMENT = """
+SELECT count()
+FROM comment_sentiment FINAL
+WHERE user_id = {user_id:UUID}
+"""
+
+COUNT_STORED_COMMENT_TOPICS = """
+SELECT count()
+FROM comment_topics FINAL
+WHERE user_id = {user_id:UUID}
 """

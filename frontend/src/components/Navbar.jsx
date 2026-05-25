@@ -58,7 +58,6 @@ export default function Navbar({ dark = false }) {
         <div className="hidden sm:flex items-center gap-1">
           <NavLink to="/dashboard" className={linkClass}>Dashboard</NavLink>
           <NavLink to="/insta-dashboard" className={linkClass}>Instagram</NavLink>
-          <NavLink to="/stories" className={linkClass}>Stories</NavLink>
         </div>
       </div>
 
@@ -71,14 +70,12 @@ export default function Navbar({ dark = false }) {
         </span>
         <button
           onClick={handleLogout}
-          className="text-xs px-3 py-1.5 rounded-lg transition-all"
+          className="text-xs px-3 py-1.5 rounded-lg transition-opacity hover:opacity-70"
           style={{
             background: dark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.05)",
             color: dark ? "#94a3b8" : "#64748b",
             border: dark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(15,23,42,0.08)",
           }}
-          onMouseEnter={e => e.currentTarget.style.opacity = "0.7"}
-          onMouseLeave={e => e.currentTarget.style.opacity = "1"}
         >
           Sign out
         </button>

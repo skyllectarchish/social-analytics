@@ -305,7 +305,10 @@ export default function DashboardMockup() {
           {/* KPI strip */}
           <div className="mt-3 grid grid-cols-4 gap-2">
             {KPIS.map((k) => {
-              const Icon = { Likes: Heart, Comments: MessageCircle, Shares: Share2, Saves: Bookmark }[k.label];
+              // Fallback to Heart so a future KPI label that doesn't match
+              // one of the four entries can't take down the whole mockup
+              // with "Element type is invalid (Icon is undefined)".
+              const Icon = ({ Likes: Heart, Comments: MessageCircle, Shares: Share2, Saves: Bookmark }[k.label]) ?? Heart;
               return (
                 <div
                   key={k.label}

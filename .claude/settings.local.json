@@ -130,7 +130,11 @@
       "PowerShell(Start-Sleep -Seconds 3; $venvPy = \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend\\\\venv\\\\Scripts\\\\python.exe\"; Push-Location \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend\"; try { & $venvPy \".\\\\scripts\\\\retry_diagnostic.py\" 2>&1 } finally { Pop-Location })",
       "PowerShell($venvPy = \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend\\\\venv\\\\Scripts\\\\python.exe\"; Push-Location \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend\"; try { & $venvPy \".\\\\scripts\\\\test_regenerate.py\" 2>&1 } finally { Pop-Location })",
       "PowerShell($venvPy = \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend\\\\venv\\\\Scripts\\\\python.exe\"; Push-Location \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend\"; try { & $venvPy \".\\\\scripts\\\\test_week_picker.py\" 2>&1 } finally { Pop-Location })",
-      "PowerShell($venvPy = \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend\\\\venv\\\\Scripts\\\\python.exe\"; Push-Location \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend\"; try { & $venvPy \".\\\\scripts\\\\test_picker_roundtrip.py\" 2>&1 } finally { Pop-Location })"
+      "PowerShell($venvPy = \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend\\\\venv\\\\Scripts\\\\python.exe\"; Push-Location \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend\"; try { & $venvPy \".\\\\scripts\\\\test_picker_roundtrip.py\" 2>&1 } finally { Pop-Location })",
+      "Bash(./venv/Scripts/python -c \"import sys; sys.path.insert\\(0, '.'\\); from app.main import app; print\\('OK', app.title\\)\")",
+      "Bash(npm view *)",
+      "Bash(./venv/Scripts/python -c \"from app.config import settings; print\\('OK'\\)\")",
+      "Bash(./venv/Scripts/python -c \"from app.main import app; print\\('OK'\\)\")"
     ]
   }
 }

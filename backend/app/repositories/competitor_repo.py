@@ -251,12 +251,17 @@ def upsert_handle(
     logger.info("Upserted competitor handle %s for user %s", handle, user_id)
 
 
-def soft_delete_handle(client: Client, user_id: str, handle: str) -> None:
-    """Mark a handle inactive without dropping its snapshot history."""
+def soft_delete_handle(client: Client, user_id: str, handle: str) -> bool:
+    """Mark a handle inactive without dropping its snapshot history.
+
+    Returns True if a row was found and soft-deleted, False if the handle
+    wasn't tracked for this user (so the route can return 404 instead of
+    a misleading 204 success).
+    """
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     existing = _load_existing_handle_row(client, user_id, handle)
     if existing is None:
-        return
+        return False
     ig_user_id, display_name, profile_picture_url, added_at, _active, failures = existing
     _insert_handle_row(client, [
         str(uuid.uuid4()),
@@ -271,6 +276,7 @@ def soft_delete_handle(client: Client, user_id: str, handle: str) -> None:
         int(failures or 0),
     ])
     logger.info("Soft-deleted competitor handle %s for user %s", handle, user_id)
+    return True
 
 
 def record_success(client: Client, user_id: str, handle: str) -> None:

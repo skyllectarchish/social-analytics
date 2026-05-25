@@ -16,7 +16,7 @@ from ..models.queries import (
     GET_INSTAGRAM_PROFILE,
     GET_INSTAGRAM_TOKEN,
 )
-from .safe_query import safe_call
+from .safe_query import is_schema_missing, log_schema_missing, safe_call
 
 logger = logging.getLogger(__name__)
 
@@ -326,7 +326,13 @@ def bulk_insert_media(
     for item in media_list:
         ts_str = item.get("timestamp", "")
         try:
-            ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00")).replace(tzinfo=None)
+            # Normalize through UTC first so a non-UTC-offset timestamp lands
+            # at the right UTC moment before dropping tzinfo for ClickHouse.
+            ts = (
+                datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                .astimezone(timezone.utc)
+                .replace(tzinfo=None)
+            )
         except (ValueError, TypeError):
             ts = now
 
@@ -378,7 +384,13 @@ def _insert_hashtags_for_media(
         caption = item.get("caption", "") or ""
         ts_str = item.get("timestamp", "")
         try:
-            ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00")).replace(tzinfo=None)
+            # Normalize through UTC first so a non-UTC-offset timestamp lands
+            # at the right UTC moment before dropping tzinfo for ClickHouse.
+            ts = (
+                datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                .astimezone(timezone.utc)
+                .replace(tzinfo=None)
+            )
         except (ValueError, TypeError):
             ts = now
         media_product_type = item.get("media_product_type", "") or ""
@@ -410,8 +422,7 @@ def _insert_hashtags_for_media(
     except Exception as exc:
         # The post_hashtags table may not exist yet (migration 008 not run).
         # Don't fail the media sync if hashtag denorm is missing.
-        if _is_schema_missing(exc):
-            from .safe_query import log_schema_missing
+        if is_schema_missing(exc):
             log_schema_missing(
                 "instagram_repo._insert_hashtags_for_media", exc,
                 f"skipped {len(hashtag_rows)} rows — post_hashtags missing?",

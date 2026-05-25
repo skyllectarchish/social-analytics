@@ -186,6 +186,8 @@ def _load_context(
         posts.append({
             "id": ig_media_id,
             "type": media_type,
+            "permalink": permalink or None,
+            "thumbnail_url": thumbnail_url or None,
             "ts": ts.isoformat() if hasattr(ts, "isoformat") else str(ts),
             "caption": truncate_caption(redact_pii(caption_preview or "")),
             "reach": int(reach or 0),
@@ -287,8 +289,8 @@ async def synthesize(
     source_posts = [
         IdeasSourcePost(
             ig_media_id=p["id"],
-            permalink=None,  # not stored in ctx; fetched fresh isn't worth it for now
-            thumbnail_url=None,
+            permalink=p.get("permalink"),
+            thumbnail_url=p.get("thumbnail_url"),
             caption_preview=p["caption"],
             algorithm_score_pct=int(round(p["algorithm_score_pct"])),
         )

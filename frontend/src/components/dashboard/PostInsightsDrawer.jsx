@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import AnimatedCounter from "../landing/ui/AnimatedCounter";
 import { UserPlus, Sparkles } from "lucide-react";
@@ -225,10 +226,13 @@ function InsightMiniCard({ name, value, icon, index = 0 }) {
 export default function PostInsightsDrawer({ media, onClose, onDiagnose }) {
   const { data, loading } = useMediaInsights(media?.ig_media_id);
 
-  const insightsMap = {};
-  (data?.insights ?? []).forEach((item) => {
-    insightsMap[item.metric_name] = item.value;
-  });
+  const insightsMap = useMemo(() => {
+    const map = {};
+    for (const item of data?.insights ?? []) {
+      map[item.metric_name] = item.value;
+    }
+    return map;
+  }, [data]);
 
   const isReel = media?.media_type === "VIDEO";
   const imgSrc = media?.thumbnail_url || media?.media_url;
@@ -255,6 +259,9 @@ export default function PostInsightsDrawer({ media, onClose, onDiagnose }) {
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 32, stiffness: 380 }}
             className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Post insights"
             style={{
               maxHeight: "82vh",
               background: "rgba(255,255,255,0.98)",
@@ -281,6 +288,13 @@ export default function PostInsightsDrawer({ media, onClose, onDiagnose }) {
                     alt="Post"
                     className="w-16 h-16 rounded-xl object-cover shrink-0"
                     style={{ border: "1px solid rgba(0,0,0,0.08)" }}
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      // Instagram CDN URLs expire after ~24h. Swap the broken
+                      // image out for a neutral placeholder rather than show a
+                      // browser's broken-image glyph.
+                      e.currentTarget.style.display = "none";
+                    }}
                   />
                 )}
                 <div className="flex-1 min-w-0">

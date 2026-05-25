@@ -19,14 +19,24 @@ from ..constants import (
 )
 from ..crypto import decrypt_token, encrypt_token
 from ..database import get_client
-from ..exceptions import InstagramAPIError, InstagramNotConnectedError
+from ..exceptions import (
+    EntityNotFoundError,
+    InstagramAPIError,
+    InstagramNotConnectedError,
+    OAuthError,
+)
 from ..models.queries import (
+    COUNT_IG_COMMENTS_FROM_MEDIA,
+    COUNT_STORED_COMMENTS,
+    COUNT_STORED_COMMENT_SENTIMENT,
+    COUNT_STORED_COMMENT_TOPICS,
     GET_DASHBOARD_SUMMARY,
     GET_FOLLOWER_GROWTH,
     GET_TOP_PERFORMING_MEDIA,
     GET_FORMAT_BREAKDOWN,
 )
 from ..models.user import User
+from ..jobs import seed_demo_sentiment
 from ..repositories import (
     branded_hashtag_repo,
     comment_repo,
@@ -155,19 +165,37 @@ async def callback(
     user_id = str(current_user.id)
     service.verify_oauth_state(state, user_id)
 
-    short_token, ig_user_id = await service.exchange_code_for_token(code)
+    # Idempotency: a refresh of the callback URL re-fires the GET with the
+    # already-redeemed `code`, which Meta rejects. If the user already has a
+    # connected profile, short-circuit to success instead of bouncing them
+    # back to /connect with a misleading "failed to exchange" error.
+    client = get_client()
+    existing_profile = instagram_repo.find_profile(client, user_id)
+
+    try:
+        short_token, ig_user_id = await service.exchange_code_for_token(code)
+    except OAuthError:
+        if existing_profile is not None:
+            logger.info(
+                "Instagram callback re-fired for already-connected user %s — "
+                "skipping code exchange",
+                user_id,
+            )
+            return CallbackResponse(
+                success=True,
+                profile=InstagramProfile.from_model(existing_profile),
+            )
+        raise
     long_token, expires_in = await service.get_long_lived_token(short_token)
 
     profile_data = await service.fetch_profile(ig_user_id, long_token)
     media_list = await service.fetch_media(ig_user_id, long_token)
 
     encrypted_token = encrypt_token(long_token, settings.jwt_secret_key)
-    token_expires_at = datetime.fromtimestamp(
-        datetime.now(timezone.utc).timestamp() + expires_in,
-        tz=timezone.utc,
+    token_expires_at = (
+        datetime.now(timezone.utc) + timedelta(seconds=expires_in)
     ).replace(tzinfo=None)
 
-    client = get_client()
     instagram_repo.upsert_profile(
         client, user_id, ig_user_id, profile_data, encrypted_token, token_expires_at,
     )
@@ -285,9 +313,8 @@ async def refresh(current_user: User = Depends(get_current_user)):
     media_list = await service.fetch_media(ig_user_id, token)
 
     encrypted_token = encrypt_token(token, settings.jwt_secret_key)
-    token_expires_at = datetime.fromtimestamp(
-        datetime.now(timezone.utc).timestamp() + DEFAULT_TOKEN_EXPIRY_SECONDS,
-        tz=timezone.utc,
+    token_expires_at = (
+        datetime.now(timezone.utc) + timedelta(seconds=DEFAULT_TOKEN_EXPIRY_SECONDS)
     ).replace(tzinfo=None)
 
     instagram_repo.upsert_profile(
@@ -497,7 +524,10 @@ async def _run_insights_sync(
                         "metric_value": int(point.get("value", 0)),
                         "end_time": end_time,
                     })
-                except (KeyError, ValueError):
+                except (KeyError, ValueError, TypeError):
+                    # Meta occasionally returns nested dicts for total_value
+                    # breakdown metrics or omits end_time — skip the offending
+                    # point rather than aborting the whole account-insights phase.
                     continue
         insights_repo.bulk_upsert_account_insights(client, user_id, ig_user_id, account_rows)
         logger.info("Background sync: %d account rows for user %s", len(account_rows), user_id)
@@ -1313,7 +1343,9 @@ def get_follower_spikes(
 
 @router.get("/insights/format-breakdown/posts", response_model=FormatBreakdownPostsResponse)
 def get_format_breakdown_posts(
-    format: str = Query(..., description="Content format: FEED, REELS, or STORY"),
+    format: Literal["FEED", "REELS", "STORY"] = Query(
+        ..., description="Content format: FEED, REELS, or STORY",
+    ),
     days: int = Query(90, ge=1, le=365),
     limit: int = Query(20, ge=1, le=50),
     current_user: User = Depends(get_current_user),
@@ -1721,26 +1753,22 @@ def diagnose_sentiment(current_user: User = Depends(get_current_user)):
         )
 
     ig_total_rows = client.query(
-        "SELECT toInt64(sum(comments_count)) FROM instagram_media FINAL "
-        "WHERE user_id = {u:UUID} AND ig_user_id = {ig:String}",
-        parameters={"u": user_id, "ig": profile.ig_user_id},
+        COUNT_IG_COMMENTS_FROM_MEDIA,
+        parameters={"user_id": user_id, "ig_user_id": profile.ig_user_id},
     ).result_rows
     ig_total = int(ig_total_rows[0][0] or 0) if ig_total_rows else 0
 
     stored_comments = int(client.query(
-        "SELECT count() FROM instagram_comments FINAL "
-        "WHERE user_id = {u:UUID}",
-        parameters={"u": user_id},
+        COUNT_STORED_COMMENTS,
+        parameters={"user_id": user_id},
     ).result_rows[0][0] or 0)
     stored_sentiment = int(client.query(
-        "SELECT count() FROM comment_sentiment FINAL "
-        "WHERE user_id = {u:UUID}",
-        parameters={"u": user_id},
+        COUNT_STORED_COMMENT_SENTIMENT,
+        parameters={"user_id": user_id},
     ).result_rows[0][0] or 0)
     stored_topics = int(client.query(
-        "SELECT count() FROM comment_topics FINAL "
-        "WHERE user_id = {u:UUID}",
-        parameters={"u": user_id},
+        COUNT_STORED_COMMENT_TOPICS,
+        parameters={"user_id": user_id},
     ).result_rows[0][0] or 0)
 
     if stored_comments > 0:
@@ -1779,8 +1807,6 @@ def seed_sentiment_demo(current_user: User = Depends(get_current_user)):
     Access on `instagram_business_manage_comments` and therefore can't see
     real comment data flowing through.
     """
-    from ..jobs import seed_demo_sentiment
-
     user_id = str(current_user.id)
     counts = seed_demo_sentiment.seed_for_user(user_id)
     logger.info(
@@ -1970,7 +1996,7 @@ async def add_competitor(
         display_name=snap.get("name") or snap.get("username") or "",
         profile_picture_url=snap.get("profile_picture_url", "") or "",
     )
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
     competitor_repo.insert_snapshot(client, user_id, handle, today, metrics)
 
     return CompetitorItem(
@@ -1994,7 +2020,9 @@ def remove_competitor(
     """Soft-delete (active=0). Snapshot history is preserved."""
     client = get_client()
     user_id = str(current_user.id)
-    competitor_repo.soft_delete_handle(client, user_id, handle.lower())
+    removed = competitor_repo.soft_delete_handle(client, user_id, handle.lower())
+    if not removed:
+        raise EntityNotFoundError("Competitor")
 
 
 @router.get("/competitors/timeline", response_model=CompetitorTimelineResponse)
@@ -2012,9 +2040,9 @@ def get_competitor_timeline(
     client = get_client()
     user_id = str(current_user.id)
 
-    since_date = (
-        datetime.now(timezone.utc) - timedelta(days=days)
-    ).date()
+    # Compute the cutoff as today_utc - days in date space to avoid an
+    # off-by-one when the request fires near midnight UTC.
+    since_date = datetime.now(timezone.utc).date() - timedelta(days=days)
     snapshot_series = competitor_repo.timeline(client, user_id, since_date)
 
     series: list[CompetitorTimelineSeries] = []
@@ -2040,7 +2068,7 @@ def get_competitor_timeline(
                 handle="you",
                 display_name="You",
                 points=[CompetitorTimelinePoint(
-                    date=date.today().isoformat(),
+                    date=datetime.now(timezone.utc).date().isoformat(),
                     followers=profile.followers_count or 0,
                 )],
             ))
@@ -2163,14 +2191,34 @@ def list_branded_hashtags(
     return BrandedHashtagListResponse(period_days=days, branded=branded)
 
 
+def _run_branded_hashtag_initial_scan(user_id: str, hashtag: str) -> None:
+    """Background task: scan the user's stored comment corpus for tag mentions."""
+    client = get_client()
+    try:
+        inserted = branded_hashtag_repo.scan_comments_for_mentions(
+            client, user_id, hashtag,
+        )
+        branded_hashtag_repo.touch_synced_at(client, user_id, hashtag)
+        logger.info(
+            "branded_hashtag add: user %s tag #%s initial scan -> %d mentions",
+            user_id, hashtag, inserted,
+        )
+    except Exception:
+        logger.exception(
+            "branded_hashtag add: initial scan failed for user %s tag #%s",
+            user_id, hashtag,
+        )
+
+
 @router.post("/branded-hashtags", response_model=BrandedHashtagItem)
 def add_branded_hashtag(
     payload: AddBrandedHashtagRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
 ):
-    """Track a hashtag. Runs an immediate comment-corpus scan so users see
-    historical mentions right after adding — the weekly scheduler keeps it
-    fresh after that.
+    """Track a hashtag. Schedules an initial comment-corpus scan in the
+    background so the request returns quickly; the panel populates on next
+    poll. The weekly scheduler keeps it fresh after that.
     """
     client = get_client()
     user_id = str(current_user.id)
@@ -2194,22 +2242,9 @@ def add_branded_hashtag(
     hashtag = payload.hashtag.lower()
     branded_hashtag_repo.upsert_branded(client, user_id, hashtag, "")
 
-    # Initial scan — populate the panel with any historical mentions of the
-    # tag already sitting in the stored comment corpus.
-    try:
-        inserted = branded_hashtag_repo.scan_comments_for_mentions(
-            client, user_id, hashtag,
-        )
-        branded_hashtag_repo.touch_synced_at(client, user_id, hashtag)
-        logger.info(
-            "branded_hashtag add: user %s tag #%s initial scan -> %d mentions",
-            user_id, hashtag, inserted,
-        )
-    except Exception:
-        logger.exception(
-            "branded_hashtag add: initial scan failed for user %s tag #%s",
-            user_id, hashtag,
-        )
+    background_tasks.add_task(
+        _run_branded_hashtag_initial_scan, user_id, hashtag,
+    )
 
     return BrandedHashtagItem(
         hashtag=hashtag,

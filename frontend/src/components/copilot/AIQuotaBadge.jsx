@@ -18,17 +18,30 @@ export default function AIQuotaBadge({ variant = "compact", tooltip = true }) {
   const { loading, used, limit, resetsAt, exhausted, percentUsed } = useAIQuota();
   const [hovered, setHovered] = useState(false);
 
-  if (loading || limit === 0) {
+  if (loading) {
     return (
       <div
         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium"
-        style={{
-          background: "rgba(15,23,42,0.04)",
-          color: "#94a3b8",
-        }}
+        style={{ background: "rgba(15,23,42,0.04)", color: "#94a3b8" }}
+        aria-busy="true"
+        aria-label="Loading AI quota"
       >
         <Sparkles size={11} />
         <span>—</span>
+      </div>
+    );
+  }
+  if (limit === 0) {
+    // Real "no quota configured" state — visually distinct from the loading
+    // placeholder so users can tell their account just isn't gated yet.
+    return (
+      <div
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium"
+        style={{ background: "rgba(15,23,42,0.04)", color: "#94a3b8" }}
+        title="No quota configured"
+      >
+        <Sparkles size={11} />
+        <span>No quota</span>
       </div>
     );
   }

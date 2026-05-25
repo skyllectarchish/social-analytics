@@ -1,23 +1,42 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+
+// Validate the `?next=` query param before navigating to it after login.
+// Must be a relative path (starts with `/` but not `//`) to prevent
+// open-redirect to attacker-controlled origins.
+function safeNextOr(next, fallback) {
+  if (typeof next === "string" && next.startsWith("/") && !next.startsWith("//")) {
+    return next;
+  }
+  return fallback;
+}
 
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setError("");
     setLoading(true);
     try {
       await login(form.email, form.password);
-      navigate("/dashboard");
+      navigate(safeNextOr(searchParams.get("next"), "/dashboard"), { replace: true });
     } catch (err) {
-      setError(err.response?.data?.detail || "Login failed");
+      // Distinguish "couldn't reach the server" from "bad credentials" so
+      // users on a flaky network don't think they typed the wrong password.
+      if (err.code === "ERR_NETWORK" || !err.response) {
+        setError("Can't reach the server. Check your connection and try again.");
+      } else {
+        setError(err.response?.data?.detail || "Login failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -51,9 +70,11 @@ export default function LoginPage() {
           )}
 
           <div>
-            <label className="block text-sm font-medium mb-2 text-slate-600">Email</label>
+            <label htmlFor="login-email" className="block text-sm font-medium mb-2 text-slate-600">Email</label>
             <input
+              id="login-email"
               type="email"
+              autoComplete="email"
               required
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -63,15 +84,28 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2 text-slate-600">Password</label>
-            <input
-              type="password"
-              required
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all bg-white border border-slate-200 text-[#0a0e27] placeholder-slate-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-              placeholder="••••••••"
-            />
+            <label htmlFor="login-password" className="block text-sm font-medium mb-2 text-slate-600">Password</label>
+            <div className="relative">
+              <input
+                id="login-password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                required
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                className="w-full rounded-xl px-4 py-3 pr-14 text-sm outline-none transition-all bg-white border border-slate-200 text-[#0a0e27] placeholder-slate-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+                className="absolute inset-y-0 right-2 px-2 text-xs font-medium text-violet-600 hover:text-violet-700"
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
           </div>
 
           <button

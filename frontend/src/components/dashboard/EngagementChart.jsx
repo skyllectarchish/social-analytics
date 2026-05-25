@@ -145,7 +145,8 @@ export default function EngagementChart() {
   const onToggle = (key) => {
     setHidden((prev) => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
@@ -161,19 +162,19 @@ export default function EngagementChart() {
   const priorInteract = overview?.prior?.total_interactions?.data ?? [];
   const hasPrior = priorViews.length > 0 || priorReach.length > 0 || priorInteract.length > 0;
 
-  const chartData = alignSeriesByDate({
+  const baseChartData = alignSeriesByDate({
     Views: viewsData,
     Reach: reachData,
     Interactions: interactData,
   }).map((row) => ({ ...row, date: fmtDate(row.end_time) }));
 
-  if (hasPrior) {
-    attachPriorByIndex(chartData, {
-      ViewsPrior: priorViews,
-      ReachPrior: priorReach,
-      InteractionsPrior: priorInteract,
-    });
-  }
+  const chartData = hasPrior
+    ? attachPriorByIndex(baseChartData, {
+        ViewsPrior: priorViews,
+        ReachPrior: priorReach,
+        InteractionsPrior: priorInteract,
+      })
+    : baseChartData;
 
   const totals = {
     Views: viewsData.reduce((s, d) => s + (d.value ?? 0), 0),

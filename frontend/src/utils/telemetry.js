@@ -33,18 +33,23 @@ async function flush() {
   const batch = buffer;
   buffer = [];
   const token = pickAuth();
+  // Skip the POST when we don't even have a token — many telemetry events
+  // fire pre-login and would otherwise trip the 401 redirect interceptor.
+  if (!token) return;
   try {
     const res = await fetch(ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ events: batch }),
       keepalive: true,
     });
-    if (res.status === 404) {
-      disabled = true; // backend hasn't shipped this yet — stop trying
+    // Disable on any "endpoint not usable" status so we don't burn requests
+    // for the rest of the session — 401/403 also mean we can't deliver.
+    if (res.status === 401 || res.status === 403 || res.status === 404) {
+      disabled = true;
     }
   } catch {
     // Network blip — silently drop. We do not retry; telemetry must never
@@ -66,8 +71,12 @@ function beaconFlush() {
   }
 }
 
-if (typeof window !== "undefined") {
-  window.addEventListener("beforeunload", beaconFlush);
+// Guard against double-attaching listeners across Vite HMR module reloads —
+// every reload of telemetry.js would otherwise install another pair of
+// listeners that retain the module closure. Also drop the redundant
+// `beforeunload` handler; `pagehide` covers tab close + bfcache for us.
+if (typeof window !== "undefined" && !window.__telemetryListenersAttached) {
+  window.__telemetryListenersAttached = true;
   window.addEventListener("pagehide", beaconFlush);
 }
 
@@ -85,13 +94,17 @@ if (typeof window !== "undefined") {
  */
 export function trackAI(feature, action, opts = {}) {
   if (disabled) return;
+  // Normalize undefined → null for every field so JSON.stringify produces a
+  // consistent shape regardless of which optional args the caller passed.
+  // (JSON.stringify drops undefined keys; backend validation expects them
+  // to be present.)
   const evt = {
     ts: new Date().toISOString(),
     feature,
     action,
     ref_id: opts.refId ?? null,
-    meta: opts.meta,
-    latency_ms: opts.latency_ms,
+    meta: opts.meta ?? null,
+    latency_ms: opts.latency_ms ?? null,
   };
   buffer.push(evt);
   if (buffer.length >= MAX_BUFFER) {

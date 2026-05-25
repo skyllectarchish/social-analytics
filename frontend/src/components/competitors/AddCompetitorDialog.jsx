@@ -237,7 +237,7 @@ export default function AddCompetitorDialog({ open, onClose }) {
               >
                 {submitting && <Loader2 size={14} className="animate-spin" />}
                 {preview
-                  ? `Track @${preview.username || preview.handle}`
+                  ? `Track @${preview.username || preview.handle || ""}`
                   : "Add competitor"}
               </button>
             </form>

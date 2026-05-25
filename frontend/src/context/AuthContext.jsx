@@ -1,5 +1,6 @@
-import { createContext, useCallback, useEffect, useState } from "react";
+import { createContext, useCallback, useEffect, useMemo, useState } from "react";
 import api from "../api/client";
+import { flushTelemetry } from "../utils/telemetry";
 
 export const AuthContext = createContext(null);
 
@@ -14,7 +15,11 @@ export function AuthProvider({ children }) {
       const { data } = await api.get("/auth/me");
       setUser(data);
     } catch {
+      // Token was rejected (expired, revoked, server-side invalidation).
+      // Clear both the token and any cached user so protected routes don't
+      // briefly render against a stale identity.
       localStorage.removeItem("access_token");
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -22,27 +27,50 @@ export function AuthProvider({ children }) {
 
   useEffect(() => { fetchMe(); }, [fetchMe]);
 
-  const login = async (email, password) => {
+  const storeSession = (data) => {
+    // Defensive: a malformed login/register response (e.g. backend regression
+    // that drops `access_token`) would otherwise put the literal string
+    // "undefined" in localStorage, producing `Authorization: Bearer undefined`
+    // and a 401-redirect loop.
+    if (!data?.access_token) {
+      throw new Error("Authentication response missing access_token");
+    }
+    localStorage.setItem("access_token", data.access_token);
+    setUser(data.user ?? null);
+  };
+
+  const login = useCallback(async (email, password) => {
     const { data } = await api.post("/auth/login", { email, password });
-    localStorage.setItem("access_token", data.access_token);
-    setUser(data.user);
+    storeSession(data);
     return data;
-  };
+  }, []);
 
-  const register = async (email, username, password) => {
+  const register = useCallback(async (email, username, password) => {
     const { data } = await api.post("/auth/register", { email, username, password });
-    localStorage.setItem("access_token", data.access_token);
-    setUser(data.user);
+    storeSession(data);
     return data;
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
+    // Best-effort: drain any buffered telemetry under the soon-to-be-stale
+    // token, wipe the cached `/auth/me` (and other authed GETs) from the
+    // service worker, then clear state. `caches?.delete` and the flush both
+    // succeed silently if unavailable.
+    flushTelemetry();
+    if (typeof caches !== "undefined") {
+      caches.delete("api-cache").catch(() => {});
+    }
     localStorage.removeItem("access_token");
     setUser(null);
-  };
+  }, []);
+
+  const value = useMemo(
+    () => ({ user, loading, login, register, logout }),
+    [user, loading, login, register, logout],
+  );
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

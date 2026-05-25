@@ -47,18 +47,26 @@ export function alignSeriesByDate(seriesByKey) {
  * sort each prior series chronologically and zip into `chartData` by index.
  * Rows past the prior series's length get `null` for that key.
  *
+ * Returns a NEW array of NEW row objects — does not mutate the input, so
+ * callers can safely memoize the input across renders.
+ *
  * @param {Array<Record<string, unknown>>} chartData - rows from alignSeriesByDate.
  * @param {Record<string, Array<{end_time: string, value: number}>>} priorByKey
- *   Map of output-column-name -> prior-period time-series array. Mutates each
- *   row to add `[key]` properties.
+ *   Map of output-column-name -> prior-period time-series array.
+ * @returns {Array<Record<string, unknown>>} New rows with added prior-keyed values.
  */
 export function attachPriorByIndex(chartData, priorByKey) {
+  const priorByKeySorted = {};
   for (const [key, series] of Object.entries(priorByKey)) {
-    const sorted = [...(series ?? [])]
+    priorByKeySorted[key] = [...(series ?? [])]
       .filter((p) => p && p.end_time != null)
       .sort((a, b) => (a.end_time < b.end_time ? -1 : 1));
-    for (let i = 0; i < chartData.length; i++) {
-      chartData[i][key] = sorted[i]?.value ?? null;
-    }
   }
+  return chartData.map((row, i) => {
+    const next = { ...row };
+    for (const [key, sorted] of Object.entries(priorByKeySorted)) {
+      next[key] = sorted[i]?.value ?? null;
+    }
+    return next;
+  });
 }

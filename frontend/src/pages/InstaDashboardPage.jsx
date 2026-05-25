@@ -19,33 +19,42 @@ export default function InstaDashboardPage() {
   const PAGE_SIZE = 12;
 
   useEffect(() => {
+    const controller = new AbortController();
     (async () => {
       try {
-        const { data } = await api.get("/instagram/profile");
+        const { data } = await api.get("/instagram/profile", { signal: controller.signal });
         setProfile(data);
       } catch (err) {
+        if (controller.signal.aborted) return;
         if (err.response?.status === 404) {
           navigate("/connect");
         } else {
           setError("Failed to load profile");
         }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     })();
+    return () => controller.abort();
   }, [navigate]);
 
   useEffect(() => {
-    if (!profile) return;
+    if (!profile) return undefined;
+    const controller = new AbortController();
     (async () => {
       try {
-        const { data } = await api.get(`/instagram/media?page=${page}&page_size=${PAGE_SIZE}`);
+        const { data } = await api.get("/instagram/media", {
+          params: { page, page_size: PAGE_SIZE },
+          signal: controller.signal,
+        });
         setMedia(data.items);
         setTotal(data.total);
       } catch {
+        if (controller.signal.aborted) return;
         setError("Failed to load media");
       }
     })();
+    return () => controller.abort();
   }, [profile, page]);
 
   const handleRefresh = async () => {

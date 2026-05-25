@@ -16,16 +16,20 @@ export function SkeletonMetric() {
   );
 }
 
+// Stable pseudo-random bar heights so the skeleton doesn't reshuffle on every
+// parent re-render (which is distracting in a "loading" state).
+const SKELETON_BAR_HEIGHTS = [38, 58, 42, 72, 50, 64, 46, 78, 52, 60, 44, 70];
+
 export function SkeletonChart({ height = "h-64" }) {
   return (
     <div className={`d-card p-5 ${height} flex flex-col`}>
       <div className="h-4 w-32 rounded bg-slate-100 mb-4" />
       <div className="flex-1 flex items-end gap-2 px-4 pb-4">
-        {Array.from({ length: 12 }).map((_, i) => (
+        {SKELETON_BAR_HEIGHTS.map((h, i) => (
           <div
             key={i}
             className="flex-1 rounded-t bg-slate-50 shimmer-line"
-            style={{ height: `${20 + Math.random() * 60}%` }}
+            style={{ height: `${h}%` }}
           />
         ))}
       </div>

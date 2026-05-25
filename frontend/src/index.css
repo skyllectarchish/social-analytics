@@ -419,11 +419,18 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* Scope to animations only — leaving color/box-shadow `transition`s alone
+     keeps focus rings and hover states feeling responsive without violating
+     WCAG 2.3.3 (those aren't "motion" in the spec sense). */
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  /* Disable layout-affecting transform/translate transitions specifically. */
+  *, *::before, *::after {
+    transition-property: background-color, color, border-color, opacity, box-shadow !important;
+    transition-duration: 150ms !important;
   }
 }
 

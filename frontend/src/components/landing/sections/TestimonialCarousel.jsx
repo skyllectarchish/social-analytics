@@ -36,11 +36,22 @@ const REVIEWS = [
 
 export default function TestimonialCarousel() {
   const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
 
   useEffect(() => {
+    // Respect prefers-reduced-motion: WCAG 2.2.2 expects users on this
+    // setting to be able to pause auto-rotating content — easiest path is
+    // not to start the rotation at all.
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return undefined;
+    }
+    if (paused) return undefined;
     const id = setInterval(() => setIndex((i) => (i + 1) % REVIEWS.length), 6500);
     return () => clearInterval(id);
-  }, []);
+  }, [paused]);
 
   const review = REVIEWS[index];
 
@@ -60,7 +71,13 @@ export default function TestimonialCarousel() {
           }
         />
 
-        <div className="relative mx-auto mt-12 max-w-4xl">
+        <div
+          className="relative mx-auto mt-12 max-w-4xl"
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+          onFocusCapture={() => setPaused(true)}
+          onBlurCapture={() => setPaused(false)}
+        >
           <div className="relative">
             <AnimatePresence mode="wait">
               <motion.div

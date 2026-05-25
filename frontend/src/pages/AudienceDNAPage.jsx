@@ -158,9 +158,11 @@ export default function AudienceDNAPage() {
           setDiagnosticMedia(m);
         }}
       />
-      <Suspense fallback={null}>
-        <PostDiagnosticDrawer media={diagnosticMedia} onClose={() => setDiagnosticMedia(null)} />
-      </Suspense>
+      {diagnosticMedia && (
+        <Suspense fallback={null}>
+          <PostDiagnosticDrawer media={diagnosticMedia} onClose={() => setDiagnosticMedia(null)} />
+        </Suspense>
+      )}
     </DashboardLayout>
   );
 }

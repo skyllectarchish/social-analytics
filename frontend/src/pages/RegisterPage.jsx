@@ -11,6 +11,7 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setError("");
     if (form.password.length < 8) { setError("Password must be at least 8 characters"); return; }
     setLoading(true);
@@ -18,7 +19,11 @@ export default function RegisterPage() {
       await register(form.email, form.username, form.password);
       navigate("/connect");
     } catch (err) {
-      setError(err.response?.data?.detail || "Registration failed");
+      if (err.code === "ERR_NETWORK" || !err.response) {
+        setError("Can't reach the server. Check your connection and try again.");
+      } else {
+        setError(err.response?.data?.detail || "Registration failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -52,14 +57,16 @@ export default function RegisterPage() {
           )}
 
           {[
-            { label: "Email", key: "email", type: "email", placeholder: "you@example.com" },
-            { label: "Username", key: "username", type: "text", placeholder: "yourname" },
-            { label: "Password", key: "password", type: "password", placeholder: "Min 8 characters" },
-          ].map(({ label, key, type, placeholder }) => (
+            { label: "Email", key: "email", type: "email", placeholder: "you@example.com", autoComplete: "email" },
+            { label: "Username", key: "username", type: "text", placeholder: "yourname", autoComplete: "username" },
+            { label: "Password", key: "password", type: "password", placeholder: "Min 8 characters", autoComplete: "new-password" },
+          ].map(({ label, key, type, placeholder, autoComplete }) => (
             <div key={key}>
-              <label className="block text-sm font-medium mb-2 text-slate-600">{label}</label>
+              <label htmlFor={`register-${key}`} className="block text-sm font-medium mb-2 text-slate-600">{label}</label>
               <input
+                id={`register-${key}`}
                 type={type}
+                autoComplete={autoComplete}
                 required
                 value={form[key]}
                 onChange={(e) => setForm({ ...form, [key]: e.target.value })}

@@ -15,31 +15,25 @@ const PostDiagnosticDrawer = lazy(() =>
   import("../components/copilot/PostDiagnosticDrawer"),
 );
 
-function adaptAlgoPost(p) {
+// Backend endpoints disagree on field names: algorithm-metrics rows ship
+// `caption` + a real `media_url`, while format-breakdown rows ship
+// `caption_preview` and no separate media URL. Normalize both into the
+// PostInsightsDrawer's expected shape via a single adapter with a flag.
+function adaptPostForDrawer(p, { preview = false } = {}) {
   if (!p) return null;
   return {
     ig_media_id: p.ig_media_id,
     media_type: p.media_type,
-    media_url: p.media_url,
+    media_url: preview ? p.thumbnail_url : p.media_url,
     thumbnail_url: p.thumbnail_url,
     permalink: p.permalink,
-    caption: p.caption,
+    caption: preview ? p.caption_preview : p.caption,
     timestamp: p.timestamp,
   };
 }
 
-function adaptFormatPost(p) {
-  if (!p) return null;
-  return {
-    ig_media_id: p.ig_media_id,
-    media_type: p.media_type,
-    media_url: p.thumbnail_url,
-    thumbnail_url: p.thumbnail_url,
-    permalink: p.permalink,
-    caption: p.caption_preview,
-    timestamp: p.timestamp,
-  };
-}
+const adaptAlgoPost = (p) => adaptPostForDrawer(p);
+const adaptFormatPost = (p) => adaptPostForDrawer(p, { preview: true });
 
 export default function ContentLabPage() {
   const [selectedMedia, setSelectedMedia] = useState(null);
@@ -101,9 +95,11 @@ export default function ContentLabPage() {
           setDiagnosticMedia(m);
         }}
       />
-      <Suspense fallback={null}>
-        <PostDiagnosticDrawer media={diagnosticMedia} onClose={() => setDiagnosticMedia(null)} />
-      </Suspense>
+      {diagnosticMedia && (
+        <Suspense fallback={null}>
+          <PostDiagnosticDrawer media={diagnosticMedia} onClose={() => setDiagnosticMedia(null)} />
+        </Suspense>
+      )}
     </DashboardLayout>
   );
 }

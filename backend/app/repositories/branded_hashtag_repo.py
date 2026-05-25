@@ -98,9 +98,12 @@ def upsert_branded(
     )
     added_at = existing[0][0] if existing else now
 
+    # No initial sync has happened yet when ig_hashtag_id is unknown; touch_synced_at
+    # bumps last_synced_at to a real timestamp once the first sync completes.
+    last_synced_at = now if ig_hashtag_id else datetime(1970, 1, 1)
     row = [
         str(uuid.uuid4()), user_id, hashtag, ig_hashtag_id, 1,
-        now if not ig_hashtag_id else now, added_at, now,
+        last_synced_at, added_at, now,
     ]
     safe_call(
         lambda: client.insert(
@@ -220,13 +223,15 @@ def _has_word_boundary_match(text: str, needle: str) -> bool:
     text_lower = text.lower()
     needle_lower = needle.lower()
     idx = text_lower.find(needle_lower)
-    if idx < 0:
-        return False
-    end = idx + len(needle_lower)
-    if end >= len(text_lower):
-        return True
-    nxt = text_lower[end]
-    return not (nxt.isalnum() or nxt == "_")
+    while idx >= 0:
+        end = idx + len(needle_lower)
+        if end >= len(text_lower):
+            return True
+        nxt = text_lower[end]
+        if not (nxt.isalnum() or nxt == "_"):
+            return True
+        idx = text_lower.find(needle_lower, end)
+    return False
 
 
 def _scan_comments(

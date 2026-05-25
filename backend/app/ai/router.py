@@ -183,10 +183,11 @@ async def regenerate_digest(
     target_week = payload.week_of or _default_week_of()
     client = get_client()
     user_id = str(current_user.id)
-    quota_service.enforce(client, user_id)
-    return await digest_service.synthesize(
-        client, user_id=user_id, week_of=target_week,
-    )
+    async with quota_service.user_lock(user_id):
+        quota_service.enforce(client, user_id)
+        return await digest_service.synthesize(
+            client, user_id=user_id, week_of=target_week,
+        )
 
 
 @router.get("/api/ai/digest/stream")
@@ -237,10 +238,11 @@ async def get_ideas(
         )
         if cached is not None:
             return cached
-    quota_service.enforce(client, user_id)
-    return await ideas_service.synthesize(
-        client, user_id=user_id, period_days=days, limit_n=limit,
-    )
+    async with quota_service.user_lock(user_id):
+        quota_service.enforce(client, user_id)
+        return await ideas_service.synthesize(
+            client, user_id=user_id, period_days=days, limit_n=limit,
+        )
 
 
 @router.post("/api/ai/diagnose-post", response_model=DiagnosticResponse)
@@ -258,10 +260,11 @@ async def diagnose_post(
     )
     if cached is not None:
         return cached
-    quota_service.enforce(client, user_id)
-    return await diagnostic_service.synthesize(
-        client, user_id=user_id, ig_media_id=payload.ig_media_id,
-    )
+    async with quota_service.user_lock(user_id):
+        quota_service.enforce(client, user_id)
+        return await diagnostic_service.synthesize(
+            client, user_id=user_id, ig_media_id=payload.ig_media_id,
+        )
 
 
 @router.post("/api/ai/caption/suggest", response_model=CaptionSuggestResponse)
@@ -277,11 +280,12 @@ async def suggest_caption(
     """
     client = get_client()
     user_id = str(current_user.id)
-    quota_service.enforce(client, user_id)
-    return await caption_service.synthesize(
-        client,
-        user_id=user_id,
-        draft=payload.draft,
-        fmt=payload.format,
-        topic_hint=payload.topic_hint,
-    )
+    async with quota_service.user_lock(user_id):
+        quota_service.enforce(client, user_id)
+        return await caption_service.synthesize(
+            client,
+            user_id=user_id,
+            draft=payload.draft,
+            fmt=payload.format,
+            topic_hint=payload.topic_hint,
+        )
