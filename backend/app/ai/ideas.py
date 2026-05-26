@@ -271,6 +271,7 @@ async def synthesize(
         max_tokens=IDEAS_MAX_TOKENS,
         stream=False,
     )
+    logger.info("ideas.synthesize model_raw_response=%s", result.text)
     parsed = parse_ideas_output(result.text)
     themes_detected = parsed["themes_detected"]
     ideas = parsed["ideas"]

@@ -14,6 +14,7 @@ from typing import Any
 
 import httpx
 
+from ..config import settings
 from ..constants import GRAPH_BASE_URL, HTTP_TIMEOUT_SECONDS
 
 logger = logging.getLogger(__name__)
@@ -50,12 +51,20 @@ async def fetch_competitor_snapshot(
         # weird rather than send it.
         return None, "Invalid Instagram handle format."
 
-    url = f"{GRAPH_BASE_URL}/{my_ig_user_id}"
+    # If a system-wide developer token and Facebook-linked Instagram Business User ID is configured,
+    # route the query through the full Instagram Graph API (graph.facebook.com) to support business_discovery.
+    if settings.meta_system_token and settings.meta_system_ig_user_id:
+        url = f"https://graph.facebook.com/v18.0/{settings.meta_system_ig_user_id}"
+        query_token = settings.meta_system_token
+    else:
+        url = f"{GRAPH_BASE_URL}/{my_ig_user_id}"
+        query_token = token
+
     params = {
         "fields": (
             f"business_discovery.username({handle}){{{BUSINESS_DISCOVERY_FIELDS}}}"
         ),
-        "access_token": token,
+        "access_token": query_token,
     }
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
         try:

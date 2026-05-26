@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     meta_app_id: str
     meta_app_secret: str
     meta_redirect_uri: str
+    meta_system_token: str = ""
+    meta_system_ig_user_id: str = ""
 
     # OAuth state CSRF token (signed JWT, scoped to the IG connect flow)
     oauth_state_ttl_seconds: int = 600

@@ -2,11 +2,13 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import tailwindcss from "@tailwindcss/vite";
+import basicSsl from "@vitejs/plugin-basic-ssl";
 
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    basicSsl(),
     VitePWA({
       registerType: "autoUpdate",
       manifest: {
@@ -51,6 +53,7 @@ export default defineConfig({
   ],
   server: {
     port: 5173,
+    https: true,
     // Explicit allow-list instead of `true` so dev servers exposed on a LAN
     // / tunnel can't be hit via DNS rebinding to exfiltrate /api responses.
     // Add additional hostnames here (e.g. ngrok URL) as needed.
