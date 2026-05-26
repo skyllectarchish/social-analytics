@@ -1074,7 +1074,13 @@ def get_algorithm_metrics(
 
 @router.get("/stories", response_model=StoriesResponse)
 async def get_stories(current_user: User = Depends(get_current_user)):
-    """Fetch currently active stories with live insights from the Instagram API."""
+    """Fetch currently active stories with live insights from the Instagram API.
+
+    Stories are non-critical enrichment data. If the API call fails (e.g. the
+    token lost the stories permission, or the account has no active stories),
+    we return an empty list rather than propagating a 502 that would break
+    whichever page embeds this widget.
+    """
     client = get_client()
     user_id = str(current_user.id)
 
@@ -1085,7 +1091,16 @@ async def get_stories(current_user: User = Depends(get_current_user)):
     ig_user_id = token_data.ig_user_id
     token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
 
-    raw_stories = await service.fetch_active_stories(ig_user_id, token)
+    try:
+        raw_stories = await service.fetch_active_stories(ig_user_id, token)
+    except InstagramAPIError as exc:
+        # Stories permission revoked, token expired, or account has no active
+        # stories — degrade gracefully rather than crashing the response.
+        logger.warning(
+            "Stories fetch failed for user %s (returning empty): %s",
+            user_id, exc.message,
+        )
+        return StoriesResponse(stories=[])
 
     # Batch-fetch insights for all stories with rate limiting
     story_tuples = [(s.get("id", ""), "STORY") for s in raw_stories]
