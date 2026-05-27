@@ -29,8 +29,16 @@ const SERIES = [
   { key: "Interactions", color: "#EC4899", label: "Interactions" },
 ];
 
-function GlassTooltip({ active, payload, label }) {
+function GlassTooltip({ active, payload, label, hidden }) {
   if (!active || !payload?.length) return null;
+  // Read straight from the aligned data row instead of `payload`. recharts v3
+  // drops any series whose value is null at the hovered point, which made
+  // Views / Interactions silently disappear from the tooltip on days where
+  // only Reach had data. The row object always carries every series key, so
+  // sourcing from it guarantees all visible series are listed on hover.
+  const row = payload[0]?.payload ?? {};
+  const rows = SERIES.filter((s) => !hidden?.has(s.key));
+  if (!rows.length) return null;
   return (
     <div
       style={{
@@ -55,29 +63,38 @@ function GlassTooltip({ active, payload, label }) {
       >
         {label}
       </p>
-      {payload.map((p) => (
-        <div
-          key={p.name}
-          style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}
-        >
+      {rows.map((s) => {
+        const value = row[s.key];
+        const prior = row[`${s.key}Prior`];
+        return (
           <div
-            style={{
-              width: 8, height: 8,
-              borderRadius: "50%",
-              background: p.color,
-              boxShadow: `0 0 6px ${p.color}88`,
-              flexShrink: 0,
-            }}
-          />
-          <span style={{ color: "#64748B", fontSize: 12, flex: 1 }}>{p.name}</span>
-          <span
-            className="metric-value"
-            style={{ color: "#0F172A", fontSize: 14 }}
+            key={s.key}
+            style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}
           >
-            {fmtNum(p.value)}
-          </span>
-        </div>
-      ))}
+            <div
+              style={{
+                width: 8, height: 8,
+                borderRadius: "50%",
+                background: s.color,
+                boxShadow: `0 0 6px ${s.color}88`,
+                flexShrink: 0,
+              }}
+            />
+            <span style={{ color: "#64748B", fontSize: 12, flex: 1 }}>{s.label}</span>
+            <span
+              className="metric-value"
+              style={{ color: "#0F172A", fontSize: 14 }}
+            >
+              {value == null ? "—" : fmtNum(value)}
+            </span>
+            {prior != null && (
+              <span style={{ color: "#CBD5E1", fontSize: 11, marginLeft: 6 }}>
+                vs {fmtNum(prior)}
+              </span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -260,7 +277,7 @@ export default function EngagementChart() {
               width={42}
             />
             <Tooltip
-              content={<GlassTooltip />}
+              content={<GlassTooltip hidden={hidden} />}
               cursor={{ stroke: "rgba(0,0,0,0.07)", strokeWidth: 1.5 }}
             />
 

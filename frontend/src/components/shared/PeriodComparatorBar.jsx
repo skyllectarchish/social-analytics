@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import { GitCompare } from "lucide-react";
 import { usePeriodComparator } from "../../context/PeriodComparatorContext";
 
 const DAY_OPTS = [
@@ -85,16 +84,6 @@ export default function PeriodComparatorBar() {
         onChange={setDays}
         layoutId="period-pill"
         disabled={calendarMode}
-      />
-      <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
-        <GitCompare size={12} />
-        <span className="hidden sm:inline">Compare</span>
-      </div>
-      <ChipGroup
-        options={COMPARE_OPTS}
-        selected={compareMode}
-        onChange={setCompareMode}
-        layoutId="compare-pill"
       />
     </div>
   );

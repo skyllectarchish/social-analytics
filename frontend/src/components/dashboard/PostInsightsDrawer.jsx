@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import AnimatedCounter from "../landing/ui/AnimatedCounter";
+import MediaThumb from "../shared/MediaThumb";
 import { UserPlus, Sparkles } from "lucide-react";
 import { useMediaInsights, useMediaConversion } from "../../hooks/useInsights";
 import { useMediaSentiment } from "../../hooks/useSentiment";
@@ -235,7 +236,6 @@ export default function PostInsightsDrawer({ media, onClose, onDiagnose }) {
   }, [data]);
 
   const isReel = media?.media_type === "VIDEO";
-  const imgSrc = media?.thumbnail_url || media?.media_url;
 
   return (
     <AnimatePresence>
@@ -282,21 +282,12 @@ export default function PostInsightsDrawer({ media, onClose, onDiagnose }) {
             <div className="px-5 pb-8 pt-2 space-y-5">
               {/* Header row */}
               <div className="flex items-start gap-4">
-                {imgSrc && (
-                  <img
-                    src={imgSrc}
-                    alt="Post"
-                    className="w-16 h-16 rounded-xl object-cover shrink-0"
-                    style={{ border: "1px solid rgba(0,0,0,0.08)" }}
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      // Instagram CDN URLs expire after ~24h. Swap the broken
-                      // image out for a neutral placeholder rather than show a
-                      // browser's broken-image glyph.
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
-                )}
+                <MediaThumb
+                  mediaId={media?.ig_media_id}
+                  alt="Post"
+                  className="w-16 h-16 rounded-xl object-cover shrink-0"
+                  style={{ border: "1px solid rgba(0,0,0,0.08)" }}
+                />
                 <div className="flex-1 min-w-0">
                   {media.caption && (
                     <p style={{ fontSize: 13, color: "#475569", lineHeight: 1.5, marginBottom: 6, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>

@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { TrendingUp, Film, Image as ImageIcon } from "lucide-react";
 import AnimatedCard from "../shared/AnimatedCard";
+import MediaThumb from "../shared/MediaThumb";
 import { SkeletonChart } from "../shared/Skeleton";
 import { useGrowthDrivers } from "../../hooks/useGrowthDrivers";
 
@@ -80,16 +81,13 @@ export default function GrowthDriversTable({ onSelectPost }) {
                 <span className="w-5 text-[11px] font-mono text-slate-400 text-right shrink-0">
                   #{i + 1}
                 </span>
-                {d.thumbnail_url ? (
-                  <img
-                    src={d.thumbnail_url}
-                    alt=""
-                    className="w-10 h-10 rounded-lg object-cover shrink-0"
-                    style={{ border: "1px solid rgba(0,0,0,0.06)" }}
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-lg bg-slate-100 shrink-0" />
-                )}
+                <MediaThumb
+                  mediaId={d.ig_media_id}
+                  alt=""
+                  className="w-10 h-10 rounded-lg object-cover shrink-0"
+                  style={{ border: "1px solid rgba(0,0,0,0.06)" }}
+                  fallback={<div className="w-10 h-10 rounded-lg bg-slate-100 shrink-0" />}
+                />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span

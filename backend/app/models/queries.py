@@ -75,6 +75,18 @@ WHERE user_id = {user_id:UUID}
 ORDER BY timestamp DESC
 """
 
+# Used by the media-image proxy to resolve a single media's stored CDN URL,
+# scoped to the requesting user. Prefers the video thumbnail, falls back to the
+# image media_url. FINAL collapses the ReplacingMergeTree dupes (the table has
+# no updated_at column — dedup is handled by FINAL, as in GET_INSTAGRAM_MEDIA_PAGE).
+GET_MEDIA_IMAGE_URL = """
+SELECT thumbnail_url, media_url
+FROM instagram_media FINAL
+WHERE user_id = {user_id:UUID}
+  AND ig_media_id = {ig_media_id:String}
+LIMIT 1
+"""
+
 # --- Account Insights ---
 
 GET_ACCOUNT_INSIGHTS = """

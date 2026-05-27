@@ -4,7 +4,7 @@ import logging
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response
 
 from ..auth.dependencies import get_current_user
 from ..config import settings
@@ -32,6 +32,7 @@ from ..models.queries import (
     COUNT_STORED_COMMENT_TOPICS,
     GET_DASHBOARD_SUMMARY,
     GET_FOLLOWER_GROWTH,
+    GET_MEDIA_IMAGE_URL,
     GET_TOP_PERFORMING_MEDIA,
     GET_FORMAT_BREAKDOWN,
 )
@@ -241,6 +242,42 @@ def get_media(
     items = [InstagramMedia.from_model(m) for m in media_models]
 
     return MediaListResponse(items=items, total=total)
+
+
+@router.get("/media/{ig_media_id}/image")
+async def get_media_image(
+    ig_media_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Proxy a stored media thumbnail/image through our own origin.
+
+    The browser can't reliably render Instagram CDN URLs directly: content/
+    tracker blockers reject *.cdninstagram.com (it's the Facebook CDN) and
+    cross-origin/referrer rules can leave the bare <img> blank. Streaming the
+    bytes from here makes it a same-origin request that those blocks don't
+    touch. We only fetch a URL already stored for THIS user's media (looked up
+    by id, never an arbitrary URL from the caller), so this is not an open proxy.
+    """
+    client = get_client()
+    rows = client.query(
+        GET_MEDIA_IMAGE_URL,
+        parameters={"user_id": str(current_user.id), "ig_media_id": ig_media_id},
+    ).result_rows
+    if not rows:
+        raise EntityNotFoundError("Media not found")
+    thumbnail_url, media_url = rows[0]
+    url = thumbnail_url or media_url
+    if not url:
+        raise EntityNotFoundError("Media has no image URL")
+
+    content, content_type = await service.fetch_image(url)
+    # Private + cacheable: the bytes are user-scoped but immutable for the URL's
+    # lifetime, so let the browser cache them rather than re-proxy on every render.
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
 
 
 @router.post("/purge", response_model=PurgeResponse)
@@ -516,9 +553,23 @@ async def _run_insights_sync(
             metric_name = metric_entry.get("name", "")
             for point in metric_entry.get("values", []):
                 try:
-                    end_time = datetime.fromisoformat(
+                    parsed = datetime.fromisoformat(
                         point["end_time"].replace("Z", "+00:00")
-                    ).replace(tzinfo=None)
+                    )
+                    # Anchor every metric to NOON UTC of its calendar date. The
+                    # ClickHouse server runs in a non-UTC zone (IST) and
+                    # clickhouse-connect interprets naive inserts as server-local,
+                    # shifting them ~5.5h on the round-trip. Metrics stamped at
+                    # midnight UTC (views/interactions via total_value) were pushed
+                    # back across the date boundary while reach (stamped ~07:00 by
+                    # Meta's time_series) stayed put — so the same logical day split
+                    # onto two calendar dates and the dashboard could never line
+                    # reach up with views/interactions. Noon keeps the inevitable
+                    # tz shift comfortably within the same date.
+                    day = (
+                        parsed.astimezone(timezone.utc) if parsed.tzinfo else parsed
+                    ).date()
+                    end_time = datetime(day.year, day.month, day.day, 12, 0, 0)
                     account_rows.append({
                         "metric_name": metric_name,
                         "metric_value": int(point.get("value", 0)),

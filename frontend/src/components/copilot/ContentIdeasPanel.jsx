@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { trackAI } from "../../utils/telemetry";
+import MediaThumb from "../shared/MediaThumb";
 import {
   RefreshCcw,
   Loader2,
@@ -78,26 +79,22 @@ function SourcePostsStrip({ posts, onClick }) {
             }}
             aria-label={`Open diagnostic for ${p.caption_preview?.slice(0, 60) || "post"}`}
           >
-            {p.thumbnail_url ? (
-              <img
-                src={p.thumbnail_url}
-                alt=""
-                className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                }}
-              />
-            ) : (
-              <div
-                className="w-full h-full flex items-center justify-center"
-                style={{
-                  background:
-                    "linear-gradient(135deg, rgba(139,92,246,0.18), rgba(236,72,153,0.12))",
-                }}
-              >
-                <ImageIcon size={14} className="text-violet-500" />
-              </div>
-            )}
+            <MediaThumb
+              mediaId={p.ig_media_id}
+              alt=""
+              className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+              fallback={
+                <div
+                  className="w-full h-full flex items-center justify-center"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, rgba(139,92,246,0.18), rgba(236,72,153,0.12))",
+                  }}
+                >
+                  <ImageIcon size={14} className="text-violet-500" />
+                </div>
+              }
+            />
             {typeof p.algorithm_score_pct === "number" && (
               <span
                 className="absolute bottom-0.5 right-0.5 text-[9px] font-bold px-1 rounded-md"

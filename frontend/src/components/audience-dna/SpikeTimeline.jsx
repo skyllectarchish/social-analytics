@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import MediaThumb from "../shared/MediaThumb";
 import {
   ScatterChart,
   Scatter,
@@ -127,16 +128,13 @@ function SpikeDetailPanel({ spike, onClose, onSelectPost }) {
                 onClick={() => onSelectPost?.(d)}
                 className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors text-left"
               >
-                {d.thumbnail_url ? (
-                  <img
-                    src={d.thumbnail_url}
-                    alt=""
-                    className="w-9 h-9 rounded-lg object-cover shrink-0"
-                    style={{ border: "1px solid rgba(0,0,0,0.06)" }}
-                  />
-                ) : (
-                  <div className="w-9 h-9 rounded-lg bg-slate-100 shrink-0" />
-                )}
+                <MediaThumb
+                  mediaId={d.ig_media_id}
+                  alt=""
+                  className="w-9 h-9 rounded-lg object-cover shrink-0"
+                  style={{ border: "1px solid rgba(0,0,0,0.06)" }}
+                  fallback={<div className="w-9 h-9 rounded-lg bg-slate-100 shrink-0" />}
+                />
                 <p className="flex-1 min-w-0 text-xs text-slate-800 truncate">
                   {d.caption || "(no caption)"}
                 </p>

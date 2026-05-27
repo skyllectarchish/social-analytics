@@ -19,21 +19,32 @@
  */
 export function alignSeriesByDate(seriesByKey) {
   const maps = {};
-  const allDates = new Set();
+  const allDays = new Set();
+  // Group by calendar date (the YYYY-MM-DD prefix), NOT the full timestamp.
+  // The backend stamps `time_series` metrics (reach) at Meta's day-boundary
+  // clock time (e.g. T07:00:00) but pins `total_value` metrics (views /
+  // interactions / follows) to UTC midnight — so the same calendar day arrives
+  // with different time-of-day components. Keying on the full ISO string split
+  // one day into two rows (reach on one, views/interactions on the other),
+  // which left the tooltip showing only whichever series owned the hovered row.
+  const dayOf = (iso) => String(iso).slice(0, 10);
   for (const [key, series] of Object.entries(seriesByKey)) {
     const map = new Map();
     for (const point of series ?? []) {
       if (!point || !point.end_time) continue;
-      map.set(point.end_time, point.value);
-      allDates.add(point.end_time);
+      const day = dayOf(point.end_time);
+      map.set(day, point.value);
+      allDays.add(day);
     }
     maps[key] = map;
   }
-  const dates = Array.from(allDates).sort();
-  return dates.map((end_time) => {
-    const row = { end_time };
+  const days = Array.from(allDays).sort();
+  return days.map((day) => {
+    // Re-emit as a local-midnight timestamp: a bare "YYYY-MM-DD" parses as UTC
+    // and can drift a day when formatted in a behind-UTC timezone.
+    const row = { end_time: `${day}T00:00:00` };
     for (const [key, map] of Object.entries(maps)) {
-      row[key] = map.has(end_time) ? map.get(end_time) : null;
+      row[key] = map.has(day) ? map.get(day) : null;
     }
     return row;
   });

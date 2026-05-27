@@ -56,8 +56,16 @@ export default defineConfig({
     https: true,
     // Explicit allow-list instead of `true` so dev servers exposed on a LAN
     // / tunnel can't be hit via DNS rebinding to exfiltrate /api responses.
-    // Add additional hostnames here (e.g. ngrok URL) as needed.
-    allowedHosts: ["localhost", "127.0.0.1"],
+      // Add additional hostnames here as your tunnel URL changes — `.ngrok-free.dev`
+    // wildcards every subdomain ngrok hands out on the free tier in one entry.
+    allowedHosts: [
+      "localhost",
+      "127.0.0.1",
+      ".ngrok-free.dev",
+      ".ngrok-free.app",
+      ".ngrok.app",
+      ".ngrok.io",
+    ],
     proxy: {
       "/api": {
         target: "http://127.0.0.1:8000",

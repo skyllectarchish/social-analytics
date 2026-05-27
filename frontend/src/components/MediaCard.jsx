@@ -1,3 +1,5 @@
+import MediaThumb from "./shared/MediaThumb";
+
 function HeartIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -32,7 +34,6 @@ function fmtNum(v) {
 }
 
 export default function MediaCard({ media, onInsightsClick }) {
-  const imgSrc = media.media_type === "VIDEO" ? media.thumbnail_url : media.media_url;
   const likes = Number(media.like_count) || 0;
   const comments = Number(media.comments_count) || 0;
 
@@ -43,19 +44,18 @@ export default function MediaCard({ media, onInsightsClick }) {
       onClick={() => onInsightsClick?.(media)}
     >
       <div className="relative aspect-square overflow-hidden">
-        {imgSrc ? (
-          <img
-            src={imgSrc}
-            alt={media.caption?.slice(0, 60) || "Post"}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-slate-100">
-            <span className="text-4xl text-slate-400">
-              {media.media_type === "VIDEO" ? "▶" : "🖼"}
-            </span>
-          </div>
-        )}
+        <MediaThumb
+          mediaId={media.ig_media_id}
+          alt={media.caption?.slice(0, 60) || "Post"}
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          fallback={
+            <div className="w-full h-full flex items-center justify-center bg-slate-100">
+              <span className="text-4xl text-slate-400">
+                {media.media_type === "VIDEO" ? "▶" : "🖼"}
+              </span>
+            </div>
+          }
+        />
 
         {/* Hover overlay */}
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"

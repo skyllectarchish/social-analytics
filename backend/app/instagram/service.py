@@ -548,6 +548,48 @@ def _iter_windows(since: int, until: int, window_days: int) -> list[tuple[int, i
     return windows
 
 
+async def fetch_image(url: str) -> tuple[bytes, str]:
+    """Fetch raw image bytes for a stored Instagram CDN URL.
+
+    Used by the media-image proxy so the browser loads thumbnails from our own
+    origin instead of hitting *.cdninstagram.com directly — that sidesteps
+    content/tracker blockers (which treat the Facebook CDN as a tracker) and
+    cross-origin/referrer rules that leave the bare <img> blank.
+
+    Returns (content_bytes, content_type). Raises InstagramAPIError on failure.
+
+    The CDN occasionally returns a transient 403/429 on a still-valid signed URL
+    when it throttles a burst of requests from one IP, so we retry a couple of
+    times with a short backoff before giving up.
+    """
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+    last_exc: Exception | None = None
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS, follow_redirects=True) as client:
+        for attempt in range(3):
+            try:
+                resp = await client.get(url, headers=headers)
+                resp.raise_for_status()
+                return resp.content, resp.headers.get("content-type", "image/jpeg")
+            except httpx.HTTPStatusError as exc:
+                last_exc = exc
+                # Only transient statuses are worth retrying; a genuine 404/410
+                # (deleted media / dead signature) won't fix itself.
+                if exc.response.status_code not in (403, 429, 500, 502, 503):
+                    break
+                await asyncio.sleep(0.5 * (attempt + 1))
+            except httpx.HTTPError as exc:
+                last_exc = exc
+                await asyncio.sleep(0.5 * (attempt + 1))
+    raise InstagramAPIError(f"Failed to fetch media image: {last_exc}") from last_exc
+
+
 async def fetch_account_insights(
     ig_user_id: str,
     token: str,

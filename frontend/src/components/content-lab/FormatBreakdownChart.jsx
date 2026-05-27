@@ -8,6 +8,7 @@ import {
   Cell,
 } from "recharts";
 import { motion } from "framer-motion";
+import MediaThumb from "../shared/MediaThumb";
 import DrillDownChart from "../shared/DrillDownChart";
 import { SkeletonChart } from "../shared/Skeleton";
 import {
@@ -78,16 +79,13 @@ function FormatPostRow({ post, index, onSelect }) {
       onClick={() => onSelect?.(post)}
       className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors text-left"
     >
-      {post.thumbnail_url ? (
-        <img
-          src={post.thumbnail_url}
-          alt=""
-          className="w-12 h-12 rounded-lg object-cover shrink-0"
-          style={{ border: "1px solid rgba(0,0,0,0.06)" }}
-        />
-      ) : (
-        <div className="w-12 h-12 rounded-lg bg-slate-100 shrink-0" />
-      )}
+      <MediaThumb
+        mediaId={post.ig_media_id}
+        alt=""
+        className="w-12 h-12 rounded-lg object-cover shrink-0"
+        style={{ border: "1px solid rgba(0,0,0,0.06)" }}
+        fallback={<div className="w-12 h-12 rounded-lg bg-slate-100 shrink-0" />}
+      />
       <div className="flex-1 min-w-0">
         <p className="text-xs text-slate-800 truncate">
           {post.caption_preview || "(no caption)"}

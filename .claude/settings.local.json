@@ -134,7 +134,19 @@
       "Bash(./venv/Scripts/python -c \"import sys; sys.path.insert\\(0, '.'\\); from app.main import app; print\\('OK', app.title\\)\")",
       "Bash(npm view *)",
       "Bash(./venv/Scripts/python -c \"from app.config import settings; print\\('OK'\\)\")",
-      "Bash(./venv/Scripts/python -c \"from app.main import app; print\\('OK'\\)\")"
+      "Bash(./venv/Scripts/python -c \"from app.main import app; print\\('OK'\\)\")",
+      "PowerShell(git *)",
+      "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe diag_align.py)",
+      "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe diag_fresh_fetch.py)",
+      "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe diag_resync.py)",
+      "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe diag_thumbs.py)",
+      "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe diag_thumb_http.py)",
+      "PowerShell(try { \\(Invoke-WebRequest -Uri \"http://127.0.0.1:8000/docs\" -UseBasicParsing -TimeoutSec 5\\).StatusCode } catch { \"backend not reachable: $\\($_.Exception.Message\\)\" })",
+      "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe diag_dashboard_http.py)",
+      "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe diag_proxy_verify.py)",
+      "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe -c \"import app.main; print\\('OK: app imports cleanly with new endpoint'\\)\")",
+      "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe -m uvicorn app.main:app --reload --port 8000)",
+      "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe diag_403.py)"
     ]
   }
 }

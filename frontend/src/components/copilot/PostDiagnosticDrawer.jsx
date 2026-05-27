@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { trackAI } from "../../utils/telemetry";
+import MediaThumb from "../shared/MediaThumb";
 import {
   X,
   Loader2,
@@ -204,7 +205,6 @@ export default function PostDiagnosticDrawer({ media, onClose }) {
   };
 
   const captionText = media?.caption ?? media?.caption_preview ?? "";
-  const thumb = media?.thumbnail_url || media?.media_url || "";
   const mediaTypeLabel =
     media?.media_type === "CAROUSEL_ALBUM" ? "CAROUSEL" : media?.media_type;
 
@@ -264,25 +264,23 @@ export default function PostDiagnosticDrawer({ media, onClose }) {
 
             <div className="px-5 pb-8 pt-2 space-y-5 max-w-3xl mx-auto">
               <div className="flex items-start gap-4">
-                {thumb ? (
-                  <img
-                    src={thumb}
-                    alt=""
-                    className="w-16 h-16 rounded-xl object-cover shrink-0"
-                    style={{ border: "1px solid rgba(15,23,42,0.08)" }}
-                    onError={(e) => { e.currentTarget.style.display = "none"; }}
-                  />
-                ) : (
-                  <div
-                    className="w-16 h-16 rounded-xl shrink-0 flex items-center justify-center"
-                    style={{
-                      background:
-                        "linear-gradient(135deg, rgba(139,92,246,0.18), rgba(236,72,153,0.12))",
-                    }}
-                  >
-                    <Sparkles size={16} className="text-violet-500" />
-                  </div>
-                )}
+                <MediaThumb
+                  mediaId={igMediaId}
+                  alt=""
+                  className="w-16 h-16 rounded-xl object-cover shrink-0"
+                  style={{ border: "1px solid rgba(15,23,42,0.08)" }}
+                  fallback={
+                    <div
+                      className="w-16 h-16 rounded-xl shrink-0 flex items-center justify-center"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, rgba(139,92,246,0.18), rgba(236,72,153,0.12))",
+                      }}
+                    >
+                      <Sparkles size={16} className="text-violet-500" />
+                    </div>
+                  }
+                />
 
                 <div className="flex-1 min-w-0">
                   <h2 id="diag-title" className="text-[15px] font-semibold text-slate-900 leading-snug">

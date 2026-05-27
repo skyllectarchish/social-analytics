@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useDashboard } from "../../hooks/useInsights";
+import { useMediaImage } from "../../hooks/useMediaImage";
 import { usePeriodComparator } from "../../context/PeriodComparatorContext";
 
 function fmtNum(v) {
@@ -25,7 +26,11 @@ const RANK_GRADIENT = [
 
 function PostCard({ post, rank, onSelect }) {
   const [hovered, setHovered] = useState(false);
-  const imgSrc = post.thumbnail_url || post.media_url;
+  // Load the thumbnail through the same-origin backend proxy. Pointing <img>
+  // straight at post.thumbnail_url/media_url (cdninstagram.com) gets blocked by
+  // tracker blockers / cross-origin rules and renders blank; the proxy avoids
+  // that. Falls back to the caption tile while loading or on failure.
+  const { src: imgSrc } = useMediaImage(post.ig_media_id);
   const typeStyle = TYPE_STYLES[post.media_type] ?? { bg: "rgba(100,116,139,0.85)", color: "#fff" };
   const typeLabel = post.media_type === "CAROUSEL_ALBUM" ? "CAROUSEL" : post.media_type;
 

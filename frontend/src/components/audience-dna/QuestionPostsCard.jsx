@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { HelpCircle, ExternalLink } from "lucide-react";
 import AnimatedCard from "../shared/AnimatedCard";
+import MediaThumb from "../shared/MediaThumb";
 import { SkeletonChart } from "../shared/Skeleton";
 import { useQuestionPosts } from "../../hooks/useSentiment";
 
@@ -60,16 +61,13 @@ export default function QuestionPostsCard({ onSelect }) {
               onClick={() => onSelect?.(p)}
               className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors text-left"
             >
-              {p.thumbnail_url ? (
-                <img
-                  src={p.thumbnail_url}
-                  alt=""
-                  className="w-10 h-10 rounded-lg object-cover shrink-0"
-                  style={{ border: "1px solid rgba(0,0,0,0.06)" }}
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-lg bg-slate-100 shrink-0" />
-              )}
+              <MediaThumb
+                mediaId={p.ig_media_id}
+                alt=""
+                className="w-10 h-10 rounded-lg object-cover shrink-0"
+                style={{ border: "1px solid rgba(0,0,0,0.06)" }}
+                fallback={<div className="w-10 h-10 rounded-lg bg-slate-100 shrink-0" />}
+              />
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-slate-800 truncate">
                   {p.caption || "(no caption)"}
