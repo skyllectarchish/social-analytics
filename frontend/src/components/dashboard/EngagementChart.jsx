@@ -147,10 +147,10 @@ function ChartSkeleton() {
   return (
     <div
       className="rounded-2xl p-5 animate-pulse d-card"
-      style={{ height: 380 }}
+      style={{ height: 260 }}
     >
       <div className="h-4 w-40 rounded mb-4" style={{ background: "rgba(0,0,0,0.07)" }} />
-      <div className="h-72 rounded-xl" style={{ background: "rgba(0,0,0,0.04)" }} />
+      <div className="h-52 rounded-xl" style={{ background: "rgba(0,0,0,0.04)" }} />
     </div>
   );
 }
@@ -193,58 +193,28 @@ export default function EngagementChart() {
       })
     : baseChartData;
 
-  const totals = {
-    Views: viewsData.reduce((s, d) => s + (d.value ?? 0), 0),
-    Reach: reachData.reduce((s, d) => s + (d.value ?? 0), 0),
-    Interactions: interactData.reduce((s, d) => s + (d.value ?? 0), 0),
-  };
-
   return (
     <div
       className="rounded-2xl p-5 d-card"
       style={{ boxShadow: "0 0 60px rgba(124,58,237,0.06)" }}
     >
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-5">
-        <div>
-          <p
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.15em",
-              textTransform: "uppercase",
-              color: "#94A3B8",
-              marginBottom: 8,
-            }}
-          >
-            Engagement Overview
-          </p>
-          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-            {SERIES.map((s) => (
-              <div key={s.key}>
-                <p
-                  className="metric-value"
-                  style={{ color: s.color, fontSize: 22, lineHeight: 1.1 }}
-                >
-                  {fmtNum(totals[s.key])}
-                </p>
-                <p style={{ color: "#94A3B8", fontSize: 10, marginTop: 2 }}>{s.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+      <div className="flex items-center justify-between mb-3">
+        <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: "#94A3B8" }}>
+          Engagement
+        </p>
         <SeriesToggle hidden={hidden} onToggle={onToggle} />
       </div>
 
       {chartData.length === 0 ? (
         <div
           className="flex items-center justify-center rounded-xl text-sm"
-          style={{ height: 320, color: "#94A3B8", background: "rgba(0,0,0,0.02)" }}
+          style={{ height: 210, color: "#94A3B8", background: "rgba(0,0,0,0.02)" }}
         >
           No data yet — run a sync first.
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={330}>
+        <ResponsiveContainer width="100%" height={220}>
           <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="viewsGrad" x1="0" y1="0" x2="0" y2="1">

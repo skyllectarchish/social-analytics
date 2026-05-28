@@ -36,7 +36,7 @@ function fmtWeek(d) {
 export default function SentimentTrendChart() {
   const { data, loading, error } = useSentimentSummary();
 
-  if (loading) return <SkeletonChart height="h-72" />;
+  if (loading) return <SkeletonChart height="h-48" />;
 
   if (error) {
     return (
@@ -105,7 +105,7 @@ export default function SentimentTrendChart() {
           Not enough comment history yet.
         </p>
       ) : (
-        <div className="h-64">
+        <div className="h-44">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={trend}

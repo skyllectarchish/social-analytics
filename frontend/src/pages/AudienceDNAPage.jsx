@@ -68,7 +68,7 @@ export default function AudienceDNAPage() {
         actions={<SyncButton />}
       />
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         <div className="flex gap-2 flex-wrap">
           {BREAKDOWN_OPTIONS.map((opt) => {
             const active = breakdown === opt.value;
@@ -100,7 +100,7 @@ export default function AudienceDNAPage() {
 
         <QualityHeroMetrics breakdown={breakdown} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
           <div className="lg:col-span-5">
             <QualityRadar breakdown={breakdown} />
           </div>
@@ -109,7 +109,7 @@ export default function AudienceDNAPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
           <div className="lg:col-span-7">
             <GrowthDriversTable
               onSelectPost={(p) => setSelectedMedia(adaptDriver(p))}
@@ -129,7 +129,7 @@ export default function AudienceDNAPage() {
             <span>💬</span> Audience Voice
           </h2>
           <VoiceEmptyBanner />
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 mb-4">
             <div className="lg:col-span-5">
               <SentimentDonut />
             </div>
@@ -137,7 +137,7 @@ export default function AudienceDNAPage() {
               <TopicChips />
             </div>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
             <div className="lg:col-span-7">
               <SentimentTrendChart />
             </div>

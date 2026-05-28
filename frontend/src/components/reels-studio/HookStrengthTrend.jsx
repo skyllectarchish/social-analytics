@@ -63,7 +63,7 @@ export default function HookStrengthTrend() {
   if (loading) {
     return (
       <AnimatedCard className="p-5">
-        <SkeletonChart height="h-72" />
+        <SkeletonChart height="h-48" />
       </AnimatedCard>
     );
   }
@@ -86,7 +86,7 @@ export default function HookStrengthTrend() {
 
   return (
     <AnimatedCard className="p-5" delay={0.05}>
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between mb-2">
         <div>
           <h3 className="text-sm font-semibold text-slate-800">
             Hook Strength Trend
@@ -117,7 +117,7 @@ export default function HookStrengthTrend() {
           Not enough Reels data yet. Run a sync to populate.
         </p>
       ) : (
-        <div className="h-72">
+        <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
               data={trend}

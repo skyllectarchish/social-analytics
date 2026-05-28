@@ -69,7 +69,7 @@ function ChartSkeleton() {
   return (
     <div
       className="rounded-2xl p-5 animate-pulse d-card"
-      style={{ height: "100%", minHeight: 280 }}
+      style={{ height: "100%", minHeight: 210 }}
     >
       <div className="h-4 w-36 rounded mb-4" style={{ background: "rgba(0,0,0,0.07)" }} />
       <div className="h-8 w-20 rounded mb-2" style={{ background: "rgba(0,0,0,0.07)" }} />
@@ -101,35 +101,14 @@ export default function FollowerGrowthChart() {
       style={{ height: "100%" }}
     >
       {/* Header */}
-      <div className="flex items-start justify-between mb-5">
-        <div>
-          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: "#94A3B8", marginBottom: 8 }}>
-            Follower Change
-          </p>
-          <p
-            className="metric-value"
-            style={{ fontSize: 28, color: isNetPos ? "#059669" : "#DC2626", lineHeight: 1.1 }}
-          >
-            {isNetPos ? "+" : ""}{fmtNum(netTotal)}
-          </p>
-          <p style={{ color: "#94A3B8", fontSize: 11, marginTop: 3 }}>
-            net this period
-            {hasPrior && (
-              <span style={{ marginLeft: 6, color: "#64748B" }}>
-                · prior {priorNetTotal >= 0 ? "+" : ""}{fmtNum(priorNetTotal)}
-              </span>
-            )}
-          </p>
-        </div>
-
-        {/* Legend */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end", paddingTop: 2 }}>
-          {[
-            { label: "Gained", color: "#10B981" },
-            { label: "Lost", color: "#F43F5E" },
-          ].map((l) => (
-            <span key={l.label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#475569" }}>
-              <span style={{ width: 8, height: 8, borderRadius: 2, background: l.color, display: "inline-block", boxShadow: `0 0 6px ${l.color}88` }} />
+      <div className="flex items-center justify-between mb-3">
+        <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: "#94A3B8" }}>
+          Follower Change
+        </p>
+        <div style={{ display: "flex", gap: 10 }}>
+          {[{ label: "Gained", color: "#10B981" }, { label: "Lost", color: "#F43F5E" }].map((l) => (
+            <span key={l.label} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#475569" }}>
+              <span style={{ width: 7, height: 7, borderRadius: 2, background: l.color, display: "inline-block" }} />
               {l.label}
             </span>
           ))}
@@ -139,12 +118,12 @@ export default function FollowerGrowthChart() {
       {chartData.length === 0 ? (
         <div
           className="flex items-center justify-center rounded-xl text-sm"
-          style={{ height: 220, color: "#94A3B8", background: "rgba(0,0,0,0.02)" }}
+          style={{ height: 150, color: "#94A3B8", background: "rgba(0,0,0,0.02)" }}
         >
           No data yet — run a sync first.
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={230}>
+        <ResponsiveContainer width="100%" height={160}>
           <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="posGrad" x1="0" y1="0" x2="0" y2="1">

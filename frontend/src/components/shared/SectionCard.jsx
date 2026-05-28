@@ -40,10 +40,10 @@ export default function SectionCard({
       {...props}
     >
       {(title || actions) && (
-        <header className="flex items-start justify-between gap-3 px-5 pt-4 pb-3.5 border-b border-slate-100">
+        <header className="flex items-start justify-between gap-3 px-4 pt-3 pb-2.5 border-b border-slate-100">
           <div className="flex items-start gap-2.5 min-w-0">
             {Icon && (
-              <span className="grid place-items-center w-8 h-8 rounded-xl lab-chip shrink-0 mt-px">
+              <span className="grid place-items-center w-7 h-7 rounded-xl lab-chip shrink-0 mt-px">
                 <Icon size={15} strokeWidth={2.25} />
               </span>
             )}
@@ -61,7 +61,7 @@ export default function SectionCard({
           {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
         </header>
       )}
-      <div className={flush ? "" : `p-5 ${bodyClassName}`}>{children}</div>
+      <div className={flush ? "" : `p-4 ${bodyClassName}`}>{children}</div>
     </motion.section>
   );
 }

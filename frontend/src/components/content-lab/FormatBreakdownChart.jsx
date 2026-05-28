@@ -129,7 +129,7 @@ export default function FormatBreakdownChart({ onSelectPost }) {
     >
       {(state, onDrill) => {
         if (state.level === 0) {
-          if (loading) return <SkeletonChart height="h-72" />;
+          if (loading) return <SkeletonChart height="h-48" />;
           if (error)
             return <p className="text-xs text-rose-500 py-8">{error}</p>;
           const rows = (data?.data ?? []).map((r) => ({ ...r, label: labelForRow(r) }));
@@ -140,7 +140,7 @@ export default function FormatBreakdownChart({ onSelectPost }) {
               </p>
             );
           return (
-            <div className="h-72">
+            <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   layout="vertical"
@@ -215,7 +215,7 @@ export default function FormatBreakdownChart({ onSelectPost }) {
 
 function FormatPostsDrill({ format, onSelectPost }) {
   const { data, loading, error } = useFormatBreakdownPosts(format);
-  if (loading) return <SkeletonChart height="h-72" />;
+  if (loading) return <SkeletonChart height="h-48" />;
   if (error) return <p className="text-xs text-rose-500 py-8">{error}</p>;
   const posts = data?.posts ?? [];
   return (

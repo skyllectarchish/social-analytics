@@ -74,7 +74,7 @@ export default function QualityHeroMetrics({ breakdown = "age" }) {
           <AnimatedCard
             key={c.key}
             delay={i * 0.05}
-            className={`p-5 ${c.color}`}
+            className={`p-4 ${c.color}`}
           >
             <div className="flex items-start justify-between mb-2">
               <div

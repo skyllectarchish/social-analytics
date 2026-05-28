@@ -61,7 +61,7 @@ export default function CompetitorTimelineChart() {
     return { chartData: rows, series: seriesMeta };
   }, [data]);
 
-  if (loading) return <SkeletonChart height="h-[340px]" />;
+  if (loading) return <SkeletonChart height="h-[240px]" />;
 
   if (error) {
     return (
@@ -93,7 +93,7 @@ export default function CompetitorTimelineChart() {
         </p>
       </div>
 
-      <div className="h-[320px]">
+      <div className="h-[220px]">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}

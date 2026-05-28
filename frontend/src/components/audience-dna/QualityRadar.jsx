@@ -74,7 +74,7 @@ export default function QualityRadar({ breakdown = "age" }) {
   if (loading) {
     return (
       <AnimatedCard className="p-5">
-        <SkeletonChart height="h-80" />
+        <SkeletonChart height="h-56" />
       </AnimatedCard>
     );
   }
@@ -111,7 +111,7 @@ export default function QualityRadar({ breakdown = "age" }) {
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ type: "spring", duration: 0.5, bounce: 0 }}
-          className="h-80"
+          className="h-56"
         >
           <ResponsiveContainer width="100%" height="100%">
             <RadarChart data={rows} outerRadius="72%">

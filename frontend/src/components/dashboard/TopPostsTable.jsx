@@ -16,7 +16,7 @@ function fmtNum(v) {
 function SkeletonRow() {
   return (
     <div
-      className="animate-pulse flex items-center gap-4 px-5 py-4"
+      className="animate-pulse flex items-center gap-4 px-5 py-3"
       style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
     >
       <div className="w-6 h-4 rounded" style={{ background: "rgba(255,255,255,0.06)" }} />
@@ -44,7 +44,7 @@ export default function TopPostsTable({ onSelect }) {
     >
       {/* Header */}
       <div
-        className="flex items-center justify-between px-5 py-4"
+        className="flex items-center justify-between px-5 py-3"
         style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
       >
         <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: "#475569" }}>
@@ -104,7 +104,7 @@ export default function TopPostsTable({ onSelect }) {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.05 + i * 0.05, duration: 0.35 }}
                 onClick={() => onSelect?.(post)}
-                className="flex items-center gap-4 px-5 py-3.5 cursor-pointer transition-all"
+                className="flex items-center gap-4 px-5 py-2 cursor-pointer transition-all"
                 style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = "rgba(255,255,255,0.03)";

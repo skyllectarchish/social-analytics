@@ -43,12 +43,12 @@ export default function DashboardPage() {
           actions={<SyncButton />}
         />
 
-        <div className="space-y-9">
+        <div className="space-y-4">
           <HeroCards sparklines={sparklines} />
 
-          <section className="space-y-4">
+          <section className="space-y-3">
             <SectionDivider icon={Activity} title="Performance Overview" />
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
               <div className="lg:col-span-8">
                 <EngagementChart />
               </div>
@@ -58,9 +58,9 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          <section className="space-y-4">
+          <section className="space-y-3">
             <SectionDivider icon={Users} title="Audience & Top Content" />
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
               <div className="lg:col-span-5">
                 <TopPostsGrid onSelect={setSelectedMedia} />
               </div>
@@ -70,7 +70,7 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          <section className="space-y-4">
+          <section className="space-y-3">
             <SectionDivider icon={Radio} title="Live Stories" />
             <StoriesPanel />
           </section>

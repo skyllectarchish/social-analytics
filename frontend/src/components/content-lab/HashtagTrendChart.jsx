@@ -62,7 +62,7 @@ export default function HashtagTrendChart({ tag }) {
         tag ? "Engagement rate per week" : "Click a row on the left to see its trend."
       }
       delay={0.1}
-      className="min-h-[420px]"
+      className="min-h-[280px]"
     >
       <AnimatePresence mode="wait">
         {!tag ? (
@@ -71,13 +71,13 @@ export default function HashtagTrendChart({ tag }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="h-[340px] flex flex-col items-center justify-center gap-2 text-slate-300"
+            className="h-[220px] flex flex-col items-center justify-center gap-2 text-slate-300"
           >
             <ArrowLeft size={20} className="text-slate-300" />
             <p className="text-xs">pick a hashtag</p>
           </motion.div>
         ) : loading ? (
-          <div className="h-[340px] rounded-lg shimmer-line bg-slate-50" />
+          <div className="h-[220px] rounded-lg shimmer-line bg-slate-50" />
         ) : error ? (
           <p className="text-xs text-rose-500 py-10 text-center">{error}</p>
         ) : series.length === 0 ? (
@@ -91,7 +91,7 @@ export default function HashtagTrendChart({ tag }) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ type: "spring", duration: 0.35, bounce: 0 }}
           >
-            <ResponsiveContainer width="100%" height={340}>
+            <ResponsiveContainer width="100%" height={220}>
               <AreaChart
                 data={series}
                 margin={{ left: 0, right: 12, top: 8, bottom: 8 }}

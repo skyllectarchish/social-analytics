@@ -89,7 +89,7 @@ export default function DemographicsPanel() {
       style={{ height: "100%" }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-3">
         <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: "#94A3B8" }}>
           Audience Demographics
         </p>
@@ -198,7 +198,7 @@ export default function DemographicsPanel() {
             {breakdown === "gender" ? (
               <GenderDonut data={data.data} />
             ) : (
-              <ResponsiveContainer width="100%" height={240}>
+              <ResponsiveContainer width="100%" height={180}>
                 <BarChart
                   data={chartData}
                   layout="vertical"

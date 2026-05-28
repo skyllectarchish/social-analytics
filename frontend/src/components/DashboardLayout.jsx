@@ -8,12 +8,10 @@ export default function DashboardLayout({ children }) {
       <div className="dashboard-aurora" aria-hidden="true" />
       <Navbar />
       <PeriodComparatorProvider>
-        <div className="dashboard-content flex max-w-[1440px] mx-auto">
-          <DashboardSidebar />
-          <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-8">
-            {children}
-          </main>
-        </div>
+        <DashboardSidebar />
+        <main className="dashboard-content w-full px-4 sm:px-6 py-3">
+          {children}
+        </main>
       </PeriodComparatorProvider>
     </div>
   );

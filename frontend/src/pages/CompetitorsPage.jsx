@@ -20,8 +20,8 @@ export default function CompetitorsPage() {
         actions={<SyncButton />}
       />
 
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
           <div className="lg:col-span-4">
             <CompetitorListPanel onAdd={() => setAddOpen(true)} />
           </div>

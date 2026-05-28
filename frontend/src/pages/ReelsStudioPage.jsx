@@ -55,7 +55,7 @@ export default function ReelsStudioPage() {
         }
       />
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         <ReelsHeroMetrics />
         <HookStrengthTrend />
         <ReelsRetentionTable onSelect={setSelectedMedia} />

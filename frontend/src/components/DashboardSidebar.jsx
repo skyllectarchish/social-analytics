@@ -22,35 +22,48 @@ export default function DashboardSidebar() {
   const { pathname } = useLocation();
 
   return (
-    <aside className="hidden lg:flex flex-col w-[220px] shrink-0 h-[calc(100dvh-56px)] sticky top-[56px] py-5 px-3 gap-1">
-      {NAV_ITEMS.map(({ to, icon: Icon, label, beta }) => {
-        const isActive = pathname === to;
-        return (
-          <NavLink key={to} to={to} className="relative">
-            {isActive && (
-              <motion.div
-                layoutId="sidebar-active"
-                className="absolute inset-0 rounded-xl"
-                style={{
-                  background:
-                    "linear-gradient(135deg, rgba(139,92,246,0.10), rgba(236,72,153,0.06))",
-                  border: "1px solid rgba(139,92,246,0.12)",
-                }}
-                transition={{ type: "spring", duration: 0.45, bounce: 0 }}
-              />
-            )}
-            <div
-              className={`relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                isActive
-                  ? "text-violet-700"
-                  : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
-              }`}
+    <nav
+      className="sticky top-[56px] z-40 w-full overflow-x-auto"
+      style={{
+        background: "rgba(255,255,255,0.90)",
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
+        borderBottom: "1px solid rgba(15,23,42,0.07)",
+        scrollbarWidth: "none",
+        msOverflowStyle: "none",
+      }}
+    >
+      <div className="flex items-stretch px-4 sm:px-6">
+        {NAV_ITEMS.map(({ to, icon: Icon, label, beta }) => {
+          const isActive = pathname === to;
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              className="relative flex items-center gap-2 px-3.5 py-2 shrink-0 text-sm font-medium transition-colors whitespace-nowrap"
+              style={{
+                color: isActive ? "#7c3aed" : "#64748b",
+              }}
             >
-              <Icon size={18} strokeWidth={isActive ? 2.2 : 1.8} />
+              {isActive && (
+                <motion.div
+                  layoutId="tab-active-indicator"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+                  style={{
+                    background: "linear-gradient(90deg, #8b5cf6, #ec4899)",
+                  }}
+                  transition={{ type: "spring", duration: 0.4, bounce: 0 }}
+                />
+              )}
+              <Icon
+                size={16}
+                strokeWidth={isActive ? 2.2 : 1.8}
+                className="shrink-0"
+              />
               <span>{label}</span>
               {beta && (
                 <span
-                  className="ml-auto text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md"
+                  className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md"
                   style={{
                     background: "rgba(139,92,246,0.12)",
                     color: "#7c3aed",
@@ -59,14 +72,10 @@ export default function DashboardSidebar() {
                   Beta
                 </span>
               )}
-            </div>
-          </NavLink>
-        );
-      })}
-
-      <div className="mt-auto px-3 pt-4 border-t border-slate-100">
-        <p className="text-[11px] text-slate-400 font-medium tracking-wide">CREATOR OS</p>
+            </NavLink>
+          );
+        })}
       </div>
-    </aside>
+    </nav>
   );
 }

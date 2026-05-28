@@ -13,10 +13,10 @@ export default function PageHeader({
       initial={{ opacity: 0, y: 8, filter: "blur(4px)" }}
       animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
       transition={{ type: "spring", duration: 0.45, bounce: 0 }}
-      className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-7"
+      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3"
     >
       <div>
-        <h1 className="font-display text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-3">
+        <h1 className="font-display text-xl font-semibold text-slate-900 tracking-tight flex items-center gap-2">
           {emoji && <span className="text-2xl">{emoji}</span>}
           {title}
         </h1>

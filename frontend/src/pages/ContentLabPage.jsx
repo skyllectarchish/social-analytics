@@ -52,12 +52,12 @@ export default function ContentLabPage() {
         actions={<SyncButton />}
       />
 
-      <div className="space-y-9">
+      <div className="space-y-4">
         <LabStatStrip />
 
-        <section className="space-y-4">
+        <section className="space-y-3">
           <SectionDivider icon={BarChart3} title="Content Performance" />
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
             <div className="lg:col-span-8">
               <FormatBreakdownChart
                 onSelectPost={(p) => setSelectedMedia(adaptFormatPost(p))}
@@ -71,14 +71,14 @@ export default function ContentLabPage() {
           </div>
         </section>
 
-        <section className="space-y-4">
+        <section className="space-y-3">
           <SectionDivider icon={Clock} title="Posting Times" />
           <BestTimeHeatmap />
         </section>
 
-        <section className="space-y-4">
+        <section className="space-y-3">
           <SectionDivider icon={Hash} title="Hashtags" />
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
             <div className="lg:col-span-4">
               <HashtagPerformanceTable
                 selected={selectedTag}
