@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import AnimatedCard from "../shared/AnimatedCard";
+import { Clock } from "lucide-react";
+import SectionCard from "../shared/SectionCard";
 import MediaThumb from "../shared/MediaThumb";
 import { SkeletonChart } from "../shared/Skeleton";
 import { useBestTime, useBestTimePosts } from "../../hooks/useTier1Insights";
@@ -170,35 +171,28 @@ export default function BestTimeHeatmap() {
     return { lookup: map, maxRate: max, sweetSpots: new Set(top) };
   }, [data]);
 
-  if (loading) {
-    return (
-      <AnimatedCard className="p-5">
-        <SkeletonChart height="h-64" />
-      </AnimatedCard>
-    );
-  }
+  if (loading) return <SkeletonChart height="h-72" />;
 
   return (
-    <AnimatedCard className="p-5" delay={0.1}>
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-800">
-            Best Time to Post
-          </h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Engagement rate by day of week × hour of day. Brighter = better.
-          </p>
-        </div>
+    <SectionCard
+      icon={Clock}
+      title="Best Time to Post"
+      subtitle="Engagement rate by day of week × hour of day. Brighter = better."
+      delay={0.1}
+      actions={
         <div className="flex items-center gap-2 text-[10px] text-slate-400">
           <span>Low</span>
-          <div className="w-24 h-2 rounded-full" style={{
-            background:
-              "linear-gradient(90deg, oklch(0.97 0.005 275), oklch(0.78 0.11 275), oklch(0.50 0.22 275))",
-          }} />
+          <div
+            className="w-24 h-2 rounded-full"
+            style={{
+              background:
+                "linear-gradient(90deg, oklch(0.97 0.005 275), oklch(0.78 0.11 275), oklch(0.50 0.22 275))",
+            }}
+          />
           <span>High</span>
         </div>
-      </div>
-
+      }
+    >
       {error ? (
         <p className="text-xs text-rose-500 py-8">{error}</p>
       ) : (data?.data ?? []).length === 0 ? (
@@ -296,6 +290,6 @@ export default function BestTimeHeatmap() {
           </AnimatePresence>
         </div>
       )}
-    </AnimatedCard>
+    </SectionCard>
   );
 }

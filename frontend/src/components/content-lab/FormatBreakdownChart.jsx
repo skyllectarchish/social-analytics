@@ -6,20 +6,29 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  CartesianGrid,
 } from "recharts";
 import { motion } from "framer-motion";
+import { Layers } from "lucide-react";
 import MediaThumb from "../shared/MediaThumb";
 import DrillDownChart from "../shared/DrillDownChart";
 import { SkeletonChart } from "../shared/Skeleton";
+import { AXIS_TICK, GRID_STROKE } from "../shared/chart";
 import {
   useFormatBreakdown,
   useFormatBreakdownPosts,
 } from "../../hooks/useTier1Insights";
 
 const FORMAT_COLORS = {
-  REELS: "#8b5cf6",
+  REELS: "#7c3aed",
   FEED: "#ec4899",
-  STORY: "#fb923c",
+  STORY: "#f59e0b",
+};
+
+const FORMAT_GRAD = {
+  REELS: "url(#fmtReels)",
+  FEED: "url(#fmtFeed)",
+  STORY: "url(#fmtStory)",
 };
 
 const FORMAT_BG = {
@@ -113,6 +122,7 @@ export default function FormatBreakdownChart({ onSelectPost }) {
 
   return (
     <DrillDownChart
+      icon={Layers}
       title="Format Breakdown"
       subtitle="Which content types earn the most engagement"
       levels={["By Format", "Top Posts"]}
@@ -135,37 +145,54 @@ export default function FormatBreakdownChart({ onSelectPost }) {
                 <BarChart
                   layout="vertical"
                   data={rows}
-                  barSize={22}
-                  margin={{ left: 8, right: 24, top: 8, bottom: 8 }}
+                  barSize={20}
+                  margin={{ left: 8, right: 28, top: 4, bottom: 4 }}
                 >
+                  <defs>
+                    <linearGradient id="fmtReels" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#7c3aed" />
+                      <stop offset="100%" stopColor="#c084fc" />
+                    </linearGradient>
+                    <linearGradient id="fmtFeed" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#ec4899" />
+                      <stop offset="100%" stopColor="#f9a8d4" />
+                    </linearGradient>
+                    <linearGradient id="fmtStory" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#f59e0b" />
+                      <stop offset="100%" stopColor="#fcd34d" />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid horizontal={false} stroke={GRID_STROKE} />
                   <XAxis
                     type="number"
                     domain={[0, "auto"]}
                     tickFormatter={(v) => `${v.toFixed(1)}%`}
-                    stroke="#cbd5e1"
-                    fontSize={11}
+                    tick={AXIS_TICK}
+                    axisLine={false}
+                    tickLine={false}
                   />
                   <YAxis
                     type="category"
                     dataKey="label"
                     width={140}
-                    stroke="#64748b"
-                    fontSize={11}
+                    tick={{ ...AXIS_TICK, fill: "#475569" }}
+                    axisLine={false}
+                    tickLine={false}
                   />
                   <Tooltip
                     content={<CustomTooltip />}
-                    cursor={{ fill: "rgba(139,92,246,0.05)" }}
+                    cursor={{ fill: "rgba(124,58,237,0.05)" }}
                   />
                   <Bar
                     dataKey="avg_engagement_rate"
-                    radius={[0, 6, 6, 0]}
+                    radius={[0, 5, 5, 0]}
                     cursor="pointer"
                     onClick={(payload) => onDrill(payload?.media_product_type)}
                   >
                     {rows.map((r, i) => (
                       <Cell
                         key={i}
-                        fill={FORMAT_COLORS[r.media_product_type] ?? "#94a3b8"}
+                        fill={FORMAT_GRAD[r.media_product_type] ?? "#cbd5e1"}
                       />
                     ))}
                   </Bar>

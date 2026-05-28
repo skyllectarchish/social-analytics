@@ -1,6 +1,8 @@
 import { lazy, Suspense, useMemo, useState } from "react";
+import { Activity, Users, Radio } from "lucide-react";
 import DashboardLayout from "../components/DashboardLayout";
 import PageHeader from "../components/shared/PageHeader";
+import { SectionDivider } from "../components/shared/SectionCard";
 import HeroCards from "../components/dashboard/HeroCards";
 import SyncButton from "../components/dashboard/SyncButton";
 import EngagementChart from "../components/dashboard/EngagementChart";
@@ -34,34 +36,45 @@ export default function DashboardPage() {
 
   return (
     <DashboardLayout>
-      <PageHeader
-        title="Creator Analytics"
-        subtitle="Instagram performance across your selected period."
-        actions={<SyncButton />}
-      />
+      <div className="lab-grid">
+        <PageHeader
+          title="Creator Analytics"
+          subtitle="Instagram performance across your selected period."
+          actions={<SyncButton />}
+        />
 
-      <div className="space-y-4">
-        <HeroCards sparklines={sparklines} />
+        <div className="space-y-9">
+          <HeroCards sparklines={sparklines} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <div className="lg:col-span-8">
-            <EngagementChart />
-          </div>
-          <div className="lg:col-span-4">
-            <FollowerGrowthChart />
-          </div>
+          <section className="space-y-4">
+            <SectionDivider icon={Activity} title="Performance Overview" />
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              <div className="lg:col-span-8">
+                <EngagementChart />
+              </div>
+              <div className="lg:col-span-4">
+                <FollowerGrowthChart />
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <SectionDivider icon={Users} title="Audience & Top Content" />
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              <div className="lg:col-span-5">
+                <TopPostsGrid onSelect={setSelectedMedia} />
+              </div>
+              <div className="lg:col-span-7">
+                <DemographicsPanel />
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <SectionDivider icon={Radio} title="Live Stories" />
+            <StoriesPanel />
+          </section>
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <div className="lg:col-span-5">
-            <TopPostsGrid onSelect={setSelectedMedia} />
-          </div>
-          <div className="lg:col-span-7">
-            <DemographicsPanel />
-          </div>
-        </div>
-
-        <StoriesPanel />
       </div>
 
       <PostInsightsDrawer

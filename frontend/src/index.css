@@ -474,29 +474,117 @@ body {
   font-weight: 700;
 }
 
-/* Cards — white with soft shadow */
+/* Cards — promoted to the Content Lab "lab-card" chrome so every dashboard
+   surface picks up the same gradient hairline + soft sheen + violet glow that
+   the Content Lab pioneered. Components using .d-card automatically inherit
+   the modern look without code changes. */
 .d-card {
-  background: #FFFFFF;
-  border: 1px solid rgba(0,0,0,0.07);
-  border-radius: 1rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 6px 20px rgba(0,0,0,0.04);
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  position: relative;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #fdfcff 100%) padding-box,
+    linear-gradient(135deg, rgba(124,58,237,0.45), rgba(236,72,153,0.22) 42%, rgba(56,189,248,0.30)) border-box;
+  border: 1px solid transparent;
+  border-radius: 1.25rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.9),
+    0 1px 2px rgba(15,23,42,0.04),
+    0 2px 10px rgba(15,23,42,0.04),
+    0 22px 48px -22px rgba(124,58,237,0.28);
+  transition: box-shadow 0.28s ease, transform 0.2s ease;
 }
-
+.d-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(120% 60% at 50% -10%, rgba(124,58,237,0.06), transparent 60%);
+}
 .d-card:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.07), 0 12px 32px rgba(0,0,0,0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.9),
+    0 1px 2px rgba(15,23,42,0.05),
+    0 4px 16px rgba(15,23,42,0.06),
+    0 32px 64px -24px rgba(124,58,237,0.42);
 }
 
-/* Metric card color-border variants */
-.glow-violet  { border-color: rgba(124,58,237,0.20);  box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 6px 20px rgba(124,58,237,0.08); transition: box-shadow 0.22s ease, transform 0.15s ease; }
-.glow-cyan    { border-color: rgba(6,182,212,0.20);    box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 6px 20px rgba(6,182,212,0.07);  transition: box-shadow 0.22s ease, transform 0.15s ease; }
-.glow-pink    { border-color: rgba(236,72,153,0.20);   box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 6px 20px rgba(236,72,153,0.07); transition: box-shadow 0.22s ease, transform 0.15s ease; }
-.glow-emerald { border-color: rgba(16,185,129,0.20);   box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 6px 20px rgba(16,185,129,0.07); transition: box-shadow 0.22s ease, transform 0.15s ease; }
+/* Per-card accent variants layer a colored drop-shadow over the standard
+   d-card chrome (rather than replacing it), so the gradient hairline + top
+   sheen stay intact and the variant only re-tints the bottom glow. */
+.glow-violet  { box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 2px rgba(15,23,42,0.04), 0 2px 10px rgba(15,23,42,0.04), 0 22px 48px -22px rgba(124,58,237,0.40); }
+.glow-cyan    { box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 2px rgba(15,23,42,0.04), 0 2px 10px rgba(15,23,42,0.04), 0 22px 48px -22px rgba(6,182,212,0.36); }
+.glow-pink    { box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 2px rgba(15,23,42,0.04), 0 2px 10px rgba(15,23,42,0.04), 0 22px 48px -22px rgba(236,72,153,0.36); }
+.glow-emerald { box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 2px rgba(15,23,42,0.04), 0 2px 10px rgba(15,23,42,0.04), 0 22px 48px -22px rgba(16,185,129,0.36); }
 
-.glow-violet:hover  { box-shadow: 0 2px 8px rgba(0,0,0,0.07), 0 12px 32px rgba(124,58,237,0.14); }
-.glow-cyan:hover    { box-shadow: 0 2px 8px rgba(0,0,0,0.07), 0 12px 32px rgba(6,182,212,0.12); }
-.glow-pink:hover    { box-shadow: 0 2px 8px rgba(0,0,0,0.07), 0 12px 32px rgba(236,72,153,0.12); }
-.glow-emerald:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.07), 0 12px 32px rgba(16,185,129,0.12); }
+.glow-violet:hover  { box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 4px 16px rgba(15,23,42,0.06), 0 32px 64px -24px rgba(124,58,237,0.55); }
+.glow-cyan:hover    { box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 4px 16px rgba(15,23,42,0.06), 0 32px 64px -24px rgba(6,182,212,0.48); }
+.glow-pink:hover    { box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 4px 16px rgba(15,23,42,0.06), 0 32px 64px -24px rgba(236,72,153,0.48); }
+.glow-emerald:hover { box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 4px 16px rgba(15,23,42,0.06), 0 32px 64px -24px rgba(16,185,129,0.48); }
+
+/* ===================== Content Lab "trendy" surfaces ===================== */
+/* Richer card chrome scoped to the analytics SectionCard / DrillDownChart:
+   a gradient hairline border (padding-box + border-box trick), a faintly
+   tinted frosted surface, and a layered violet glow that intensifies on hover. */
+.lab-card {
+  position: relative;
+  border-radius: 1.25rem;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #fdfcff 100%) padding-box,
+    linear-gradient(135deg, rgba(124,58,237,0.45), rgba(236,72,153,0.22) 42%, rgba(56,189,248,0.30)) border-box;
+  border: 1px solid transparent;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.9),
+    0 1px 2px rgba(15,23,42,0.04),
+    0 2px 10px rgba(15,23,42,0.04),
+    0 22px 48px -22px rgba(124,58,237,0.28);
+  transition: box-shadow 0.28s ease, transform 0.2s ease;
+}
+.lab-card::after {
+  /* soft top sheen, fades quickly */
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(120% 60% at 50% -10%, rgba(124,58,237,0.06), transparent 60%);
+}
+.lab-card:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.9),
+    0 1px 2px rgba(15,23,42,0.05),
+    0 4px 16px rgba(15,23,42,0.06),
+    0 32px 64px -24px rgba(124,58,237,0.42);
+}
+
+/* Gradient icon chip with glow — replaces the flat slate chip in headers. */
+.lab-chip {
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #ec4899 100%);
+  color: #fff;
+  border: none;
+  box-shadow:
+    0 4px 12px -2px rgba(124,58,237,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.45);
+}
+
+/* Page backdrop: faint fading grid + soft color blobs for depth. */
+.lab-grid { position: relative; }
+.lab-grid::before {
+  content: "";
+  position: absolute;
+  inset: -2rem -1rem auto -1rem;
+  height: 460px;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(55% 60% at 12% 0%, rgba(124,58,237,0.10), transparent 70%),
+    radial-gradient(45% 50% at 100% 6%, rgba(236,72,153,0.07), transparent 70%),
+    linear-gradient(rgba(15,23,42,0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15,23,42,0.028) 1px, transparent 1px);
+  background-size: auto, auto, 30px 30px, 30px 30px;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 75%);
+  mask-image: linear-gradient(180deg, #000 0%, transparent 75%);
+}
+.lab-grid > * { position: relative; z-index: 1; }
 
 /* Instagram-branded gradient text */
 .ig-gradient {

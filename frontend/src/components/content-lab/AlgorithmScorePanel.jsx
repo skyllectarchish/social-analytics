@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Bookmark, Share2, Image as ImageIcon, Film } from "lucide-react";
-import AnimatedCard from "../shared/AnimatedCard";
+import { Bookmark, Share2, Image as ImageIcon, Film, Gauge } from "lucide-react";
+import SectionCard from "../shared/SectionCard";
+import AnimatedCounter from "../landing/ui/AnimatedCounter";
 import MediaThumb from "../shared/MediaThumb";
 import { SkeletonChart } from "../shared/Skeleton";
 import { useAlgorithmMetrics } from "../../hooks/useTier1Insights";
@@ -39,6 +40,15 @@ function RadialGauge({ score }) {
   return (
     <div className="relative w-[180px] h-[180px] mx-auto">
       <svg width="180" height="180" viewBox="0 0 180 180" className="-rotate-90">
+        <defs>
+          <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.55" />
+            <stop offset="100%" stopColor={color} />
+          </linearGradient>
+          <filter id="gaugeGlow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor={color} floodOpacity="0.55" />
+          </filter>
+        </defs>
         <circle
           cx="90"
           cy="90"
@@ -51,10 +61,11 @@ function RadialGauge({ score }) {
           cx="90"
           cy="90"
           r={radius}
-          stroke={color}
+          stroke="url(#gaugeGrad)"
           strokeWidth="14"
           fill="none"
           strokeLinecap="round"
+          filter="url(#gaugeGlow)"
           strokeDasharray={circ}
           initial={{ strokeDashoffset: circ }}
           animate={{ strokeDashoffset: circ * (1 - draw) }}
@@ -63,13 +74,13 @@ function RadialGauge({ score }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <motion.span
-          className="metric-value text-3xl"
-          style={{ color: "#0f172a" }}
+          className="metric-value text-4xl"
+          style={{ color }}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15, type: "spring", duration: 0.4, bounce: 0 }}
         >
-          {score.toFixed(1)}
+          <AnimatedCounter value={score} decimals={1} duration={1300} />
         </motion.span>
         <span className="text-[10px] uppercase tracking-wider text-slate-400 mt-0.5">
           algo score / 10
@@ -146,9 +157,9 @@ export default function AlgorithmScorePanel({ onSelectPost }) {
   if (loading) return <SkeletonChart height="h-[460px]" />;
   if (error)
     return (
-      <AnimatedCard className="p-5">
+      <SectionCard icon={Gauge} title="Algorithm Score">
         <p className="text-xs text-rose-500">{error}</p>
-      </AnimatedCard>
+      </SectionCard>
     );
 
   const score = gaugeScore(data?.summary);
@@ -157,40 +168,52 @@ export default function AlgorithmScorePanel({ onSelectPost }) {
   const topReels = allPosts.filter((p) => p.media_product_type === "REELS").slice(0, 3);
 
   return (
-    <AnimatedCard className="p-5" delay={0.05}>
-      <div className="flex items-start justify-between mb-2">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-800">
-            Algorithm Score
-          </h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Saves + shares — what Instagram's recommender weights
-          </p>
-        </div>
-      </div>
-
+    <SectionCard
+      icon={Gauge}
+      title="Algorithm Score"
+      subtitle="Saves + shares — what Instagram's recommender weights"
+      delay={0.05}
+    >
       <RadialGauge score={score} />
 
-      <div className="grid grid-cols-2 gap-2 mt-3 mb-4">
-        <div className="rounded-lg p-2.5" style={{ background: "rgba(139,92,246,0.06)" }}>
-          <p className="text-[10px] uppercase tracking-wider text-slate-500">
+      <div className="grid grid-cols-2 gap-2.5 mt-3 mb-4">
+        <div className="rounded-xl p-3 bg-gradient-to-br from-violet-50 to-white border border-violet-100 shadow-[0_10px_24px_-14px_rgba(124,58,237,0.5)]">
+          <p className="text-[10px] uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+            <span
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ background: "#7c3aed", boxShadow: "0 0 6px rgba(124,58,237,0.7)" }}
+            />
             Save Rate
           </p>
-          <p className="font-mono font-semibold text-slate-800">
-            {(data?.summary?.account_save_rate ?? 0).toFixed(2)}%
+          <p className="metric-value text-[17px] text-slate-900 mt-1">
+            <AnimatedCounter
+              value={data?.summary?.account_save_rate ?? 0}
+              decimals={2}
+              suffix="%"
+              duration={1300}
+            />
           </p>
         </div>
-        <div className="rounded-lg p-2.5" style={{ background: "rgba(236,72,153,0.06)" }}>
-          <p className="text-[10px] uppercase tracking-wider text-slate-500">
+        <div className="rounded-xl p-3 bg-gradient-to-br from-pink-50 to-white border border-pink-100 shadow-[0_10px_24px_-14px_rgba(236,72,153,0.5)]">
+          <p className="text-[10px] uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+            <span
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ background: "#ec4899", boxShadow: "0 0 6px rgba(236,72,153,0.7)" }}
+            />
             Share Rate
           </p>
-          <p className="font-mono font-semibold text-slate-800">
-            {(data?.summary?.account_share_rate ?? 0).toFixed(2)}%
+          <p className="metric-value text-[17px] text-slate-900 mt-1">
+            <AnimatedCounter
+              value={data?.summary?.account_share_rate ?? 0}
+              decimals={2}
+              suffix="%"
+              duration={1300}
+            />
           </p>
         </div>
       </div>
 
-      <div className="border-t border-slate-100 pt-3 space-y-4">
+      <div className="border-t border-slate-100 pt-4 space-y-4">
         {topFeed.length === 0 && topReels.length === 0 ? (
           <p className="text-xs text-slate-400 py-4 text-center">
             No posts yet — run a sync.
@@ -243,6 +266,6 @@ export default function AlgorithmScorePanel({ onSelectPost }) {
           </>
         )}
       </div>
-    </AnimatedCard>
+    </SectionCard>
   );
 }

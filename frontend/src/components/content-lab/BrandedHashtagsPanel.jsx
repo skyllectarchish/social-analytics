@@ -9,7 +9,7 @@ import {
   FileText,
   MessageCircle,
 } from "lucide-react";
-import AnimatedCard from "../shared/AnimatedCard";
+import SectionCard from "../shared/SectionCard";
 import { SkeletonChart } from "../shared/Skeleton";
 import {
   useBrandedHashtags,
@@ -160,21 +160,12 @@ export default function BrandedHashtagsPanel() {
   if (loading) return <SkeletonChart height="h-[420px]" />;
 
   return (
-    <AnimatedCard className="p-5" delay={0.06}>
-      <div className="flex items-start gap-2 mb-4">
-        <AtSign size={14} className="text-violet-500 mt-0.5 shrink-0" />
-        <div>
-          <h3 className="text-sm font-semibold text-slate-800">
-            Branded hashtag tracking
-          </h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Tracks up to {MAX_BRANDED} brand tags across your own captions
-            and the comments you receive on those posts. Pure local scan —
-            no external API.
-          </p>
-        </div>
-      </div>
-
+    <SectionCard
+      icon={AtSign}
+      title="Branded hashtag tracking"
+      subtitle={`Tracks up to ${MAX_BRANDED} brand tags across your captions and the comments on those posts — a local scan, no external API.`}
+      delay={0.06}
+    >
       <AddRow onAdd={add} disabled={!canAdd} />
       {error && (
         <p className="text-xs text-rose-500 mb-2">{error}</p>
@@ -203,7 +194,7 @@ export default function BrandedHashtagsPanel() {
                     }`}
                     style={
                       isSelected
-                        ? { boxShadow: "inset 2px 0 0 #8b5cf6" }
+                        ? { boxShadow: "inset 2px 0 0 #7c3aed" }
                         : undefined
                     }
                   >
@@ -243,6 +234,6 @@ export default function BrandedHashtagsPanel() {
           </div>
         </div>
       )}
-    </AnimatedCard>
+    </SectionCard>
   );
 }

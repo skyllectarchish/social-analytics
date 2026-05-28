@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Hash, TrendingUp, Flame, Snowflake, Sparkles } from "lucide-react";
-import AnimatedCard from "../shared/AnimatedCard";
+import SectionCard from "../shared/SectionCard";
 import { SkeletonChart } from "../shared/Skeleton";
 import { useTopHashtags } from "../../hooks/useHashtags";
 
@@ -42,18 +42,12 @@ export default function HashtagPerformanceTable({ selected, onSelect }) {
   );
 
   return (
-    <AnimatedCard className="p-5" delay={0.05}>
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
-            <Hash size={14} /> Top Hashtags
-          </h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            By average engagement rate across your posts.
-          </p>
-        </div>
-      </div>
-
+    <SectionCard
+      icon={Hash}
+      title="Top Hashtags"
+      subtitle="By average engagement rate across your posts."
+      delay={0.05}
+    >
       {error ? (
         <p className="text-xs text-rose-500 py-8 text-center">{error}</p>
       ) : tags.length === 0 ? (
@@ -128,6 +122,6 @@ export default function HashtagPerformanceTable({ selected, onSelect }) {
           })}
         </div>
       )}
-    </AnimatedCard>
+    </SectionCard>
   );
 }

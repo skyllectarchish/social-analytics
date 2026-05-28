@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
-import AnimatedCard from "../shared/AnimatedCard";
+import SectionCard from "../shared/SectionCard";
 import { SkeletonChart } from "../shared/Skeleton";
 import { useHashtagCombos } from "../../hooks/useHashtags";
 
@@ -26,19 +26,12 @@ export default function HashtagComboHeatmap() {
   })();
 
   return (
-    <AnimatedCard className="p-5" delay={0.15}>
-      <div className="mb-4 flex items-start gap-2">
-        <Sparkles size={14} className="text-violet-500 mt-0.5 shrink-0" />
-        <div>
-          <h3 className="text-sm font-semibold text-slate-800">
-            Hashtag combos that overperform
-          </h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Pairs co-occurring on multiple posts, ranked by combined engagement.
-          </p>
-        </div>
-      </div>
-
+    <SectionCard
+      icon={Sparkles}
+      title="Hashtag combos that overperform"
+      subtitle="Pairs co-occurring on multiple posts, ranked by combined engagement."
+      delay={0.15}
+    >
       {error ? (
         <p className="text-xs text-rose-500 py-6 text-center">{error}</p>
       ) : combos.length === 0 ? (
@@ -90,6 +83,6 @@ export default function HashtagComboHeatmap() {
           })}
         </div>
       )}
-    </AnimatedCard>
+    </SectionCard>
   );
 }

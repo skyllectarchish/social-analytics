@@ -9,7 +9,7 @@ import {
 } from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
 import { Hash, ArrowLeft } from "lucide-react";
-import AnimatedCard from "../shared/AnimatedCard";
+import SectionCard from "../shared/SectionCard";
 import { useHashtagTrend } from "../../hooks/useHashtags";
 
 function fmtWeek(dateStr) {
@@ -35,7 +35,7 @@ function CustomTooltip({ active, payload, label }) {
         <span className="flex items-center gap-1.5">
           <span
             className="w-2 h-2 rounded-full"
-            style={{ background: "#8b5cf6" }}
+            style={{ background: "#7c3aed" }}
           />
           Engagement
         </span>
@@ -55,21 +55,15 @@ export default function HashtagTrendChart({ tag }) {
   }));
 
   return (
-    <AnimatedCard className="p-5 min-h-[420px]" delay={0.1}>
-      <div className="mb-3 flex items-start gap-2">
-        <Hash size={14} className="text-violet-500 mt-0.5 shrink-0" />
-        <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-slate-800 truncate">
-            {tag ? `#${tag}` : "Select a hashtag"}
-          </h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {tag
-              ? "Engagement rate per week"
-              : "Click a row on the left to see its trend."}
-          </p>
-        </div>
-      </div>
-
+    <SectionCard
+      icon={Hash}
+      title={tag ? `#${tag}` : "Select a hashtag"}
+      subtitle={
+        tag ? "Engagement rate per week" : "Click a row on the left to see its trend."
+      }
+      delay={0.1}
+      className="min-h-[420px]"
+    >
       <AnimatePresence mode="wait">
         {!tag ? (
           <motion.div
@@ -104,8 +98,8 @@ export default function HashtagTrendChart({ tag }) {
               >
                 <defs>
                   <linearGradient id="tagTrendGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.02} />
+                    <stop offset="0%" stopColor="#7c3aed" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="#7c3aed" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
@@ -131,14 +125,14 @@ export default function HashtagTrendChart({ tag }) {
                 <Area
                   type="monotone"
                   dataKey="avg_engagement_rate_pct"
-                  stroke="#8b5cf6"
+                  stroke="#7c3aed"
                   fill="url(#tagTrendGrad)"
                   strokeWidth={2.5}
                   dot={false}
                   activeDot={{
                     r: 5,
                     strokeWidth: 2,
-                    fill: "#8b5cf6",
+                    fill: "#7c3aed",
                     stroke: "#fff",
                   }}
                 />
@@ -147,6 +141,6 @@ export default function HashtagTrendChart({ tag }) {
           </motion.div>
         )}
       </AnimatePresence>
-    </AnimatedCard>
+    </SectionCard>
   );
 }

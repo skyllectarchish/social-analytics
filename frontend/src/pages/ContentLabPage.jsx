@@ -1,6 +1,9 @@
 import { lazy, Suspense, useState } from "react";
+import { BarChart3, Clock, Hash } from "lucide-react";
 import DashboardLayout from "../components/DashboardLayout";
 import PageHeader from "../components/shared/PageHeader";
+import { SectionDivider } from "../components/shared/SectionCard";
+import LabStatStrip from "../components/content-lab/LabStatStrip";
 import FormatBreakdownChart from "../components/content-lab/FormatBreakdownChart";
 import AlgorithmScorePanel from "../components/content-lab/AlgorithmScorePanel";
 import BestTimeHeatmap from "../components/content-lab/BestTimeHeatmap";
@@ -42,49 +45,54 @@ export default function ContentLabPage() {
 
   return (
     <DashboardLayout>
+      <div className="lab-grid">
       <PageHeader
         title="Content Lab"
-        emoji="🧪"
         subtitle="Discover which formats, times, and styles the algorithm rewards most."
         actions={<SyncButton />}
       />
 
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <div className="lg:col-span-7">
-            <FormatBreakdownChart
-              onSelectPost={(p) => setSelectedMedia(adaptFormatPost(p))}
-            />
-          </div>
-          <div className="lg:col-span-5">
-            <AlgorithmScorePanel
-              onSelectPost={(p) => setSelectedMedia(adaptAlgoPost(p))}
-            />
-          </div>
-        </div>
+      <div className="space-y-9">
+        <LabStatStrip />
 
-        <BestTimeHeatmap />
+        <section className="space-y-4">
+          <SectionDivider icon={BarChart3} title="Content Performance" />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="lg:col-span-8">
+              <FormatBreakdownChart
+                onSelectPost={(p) => setSelectedMedia(adaptFormatPost(p))}
+              />
+            </div>
+            <div className="lg:col-span-4">
+              <AlgorithmScorePanel
+                onSelectPost={(p) => setSelectedMedia(adaptAlgoPost(p))}
+              />
+            </div>
+          </div>
+        </section>
 
-        <div className="pt-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-            <span>#</span> Hashtags
-          </h2>
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
-            <div className="lg:col-span-5">
+        <section className="space-y-4">
+          <SectionDivider icon={Clock} title="Posting Times" />
+          <BestTimeHeatmap />
+        </section>
+
+        <section className="space-y-4">
+          <SectionDivider icon={Hash} title="Hashtags" />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="lg:col-span-4">
               <HashtagPerformanceTable
                 selected={selectedTag}
                 onSelect={setSelectedTag}
               />
             </div>
-            <div className="lg:col-span-7">
+            <div className="lg:col-span-8">
               <HashtagTrendChart tag={selectedTag} />
             </div>
           </div>
           <HashtagComboHeatmap />
-          <div className="mt-4">
-            <BrandedHashtagsPanel />
-          </div>
-        </div>
+          <BrandedHashtagsPanel />
+        </section>
+      </div>
       </div>
 
       <PostInsightsDrawer
