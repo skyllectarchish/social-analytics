@@ -77,7 +77,7 @@ export default function InstaDashboardPage() {
     return (
       <Layout>
         <div className="flex items-center justify-center h-64">
-          <div className="text-center" style={{ color: "oklch(0.65 0.02 275)" }}>Loading...</div>
+          <div className="text-center text-slate-500">Loading...</div>
         </div>
       </Layout>
     );
@@ -87,22 +87,30 @@ export default function InstaDashboardPage() {
     <Layout>
       <div className="space-y-6 animate-fade-in">
         {error && (
-          <div className="rounded-xl px-4 py-3 text-sm"
-            style={{ background: "oklch(0.65 0.25 25 / 0.15)", border: "1px solid oklch(0.65 0.25 25 / 0.3)", color: "oklch(0.80 0.15 25)" }}>
+          <div className="rounded-xl px-4 py-3 text-sm bg-rose-50 border border-rose-200 text-rose-700">
             {error}
           </div>
         )}
 
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold" style={{ color: "oklch(0.95 0.01 275)" }}>Dashboard</h1>
+          <h1 className="font-display text-3xl font-semibold text-slate-900 tracking-tight">Dashboard</h1>
           <button
-            onClick={handleRefresh} disabled={refreshing}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-opacity"
-            style={{ background: "oklch(0.22 0.03 275)", color: "oklch(0.80 0.02 275)", border: "1px solid oklch(0.30 0.04 275)", opacity: refreshing ? 0.6 : 1 }}
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="d-card flex items-center gap-2 px-4 py-2 text-sm font-medium text-violet-700 transition-opacity hover:opacity-90"
+            style={{ opacity: refreshing ? 0.6 : 1 }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-              className={refreshing ? "animate-spin" : ""}>
-              <path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              className={refreshing ? "animate-spin" : ""}
+            >
+              <path d="M23 4v6h-6M1 20v-6h6" />
+              <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
             </svg>
             {refreshing ? "Refreshing..." : "Refresh"}
           </button>
@@ -116,8 +124,8 @@ export default function InstaDashboardPage() {
         )}
 
         <div>
-          <h2 className="text-lg font-semibold mb-4" style={{ color: "oklch(0.90 0.02 275)" }}>
-            Posts <span className="text-sm font-normal" style={{ color: "oklch(0.55 0.02 275)" }}>({total})</span>
+          <h2 className="text-lg font-semibold mb-4 text-slate-800">
+            Posts <span className="text-sm font-normal text-slate-400">({total})</span>
           </h2>
           <MediaGrid
             items={media}

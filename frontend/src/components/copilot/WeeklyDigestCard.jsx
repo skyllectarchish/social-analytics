@@ -274,12 +274,8 @@ export default function WeeklyDigestCard({ weekOf, onWeekChange }) {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", duration: 0.45, bounce: 0 }}
-      className="rounded-2xl bg-white"
-      style={{
-        border: "1px solid rgba(15,23,42,0.06)",
-        boxShadow: "var(--shadow-soft)",
-        padding: "1.25rem 1.5rem",
-      }}
+      className="d-card"
+      style={{ padding: "1.25rem 1.5rem" }}
     >
       <header className="flex items-start justify-between gap-4 mb-4">
         <div className="min-w-0">

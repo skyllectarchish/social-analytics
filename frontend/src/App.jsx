@@ -106,7 +106,7 @@ function AppRoutes() {
       <Route path="/dashboard/audience" element={<ProtectedRoute><AudienceDNAPage /></ProtectedRoute>} />
       <Route path="/dashboard/competitors" element={<ProtectedRoute><CompetitorsPage /></ProtectedRoute>} />
       <Route
-        path="/dashboard/copilot"
+        path="/dashboard/insightiq"
         element={
           <ProtectedRoute>
             <Suspense fallback={<Splash />}>

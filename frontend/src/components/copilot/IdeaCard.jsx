@@ -59,11 +59,12 @@ export default function IdeaCard({ idea, onCopy, onFeedback, onSaveDraft, index 
       initial={{ opacity: 0, y: 14, filter: "blur(6px)" }}
       animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
       transition={{ type: "spring", duration: 0.42, bounce: 0, delay: index * 0.055 }}
-      className="rounded-2xl p-4 bg-white flex flex-col gap-3"
-      style={{
-        border: idea.adjacent ? "1.5px dashed rgba(139,92,246,0.35)" : "1px solid rgba(15,23,42,0.06)",
-        boxShadow: "var(--shadow-soft)",
-      }}
+      className="d-card p-4 flex flex-col gap-3"
+      style={
+        idea.adjacent
+          ? { border: "1.5px dashed rgba(139,92,246,0.35)", background: "#fff" }
+          : undefined
+      }
     >
       <header className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 flex-wrap min-w-0">

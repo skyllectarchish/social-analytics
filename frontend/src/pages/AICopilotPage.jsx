@@ -66,20 +66,16 @@ export default function AICopilotPage() {
   if (!anyAIOn()) {
     return (
       <DashboardLayout>
-        <PageHeader
-          title="Copilot"
-          emoji="✦"
-          subtitle="Coming soon to your account."
-          showComparator={false}
-        />
-        <div
-          className="rounded-2xl p-8 bg-white text-center text-[13px] text-slate-500"
-          style={{
-            border: "1px solid rgba(15,23,42,0.06)",
-            boxShadow: "var(--shadow-soft)",
-          }}
-        >
-          AI Copilot isn't available on your account yet.
+        <div className="lab-grid">
+          <PageHeader
+            title="InsightIQ"
+            emoji="✦"
+            subtitle="Coming soon to your account."
+            showComparator={false}
+          />
+          <div className="d-card p-8 text-center text-[13px] text-slate-500">
+            InsightIQ isn't available on your account yet.
+          </div>
         </div>
       </DashboardLayout>
     );
@@ -93,45 +89,47 @@ export default function AICopilotPage() {
         }
       />
 
-      <PageHeader
-        title="Copilot"
-        emoji="✦"
-        subtitle="Synthesizes your week and suggests what to make next."
-        showComparator={false}
-        actions={
-          <div className="flex items-center gap-3">
-            <AIQuotaBadge variant="compact" />
-            {flagOn("ai_caption") && (
-              <button
-                type="button"
-                onClick={() => {
-                  trackAI("caption", "opened", { meta: { source: "Copilot" } });
-                  setCaptionStudioOpen(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold"
-                style={{
-                  background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
-                  color: "#fff",
-                  border: "none",
-                  cursor: "pointer",
-                  boxShadow: "0 4px 12px rgba(109,40,217,0.22)",
-                }}
-              >
-                <Sparkles size={12} />
-                Caption Studio
-              </button>
-            )}
-          </div>
-        }
-      />
+      <div className="lab-grid">
+        <PageHeader
+          title="InsightIQ"
+          emoji="✦"
+          subtitle="Synthesizes your week and suggests what to make next."
+          showComparator={false}
+          actions={
+            <div className="flex items-center gap-3">
+              <AIQuotaBadge variant="compact" />
+              {flagOn("ai_caption") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    trackAI("caption", "opened", { meta: { source: "InsightIQ" } });
+                    setCaptionStudioOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold"
+                  style={{
+                    background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
+                    color: "#fff",
+                    border: "none",
+                    cursor: "pointer",
+                    boxShadow: "0 4px 12px rgba(109,40,217,0.22)",
+                  }}
+                >
+                  <Sparkles size={12} />
+                  Caption Studio
+                </button>
+              )}
+            </div>
+          }
+        />
 
-      <div className="space-y-5">
-        {flagOn("ai_digest") && (
-          <WeeklyDigestCard weekOf={weekOf} onWeekChange={setWeekOf} />
-        )}
-        {flagOn("ai_ideas") && (
-          <ContentIdeasPanel onSourcePostClick={handleSourcePostClick} />
-        )}
+        <div className="space-y-9">
+          {flagOn("ai_digest") && (
+            <WeeklyDigestCard weekOf={weekOf} onWeekChange={setWeekOf} />
+          )}
+          {flagOn("ai_ideas") && (
+            <ContentIdeasPanel onSourcePostClick={handleSourcePostClick} />
+          )}
+        </div>
       </div>
 
       {flagOn("ai_diagnostic") && (

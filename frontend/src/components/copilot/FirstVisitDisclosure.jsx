@@ -76,12 +76,12 @@ export default function FirstVisitDisclosure({ onAck }) {
                 id="ai-disclosure-title"
                 className="text-base font-semibold text-slate-900"
               >
-                A quick note on Copilot
+                A quick note on InsightIQ
               </h2>
             </div>
 
             <p className="text-[13px] text-slate-600 leading-relaxed">
-              Copilot summarizes your post and comment data with an AI model.
+              InsightIQ summarizes your post and comment data with an AI model.
               Captions and comments may be sent to that model. We do not share
               your data publicly or sell it.
             </p>

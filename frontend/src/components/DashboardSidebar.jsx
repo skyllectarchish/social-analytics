@@ -14,7 +14,7 @@ const BASE_NAV_ITEMS = [
 const NAV_ITEMS = anyAIOn()
   ? [
       ...BASE_NAV_ITEMS,
-      { to: "/dashboard/copilot", icon: Sparkles, label: "Copilot", beta: true },
+      { to: "/dashboard/insightiq", icon: Sparkles, label: "InsightIQ", beta: true },
     ]
   : BASE_NAV_ITEMS;
 
