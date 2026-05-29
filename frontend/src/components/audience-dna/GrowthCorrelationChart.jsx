@@ -23,7 +23,7 @@ function fmtNum(v) {
 //: moderate, >0.7 strong. We surface a one-word label rather than the raw
 //: number alone so a creator who doesn't read stats still gets the answer.
 function interpretR(r) {
-  if (r == null) return { label: "Not enough data", tone: "text-slate-400" };
+  if (r == null) return { label: "Not enough data", tone: "text-slate-500" };
   const abs = Math.abs(r);
   if (abs < 0.2) return { label: "Effectively none", tone: "text-slate-500" };
   if (abs < 0.4) return { label: r > 0 ? "Weakly positive" : "Weakly negative", tone: "text-slate-600" };
@@ -72,7 +72,7 @@ export default function GrowthCorrelationChart() {
       </div>
 
       {points.length < 3 ? (
-        <p className="text-xs text-slate-400 py-12 text-center">
+        <p className="text-xs text-slate-500 py-12 text-center">
           Need at least 3 days of follower data to compute correlation.
         </p>
       ) : (
@@ -128,7 +128,7 @@ export default function GrowthCorrelationChart() {
       )}
 
       {!usesNFR && points.length >= 3 && (
-        <p className="text-[10px] text-slate-400 mt-3 leading-relaxed">
+        <p className="text-[10px] text-slate-500 mt-3 leading-relaxed">
           Non-follower reach hasn&apos;t synced yet — using total reach as a
           rough proxy. Numbers will sharpen once Meta&apos;s per-post breakdown
           backfills.

@@ -71,6 +71,20 @@ The landing page has its **own design system, fonts, and visual language** disti
 - **Animations.** Framer Motion + CSS keyframes defined in `index.css` (`orbFloat`, `orbFloatSm`, `pulseGlow`, `meshShift`, `shimmer`, `marquee`, `waveform`, `drawLine`, `gradientText`). Reuse the existing keyframes before adding new ones.
 - **Fonts.** `index.html` loads **Clash Display + Satoshi + Cabinet Grotesk** from Fontshare and Inter from Google Fonts. CSS variables in `@theme`: `--font-display` (Clash Display, used via `.font-display` and tightened `tracking-[-0.04em]`), `--font-sans` (Satoshi for landing body via `.lumen-landing` selector), `--font-sans` falls back to Inter for the dashboard.
 
+### Bootstrap 5 + Tailwind coexistence
+
+Bootstrap 5 (`bootstrap` + `react-bootstrap`) is installed **alongside** Tailwind v4, used selectively for behaviour-heavy components (modals, responsive tables, grid). To stop Bootstrap's Reboot and utility classes (`.border`, `.rounded`, `.shadow`, `.d-*`) from overriding Tailwind, Bootstrap is imported into its **own lower cascade layer** in `index.css`:
+
+```css
+@import "bootstrap/dist/css/bootstrap.min.css" layer(bootstrap);
+@import "tailwindcss";
+```
+
+Tailwind v4 emits its utilities inside `@layer`s, and unlayered CSS always beats layered CSS — so the explicit `layer(bootstrap)` is **required**, not optional. Final layer order is `bootstrap < theme < base < components < utilities`, meaning Tailwind preflight beats Bootstrap Reboot and Tailwind utilities win every class conflict. The existing design system (`d-card`, `lab-card`, glass surfaces) is untouched.
+
+- **Modals/dialogs.** Use the shared `components/shared/AppModal.jsx` (wraps react-bootstrap `<Modal>`). It provides focus trap, focus restoration, Escape/backdrop dismissal, body scroll-lock, ARIA wiring, and a single z-index (1055, above the Tailwind drawers at z-40/z-50) for free. Style the content with Tailwind classes (they win over Bootstrap). Pass `staticBackdrop` for forced-acknowledgement gates, `fullscreenSmDown` for mobile full-screen. `AddCompetitorDialog`, `CaptionStudioDialog`, and `FirstVisitDisclosure` are built on it — mirror them for new dialogs rather than hand-rolling a Framer-Motion backdrop.
+- **Muted text = `text-slate-500`.** `text-slate-400` (~2.8:1 on white) fails WCAG AA for small text; the dashboard standardizes on `text-slate-500` (≈4.6:1) for secondary/muted text. Landing pages keep their own lighter palette.
+
 ## Gotchas
 
 - **lucide-react brand icons.** The version installed (and current upstream) does **not** export `Instagram`, `Twitter`, `Youtube`, `Linkedin`, or `Github` — they were dropped. `LandingFooter.jsx` inlines them as small SVG components; mirror that approach if you need other brand glyphs. Other lucide icons (`Sparkles`, `Heart`, `TrendingUp`, etc.) are fine.

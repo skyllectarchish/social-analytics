@@ -23,59 +23,57 @@ export default function DashboardSidebar() {
 
   return (
     <nav
-      className="sticky top-[56px] z-40 w-full overflow-x-auto"
+      aria-label="Dashboard sections"
+      className="sticky top-[56px] z-40 self-start shrink-0 w-16 md:w-56 h-[calc(100dvh-56px)] overflow-y-auto overflow-x-hidden py-3 flex flex-col gap-0.5"
       style={{
         background: "rgba(255,255,255,0.90)",
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
-        borderBottom: "1px solid rgba(15,23,42,0.07)",
+        borderRight: "1px solid rgba(15,23,42,0.07)",
         scrollbarWidth: "none",
         msOverflowStyle: "none",
       }}
     >
-      <div className="flex items-stretch px-4 sm:px-6">
-        {NAV_ITEMS.map(({ to, icon: Icon, label, beta }) => {
-          const isActive = pathname === to;
-          return (
-            <NavLink
-              key={to}
-              to={to}
-              className="relative flex items-center gap-2 px-3.5 py-2 shrink-0 text-sm font-medium transition-colors whitespace-nowrap"
-              style={{
-                color: isActive ? "#7c3aed" : "#64748b",
-              }}
-            >
-              {isActive && (
-                <motion.div
-                  layoutId="tab-active-indicator"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
-                  style={{
-                    background: "linear-gradient(90deg, #8b5cf6, #ec4899)",
-                  }}
-                  transition={{ type: "spring", duration: 0.4, bounce: 0 }}
-                />
-              )}
-              <Icon
-                size={16}
-                strokeWidth={isActive ? 2.2 : 1.8}
-                className="shrink-0"
+      {NAV_ITEMS.map(({ to, icon: Icon, label, beta }) => {
+        const isActive = pathname === to;
+        return (
+          <NavLink
+            key={to}
+            to={to}
+            title={label}
+            aria-label={label}
+            className="group relative mx-2 flex items-center gap-3 rounded-xl px-3 md:px-3.5 py-2.5 text-sm font-medium transition-colors justify-center md:justify-start focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+            style={{
+              color: isActive ? "#7c3aed" : "#64748b",
+              background: isActive ? "rgba(139,92,246,0.10)" : "transparent",
+            }}
+          >
+            {isActive && (
+              <motion.div
+                layoutId="sidebar-active-indicator"
+                className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-full"
+                style={{ background: "linear-gradient(180deg, #8b5cf6, #ec4899)" }}
+                transition={{ type: "spring", duration: 0.4, bounce: 0 }}
               />
-              <span>{label}</span>
-              {beta && (
-                <span
-                  className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md"
-                  style={{
-                    background: "rgba(139,92,246,0.12)",
-                    color: "#7c3aed",
-                  }}
-                >
-                  Beta
-                </span>
-              )}
-            </NavLink>
-          );
-        })}
-      </div>
+            )}
+            <Icon
+              size={18}
+              strokeWidth={isActive ? 2.2 : 1.8}
+              className="shrink-0 transition-colors group-hover:text-slate-800"
+              style={isActive ? { color: "#7c3aed" } : undefined}
+            />
+            <span className="hidden md:inline truncate">{label}</span>
+            {beta && (
+              <span
+                className="hidden md:inline-flex text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md ml-auto"
+                style={{ background: "rgba(139,92,246,0.12)", color: "#7c3aed" }}
+              >
+                Beta
+              </span>
+            )}
+          </NavLink>
+        );
+      })}
     </nav>
   );
 }

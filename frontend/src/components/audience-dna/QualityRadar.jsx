@@ -102,7 +102,7 @@ export default function QualityRadar({ breakdown = "age" }) {
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-xs text-slate-400 py-16 text-center">
+        <p className="text-xs text-slate-500 py-16 text-center">
           No audience data for this breakdown yet.
         </p>
       ) : (

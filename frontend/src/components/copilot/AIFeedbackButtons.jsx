@@ -43,7 +43,7 @@ export default function AIFeedbackButtons({
         </span>
       ) : (
         <>
-          <span className="text-[11px] text-slate-400 hidden sm:inline">{promptLabel}</span>
+          <span className="text-[11px] text-slate-500 hidden sm:inline">{promptLabel}</span>
           <button
             type="button"
             disabled={pending}

@@ -99,7 +99,7 @@ function FormatPostRow({ post, index, onSelect }) {
         <p className="text-xs text-slate-800 truncate">
           {post.caption_preview || "(no caption)"}
         </p>
-        <p className="text-[10px] text-slate-400 mt-0.5">
+        <p className="text-[10px] text-slate-500 mt-0.5">
           {new Date(post.timestamp).toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
@@ -111,7 +111,7 @@ function FormatPostRow({ post, index, onSelect }) {
         <p className="text-xs font-semibold font-mono text-violet-700">
           {post.algorithm_score_pct.toFixed(1)}
         </p>
-        <p className="text-[10px] text-slate-400">score</p>
+        <p className="text-[10px] text-slate-500">score</p>
       </div>
     </motion.button>
   );
@@ -135,7 +135,7 @@ export default function FormatBreakdownChart({ onSelectPost }) {
           const rows = (data?.data ?? []).map((r) => ({ ...r, label: labelForRow(r) }));
           if (!rows.length)
             return (
-              <p className="text-xs text-slate-400 py-12 text-center">
+              <p className="text-xs text-slate-500 py-12 text-center">
                 Not enough data yet. Run a sync to populate.
               </p>
             );
@@ -232,7 +232,7 @@ function FormatPostsDrill({ format, onSelectPost }) {
       </div>
       <div className="space-y-1 max-h-[260px] overflow-y-auto pr-1">
         {posts.length === 0 ? (
-          <p className="text-xs text-slate-400 py-8 text-center">
+          <p className="text-xs text-slate-500 py-8 text-center">
             No posts for this format.
           </p>
         ) : (

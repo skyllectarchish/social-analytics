@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { X, Loader2, CheckCircle2, AlertCircle, Search } from "lucide-react";
+import { motion } from "framer-motion";
+import { Loader2, CheckCircle2, AlertCircle, Search, UserPlus } from "lucide-react";
+import AppModal from "../shared/AppModal";
 import { useCompetitors, lookupCompetitor } from "../../hooks/useCompetitors";
 
 const HANDLE_REGEX = /^[a-z0-9._]{1,30}$/;
@@ -23,6 +24,7 @@ export default function AddCompetitorDialog({ open, onClose }) {
   const [preview, setPreview] = useState(null);
   const [lookupMessage, setLookupMessage] = useState(null);
   const abortRef = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     if (!open) {
@@ -125,39 +127,15 @@ export default function AddCompetitorDialog({ open, onClose }) {
   const canSubmit = lookupState === "found" && !!preview && !submitting;
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{
-            background: "rgba(15,23,42,0.32)",
-            backdropFilter: "blur(8px)",
-          }}
-        >
-          <motion.div
-            initial={{ opacity: 0, y: 12, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.96 }}
-            transition={{ type: "spring", duration: 0.35, bounce: 0 }}
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-semibold text-slate-900">
-                Add competitor
-              </h2>
-              <button
-                onClick={onClose}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-50"
-                aria-label="Close"
-              >
-                <X size={18} />
-              </button>
-            </div>
+    <AppModal
+      open={open}
+      onClose={onClose}
+      title="Add competitor"
+      icon={UserPlus}
+      size="sm"
+      initialFocusRef={inputRef}
+      bodyClassName="px-6 py-5"
+    >
             <form onSubmit={submit} className="space-y-3">
               <label className="block">
                 <span className="text-xs font-medium text-slate-600">
@@ -165,24 +143,24 @@ export default function AddCompetitorDialog({ open, onClose }) {
                 </span>
                 <div className="relative mt-1">
                   <input
-                    autoFocus
+                    ref={inputRef}
                     type="text"
                     value={handle}
                     onChange={(e) => setHandle(e.target.value)}
                     placeholder="@handle"
-                    className="w-full pl-9 pr-9 py-2 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-400 text-sm"
+                    className="w-full pl-9 pr-9 py-2 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 text-sm"
                     style={{
                       boxShadow: "inset 0 1px 2px rgba(15,23,42,0.04)",
                     }}
                   />
                   <Search
                     size={14}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
                   />
                   {lookupState === "searching" && (
                     <Loader2
                       size={14}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 animate-spin"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 animate-spin"
                     />
                   )}
                   {lookupState === "found" && (
@@ -208,7 +186,7 @@ export default function AddCompetitorDialog({ open, onClose }) {
                 message={lookupMessage}
               />
 
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-500">
                 Looked up live on Instagram. Must be a public Business or
                 Creator account — private and personal accounts cannot be
                 tracked.
@@ -241,10 +219,7 @@ export default function AddCompetitorDialog({ open, onClose }) {
                   : "Add competitor"}
               </button>
             </form>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    </AppModal>
   );
 }
 
@@ -254,7 +229,7 @@ function PreviewArea({ state, preview, message }) {
   if (state === "searching") {
     return (
       <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 border border-slate-100 px-3 py-2.5 rounded-lg">
-        <Loader2 size={14} className="animate-spin text-slate-400" />
+        <Loader2 size={14} className="animate-spin text-slate-500" />
         <span>Looking up on Instagram…</span>
       </div>
     );

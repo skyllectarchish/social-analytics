@@ -53,7 +53,7 @@ export default function HashtagPerformanceTable({ selected, onSelect }) {
       ) : tags.length === 0 ? (
         <div className="py-10 text-center">
           <p className="text-sm text-slate-600 font-medium">No hashtags tracked yet</p>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Need at least 2 posts sharing a hashtag for it to appear here.
           </p>
         </div>
@@ -83,13 +83,13 @@ export default function HashtagPerformanceTable({ selected, onSelect }) {
                 }
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-[10px] font-mono text-slate-400 w-5 text-right shrink-0">
+                  <span className="text-[10px] font-mono text-slate-500 w-5 text-right shrink-0">
                     #{i + 1}
                   </span>
                   <span className="text-xs text-violet-700 font-medium truncate">
                     #{t.hashtag}
                   </span>
-                  <span className="text-[10px] text-slate-400 shrink-0">
+                  <span className="text-[10px] text-slate-500 shrink-0">
                     {t.post_count} posts
                   </span>
                   {(() => {
@@ -113,7 +113,7 @@ export default function HashtagPerformanceTable({ selected, onSelect }) {
                     <TrendingUp size={10} />
                     {(t.avg_engagement_rate_pct ?? 0).toFixed(1)}%
                   </span>
-                  <span className="text-slate-400 w-12 text-right">
+                  <span className="text-slate-500 w-12 text-right">
                     {fmtNum(t.avg_reach)}
                   </span>
                 </div>

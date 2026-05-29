@@ -35,7 +35,7 @@ export default function HashtagComboHeatmap() {
       {error ? (
         <p className="text-xs text-rose-500 py-6 text-center">{error}</p>
       ) : combos.length === 0 ? (
-        <p className="text-xs text-slate-400 py-8 text-center">
+        <p className="text-xs text-slate-500 py-8 text-center">
           No co-occurring hashtag pairs detected yet.
         </p>
       ) : (
@@ -75,7 +75,7 @@ export default function HashtagComboHeatmap() {
                 >
                   {c.avg_engagement_pct.toFixed(1)}%
                 </span>
-                <span className="text-slate-400 font-mono">
+                <span className="text-slate-500 font-mono">
                   ×{c.cooccurrence_count}
                 </span>
               </motion.div>

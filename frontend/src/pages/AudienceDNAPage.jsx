@@ -125,7 +125,7 @@ export default function AudienceDNAPage() {
         />
 
         <div className="pt-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
             <span>💬</span> Audience Voice
           </h2>
           <VoiceEmptyBanner />

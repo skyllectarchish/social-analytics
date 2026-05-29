@@ -40,7 +40,7 @@ function StatTile({ icon: Icon, label, value, decimals = 0, suffix = "", accent,
         <Icon size={18} strokeWidth={2.25} />
       </span>
       <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-[0.12em] text-slate-400 font-semibold">
+        <p className="text-[10px] uppercase tracking-[0.12em] text-slate-500 font-semibold">
           {label}
         </p>
         <AnimatedCounter

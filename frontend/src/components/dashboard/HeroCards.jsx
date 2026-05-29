@@ -11,6 +11,16 @@ function fmtNum(v) {
   return String(v);
 }
 
+// Hairline dividers for the 2x2 (mobile) → 4-across (sm+) metric strip.
+// Mobile: vertical rule between columns + horizontal rule between rows.
+// sm+: a single row, so only vertical rules between the four cells.
+const CELL_BORDER = [
+  "",
+  "border-l border-slate-100",
+  "border-t border-slate-100 sm:border-t-0 sm:border-l",
+  "border-t border-l border-slate-100 sm:border-t-0",
+];
+
 const CARDS = [
   {
     key: "total_views",
@@ -64,12 +74,11 @@ export default function HeroCards({ sparklines = {} }) {
 
   if (loading) {
     return (
-      <div className="d-card flex overflow-hidden animate-pulse">
+      <div className="d-card grid grid-cols-2 sm:grid-cols-4 overflow-hidden animate-pulse">
         {CARDS.map((c, i) => (
           <div
             key={c.key}
-            className="flex-1 px-5 py-3.5 flex flex-col gap-2"
-            style={{ borderLeft: i > 0 ? "1px solid rgba(15,23,42,0.06)" : "none" }}
+            className={`px-5 py-3.5 flex flex-col gap-2 ${CELL_BORDER[i]}`}
           >
             <div className="h-2 w-12 rounded" style={{ background: "rgba(0,0,0,0.05)" }} />
             <div className="flex items-center gap-2">
@@ -97,7 +106,7 @@ export default function HeroCards({ sparklines = {} }) {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "spring", duration: 0.45, bounce: 0 }}
-        className="d-card flex overflow-hidden"
+        className="d-card grid grid-cols-2 sm:grid-cols-4 overflow-hidden"
       >
         {CARDS.map((card, i) => {
           const { current: value, prior, deltaPct: rawDelta } = unwrapComparison(data[card.key]);
@@ -117,8 +126,7 @@ export default function HeroCards({ sparklines = {} }) {
           return (
             <div
               key={card.key}
-              className="flex-1 relative overflow-hidden px-5 py-3.5"
-              style={{ borderLeft: i > 0 ? "1px solid rgba(15,23,42,0.06)" : "none" }}
+              className={`relative overflow-hidden px-5 py-3.5 ${CELL_BORDER[i]}`}
             >
               {/* bg tint */}
               <div className="absolute inset-0 pointer-events-none" style={{ background: card.bg }} />

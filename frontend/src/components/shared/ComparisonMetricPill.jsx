@@ -26,14 +26,14 @@ export default function ComparisonMetricPill({
   const hasCompare = prior != null;
 
   const deltaColor = !hasCompare
-    ? "text-slate-400"
+    ? "text-slate-500"
     : deltaPct == null
-      ? "text-slate-400"
+      ? "text-slate-500"
       : deltaPct > 0
         ? "text-emerald-600"
         : deltaPct < 0
           ? "text-rose-500"
-          : "text-slate-400";
+          : "text-slate-500";
 
   const DeltaIcon = !hasCompare
     ? Minus
@@ -63,7 +63,7 @@ export default function ComparisonMetricPill({
                 ? `${Math.abs(deltaPct).toFixed(1)}%`
                 : "—"}
           </span>
-          <span className="text-[10px] text-slate-400">
+          <span className="text-[10px] text-slate-500">
             from {Number(prior).toFixed(decimals)}
             {suffix}
           </span>

@@ -77,7 +77,7 @@ export default function CompetitorTimelineChart() {
         <h3 className="text-sm font-semibold text-slate-800 mb-1">
           Follower growth
         </h3>
-        <p className="text-xs text-slate-400 py-10 text-center">
+        <p className="text-xs text-slate-500 py-10 text-center">
           Add competitors to compare growth over time.
         </p>
       </AnimatedCard>

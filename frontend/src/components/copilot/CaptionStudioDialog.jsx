@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
-  X,
   Sparkles,
   Loader2,
   Copy,
@@ -9,6 +8,7 @@ import {
   CornerDownLeft,
   AlertCircle,
 } from "lucide-react";
+import AppModal from "../shared/AppModal";
 import { useCaptionStudio } from "../../hooks/useCaptionStudio";
 import { useAIQuota } from "../../hooks/useAIQuota";
 import AIMarkdown from "./AIMarkdown";
@@ -193,7 +193,7 @@ function VariantCard({ variant, originalDraft, onCopy, onUse }) {
       <DiffView original={originalDraft} variant={variant.caption} />
 
       {variant.rationale && (
-        <p className="text-[11px] text-slate-400 italic leading-relaxed border-l-2 border-slate-100 pl-2">
+        <p className="text-[11px] text-slate-500 italic leading-relaxed border-l-2 border-slate-100 pl-2">
           {variant.rationale}
         </p>
       )}
@@ -246,9 +246,9 @@ export default function CaptionStudioDialog({
   const { exhausted, resetsAt } = useAIQuota();
   const textareaRef = useRef(null);
   const limitExceededFiredRef = useRef(false);
-  const previouslyFocusedRef = useRef(null);
 
-  // Reset state on close so re-open is clean. Capture focus to restore.
+  // Reset state on close so re-open is clean. (AppModal/react-bootstrap handles
+  // focus trapping, Escape, scroll-lock and focus restoration to the trigger.)
   useEffect(() => {
     if (!open) {
       setDraft(initialDraft);
@@ -256,16 +256,6 @@ export default function CaptionStudioDialog({
       setTopicHint(initialTopicHint);
       limitExceededFiredRef.current = false;
       reset();
-      try {
-        previouslyFocusedRef.current?.focus?.();
-      } catch {
-        // best-effort
-      }
-    } else {
-      previouslyFocusedRef.current = document.activeElement;
-      // Defer focus past the open animation so it lands after layout settles.
-      const t = setTimeout(() => textareaRef.current?.focus(), 120);
-      return () => clearTimeout(t);
     }
   }, [open, initialDraft, initialFormat, initialTopicHint, reset]);
 
@@ -278,16 +268,6 @@ export default function CaptionStudioDialog({
       trackAI("caption", "char_limit_exceeded", { meta: { length: draft.length } });
     }
   }, [draft, open]);
-
-  // Escape closes; respects the in-flight scoring state.
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e) => {
-      if (e.key === "Escape") onClose?.();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
 
   const canScore = draft.trim().length > 0 && !loading && !exhausted;
   const charLen = draft.length;
@@ -330,65 +310,18 @@ export default function CaptionStudioDialog({
   );
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          key="caption-backdrop"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="fixed inset-0 z-50 flex items-center sm:items-center justify-center p-0 sm:p-4"
-          style={{
-            background: "rgba(15,23,42,0.32)",
-            backdropFilter: "blur(8px)",
-          }}
-        >
-          <motion.div
-            key="caption-dialog"
-            initial={{ opacity: 0, y: 12, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.96 }}
-            transition={{ type: "spring", duration: 0.35, bounce: 0 }}
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white w-full h-full sm:h-auto sm:max-h-[88vh] sm:max-w-2xl lg:max-w-3xl flex flex-col sm:rounded-2xl shadow-2xl overflow-hidden"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="caption-studio-title"
-          >
-            <header className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-7 h-7 rounded-lg flex items-center justify-center"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, rgba(139,92,246,0.15), rgba(236,72,153,0.10))",
-                    color: "#7c3aed",
-                  }}
-                >
-                  <Sparkles size={14} />
-                </div>
-                <h2
-                  id="caption-studio-title"
-                  className="text-[15px] font-semibold text-slate-900"
-                >
-                  Caption Studio
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close"
-                className="w-8 h-8 rounded-full flex items-center justify-center"
-                style={{ background: "rgba(15,23,42,0.05)", color: "#64748b" }}
-              >
-                <X size={14} />
-              </button>
-            </header>
-
+    <AppModal
+      open={open}
+      onClose={onClose}
+      title="Caption Studio"
+      icon={Sparkles}
+      size="lg"
+      fullscreenSmDown
+      initialFocusRef={textareaRef}
+    >
             <form
               onSubmit={handleSubmit}
-              className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4"
+              className="px-5 py-4 space-y-4"
             >
               <div className="flex flex-wrap gap-2 items-center">
                 <div
@@ -404,8 +337,9 @@ export default function CaptionStudioDialog({
                         type="button"
                         key={f.value}
                         onClick={() => setFormat(f.value)}
+                        disabled={loading}
                         aria-pressed={active}
-                        className="px-2.5 py-1 transition-colors"
+                        className="px-2.5 py-1 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                         style={{
                           background: active ? "rgba(139,92,246,0.12)" : "transparent",
                           color: active ? "#7c3aed" : "#64748b",
@@ -425,8 +359,9 @@ export default function CaptionStudioDialog({
                   type="text"
                   value={topicHint}
                   onChange={(e) => setTopicHint(e.target.value)}
+                  disabled={loading}
                   placeholder='Topic (optional) — e.g. "morning routine"'
-                  className="flex-1 min-w-[180px] px-2.5 py-1 rounded-lg text-[12px] focus:outline-none focus:border-violet-400"
+                  className="flex-1 min-w-[180px] px-2.5 py-1 rounded-lg text-[12px] focus:outline-none focus:border-violet-400 disabled:opacity-60 disabled:cursor-not-allowed"
                   style={{
                     border: "1px solid rgba(15,23,42,0.08)",
                     boxShadow: "inset 0 1px 2px rgba(15,23,42,0.03)",
@@ -439,9 +374,10 @@ export default function CaptionStudioDialog({
                   ref={textareaRef}
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
+                  disabled={loading}
                   placeholder="Paste a draft caption to score and get variants…"
                   rows={6}
-                  className="w-full px-3 py-2.5 rounded-xl text-[13.5px] leading-relaxed focus:outline-none focus:border-violet-400 resize-y"
+                  className="w-full px-3 py-2.5 rounded-xl text-[13.5px] leading-relaxed focus:outline-none focus:border-violet-400 resize-y disabled:opacity-60 disabled:cursor-not-allowed"
                   style={{
                     border: "1px solid rgba(15,23,42,0.10)",
                     boxShadow: "inset 0 1px 2px rgba(15,23,42,0.03)",
@@ -452,7 +388,7 @@ export default function CaptionStudioDialog({
                 <div className="flex items-center justify-between mt-1.5 text-[11px]">
                   <span
                     className={
-                      overLimit ? "text-rose-600" : overWarn ? "text-amber-600" : "text-slate-400"
+                      overLimit ? "text-rose-600" : overWarn ? "text-amber-600" : "text-slate-500"
                     }
                   >
                     {overLimit
@@ -521,7 +457,7 @@ export default function CaptionStudioDialog({
               {result && !loading && (
                 <section aria-label="Results" className="space-y-4 pt-2">
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 mb-2">
+                    <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 mb-2">
                       Scores
                     </p>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -549,7 +485,7 @@ export default function CaptionStudioDialog({
 
                   {result.variants?.length > 0 && (
                     <div>
-                      <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 mb-2">
+                      <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 mb-2">
                         Variants
                       </p>
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -567,9 +503,6 @@ export default function CaptionStudioDialog({
                 </section>
               )}
             </form>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    </AppModal>
   );
 }

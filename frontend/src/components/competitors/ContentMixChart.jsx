@@ -50,7 +50,7 @@ export default function ContentMixChart() {
       </div>
 
       {accounts.length === 0 ? (
-        <p className="text-xs text-slate-400 py-10 text-center">
+        <p className="text-xs text-slate-500 py-10 text-center">
           Add competitors to see their content mix.
         </p>
       ) : (

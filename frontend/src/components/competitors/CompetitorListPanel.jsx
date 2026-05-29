@@ -113,13 +113,13 @@ export default function CompetitorListPanel({ onAdd }) {
                     </span>
                   )}
                 </div>
-                <p className="text-[10px] text-slate-400 font-mono">
+                <p className="text-[10px] text-slate-500 font-mono">
                   {fmtNum(c.latest_snapshot?.followers_count)} followers
                 </p>
               </div>
               <button
                 onClick={() => remove(c.handle)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-rose-500 p-1 rounded hover:bg-rose-50"
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-500 hover:text-rose-500 p-1 rounded hover:bg-rose-50"
                 aria-label={`Remove ${c.handle}`}
               >
                 <X size={14} />
@@ -129,7 +129,7 @@ export default function CompetitorListPanel({ onAdd }) {
         </AnimatePresence>
 
         {list.length === 0 && !error && (
-          <p className="text-xs text-slate-400 text-center py-6">
+          <p className="text-xs text-slate-500 text-center py-6">
             Add up to {MAX_COMPETITORS} competitors to compare.
           </p>
         )}

@@ -2,7 +2,7 @@ export default function EmptyState({ icon, title, description, actionLabel, onAc
   return (
     <div className="glass-subtle rounded-2xl p-10 flex flex-col items-center text-center gap-4">
       {icon && (
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-slate-100 text-slate-400">
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-slate-100 text-slate-500">
           {icon}
         </div>
       )}

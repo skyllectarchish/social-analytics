@@ -146,7 +146,11 @@
       "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe diag_proxy_verify.py)",
       "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe -c \"import app.main; print\\('OK: app imports cleanly with new endpoint'\\)\")",
       "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe -m uvicorn app.main:app --reload --port 8000)",
-      "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe diag_403.py)"
+      "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe diag_403.py)",
+      "Bash(Select-Object -First 20)",
+      "Bash(Format-Table FullName)",
+      "PowerShell(head *)",
+      "Bash(npm -v)"
     ]
   }
 }

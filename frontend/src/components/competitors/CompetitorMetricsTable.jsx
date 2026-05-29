@@ -56,7 +56,7 @@ export default function CompetitorMetricsTable() {
         <h3 className="text-sm font-semibold text-slate-800 mb-3">
           Side-by-side metrics
         </h3>
-        <p className="text-xs text-slate-400 py-8 text-center">
+        <p className="text-xs text-slate-500 py-8 text-center">
           Add competitors on the left to see side-by-side benchmarks.
         </p>
       </AnimatedCard>
@@ -88,13 +88,13 @@ export default function CompetitorMetricsTable() {
         Niche median is highlighted on your row when you beat it.
       </p>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto -mx-1 px-1">
+        <table className="w-full min-w-[440px] text-sm">
           <thead>
-            <tr className="text-[10px] uppercase tracking-wider text-slate-400 border-b border-slate-100">
-              <th className="text-left py-2 pr-4">Account</th>
+            <tr className="text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-100">
+              <th className="text-left py-2 pr-4 whitespace-nowrap">Account</th>
               {COLS.map((c) => (
-                <th key={c.key} className="text-right py-2 px-3">
+                <th key={c.key} className="text-right py-2 px-3 whitespace-nowrap">
                   {c.label}
                 </th>
               ))}
@@ -106,7 +106,7 @@ export default function CompetitorMetricsTable() {
                 key={r.handle}
                 className={r._isSelf ? "bg-violet-50/50" : "hover:bg-slate-50/40"}
               >
-                <td className="py-2 pr-4 text-xs">
+                <td className="py-2 pr-4 text-xs whitespace-nowrap">
                   {r._isSelf ? (
                     <span className="text-violet-700 font-semibold">You</span>
                   ) : (
@@ -137,7 +137,7 @@ export default function CompetitorMetricsTable() {
         </table>
       </div>
 
-      <p className="text-[10px] text-slate-400 mt-3 leading-relaxed">
+      <p className="text-[10px] text-slate-500 mt-3 leading-relaxed">
         Engagement is computed as (likes + comments) ÷ followers across the
         last 25 posts for every account — your row uses the same formula as
         competitor rows, so values are directly comparable.

@@ -103,7 +103,7 @@ function SlotPostsDrawer({ slot, onClose }) {
         </div>
         <button
           onClick={onClose}
-          className="text-[11px] text-slate-400 hover:text-slate-600 px-2 py-1 rounded-md hover:bg-slate-50"
+          className="text-[11px] text-slate-500 hover:text-slate-600 px-2 py-1 rounded-md hover:bg-slate-50"
         >
           Close
         </button>
@@ -111,7 +111,7 @@ function SlotPostsDrawer({ slot, onClose }) {
       {loading ? (
         <div className="h-24 rounded-lg bg-slate-50 shimmer-line" />
       ) : (data?.posts ?? []).length === 0 ? (
-        <p className="text-xs text-slate-400 py-4 text-center">No posts in this slot.</p>
+        <p className="text-xs text-slate-500 py-4 text-center">No posts in this slot.</p>
       ) : (
         <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
           {(data?.posts ?? []).map((p, i) => (
@@ -136,7 +136,7 @@ function SlotPostsDrawer({ slot, onClose }) {
                 <p className="text-xs text-slate-800 truncate">
                   {p.caption_preview || "(no caption)"}
                 </p>
-                <p className="text-[10px] text-slate-400">
+                <p className="text-[10px] text-slate-500">
                   reach {Math.round(p.reach).toLocaleString()}
                 </p>
               </div>
@@ -180,7 +180,7 @@ export default function BestTimeHeatmap() {
       subtitle="Engagement rate by day of week × hour of day. Brighter = better."
       delay={0.1}
       actions={
-        <div className="flex items-center gap-2 text-[10px] text-slate-400">
+        <div className="flex items-center gap-2 text-[10px] text-slate-500">
           <span>Low</span>
           <div
             className="w-24 h-2 rounded-full"
@@ -198,7 +198,7 @@ export default function BestTimeHeatmap() {
       ) : (data?.data ?? []).length === 0 ? (
         <div className="py-10 text-center">
           <p className="text-sm text-slate-600 font-medium">Not enough data yet</p>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Sync more posts or extend the time range to see your best posting windows.
           </p>
         </div>
@@ -210,7 +210,7 @@ export default function BestTimeHeatmap() {
                 h % 3 === 0 ? (
                   <div
                     key={h}
-                    className="flex-1 text-[10px] text-slate-400 text-center"
+                    className="flex-1 text-[10px] text-slate-500 text-center"
                     style={{ flexBasis: 0 }}
                   >
                     {fmtHourLabel(h)}
@@ -225,7 +225,7 @@ export default function BestTimeHeatmap() {
               const dayOfWeek = di + 1;
               return (
                 <div key={dayLabel} className="flex items-center gap-1">
-                  <div className="w-10 text-[10px] text-slate-400 font-medium text-right pr-1">
+                  <div className="w-10 text-[10px] text-slate-500 font-medium text-right pr-1">
                     {dayLabel}
                   </div>
                   <div className="flex-1 flex gap-1">
@@ -272,7 +272,7 @@ export default function BestTimeHeatmap() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="text-[11px] text-slate-400"
+                  className="text-[11px] text-slate-500"
                 >
                   Hover a cell for details. Click to see posts from that slot.
                 </motion.p>

@@ -61,7 +61,7 @@ function SourcePostsStrip({ posts, onClick }) {
   if (!posts?.length) return null;
   return (
     <div className="space-y-2">
-      <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">
+      <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">
         Based on these top posts
       </p>
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
@@ -189,7 +189,7 @@ export default function ContentIdeasPanel({ onSourcePostClick }) {
           <h2 id="ideas-title" className="text-base font-semibold text-slate-900">
             Content Ideas
           </h2>
-          <p className="text-[11px] text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-500 mt-1">
             Mined from your top-performing posts in the last {days} days.
           </p>
         </div>

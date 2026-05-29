@@ -106,7 +106,7 @@ function SpikeDetailPanel({ spike, onClose, onSelectPost }) {
         </div>
         <button
           onClick={onClose}
-          className="text-[11px] text-slate-400 hover:text-slate-600 px-2 py-1 rounded-md hover:bg-slate-50 shrink-0"
+          className="text-[11px] text-slate-500 hover:text-slate-600 px-2 py-1 rounded-md hover:bg-slate-50 shrink-0"
         >
           Dismiss
         </button>
@@ -117,7 +117,7 @@ function SpikeDetailPanel({ spike, onClose, onSelectPost }) {
           Candidate driver posts
         </p>
         {drivers.length === 0 ? (
-          <p className="text-[11px] text-slate-400 py-2">
+          <p className="text-[11px] text-slate-500 py-2">
             No candidate drivers in the 24h window before this spike.
           </p>
         ) : (
@@ -193,7 +193,7 @@ export default function SpikeTimeline({ onSelectPost }) {
       ) : error ? (
         <p className="text-xs text-rose-500 py-8">{error}</p>
       ) : points.length === 0 ? (
-        <p className="text-xs text-slate-400 py-12 text-center">
+        <p className="text-xs text-slate-500 py-12 text-center">
           No spikes above threshold in this window. Your growth has been steady.
         </p>
       ) : (
@@ -247,7 +247,7 @@ export default function SpikeTimeline({ onSelectPost }) {
             </ResponsiveContainer>
           </div>
 
-          <div className="flex items-center gap-4 mt-3 text-[10px] text-slate-400">
+          <div className="flex items-center gap-4 mt-3 text-[10px] text-slate-500">
             <span className="flex items-center gap-1.5">
               <span
                 className="w-2.5 h-2.5 rounded-full"

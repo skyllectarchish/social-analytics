@@ -117,7 +117,7 @@ export default function VoiceEmptyBanner() {
                 </>
               )}
             </button>
-            <span className="text-[10px] text-slate-400 leading-tight">
+            <span className="text-[10px] text-slate-500 leading-tight">
               Adds synthetic comments / sentiment / topics so you can preview
               the section. Tagged synthetic — clean up with{" "}
               <code className="bg-slate-100 px-1 rounded">

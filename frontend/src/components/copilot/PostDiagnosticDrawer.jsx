@@ -64,13 +64,13 @@ function MetricRow({ label, observed, baseline, isPct = false }) {
         {label}
       </span>
       <div>
-        <p className="text-[10px] text-slate-400">Observed</p>
+        <p className="text-[10px] text-slate-500">Observed</p>
         <p className="text-[14px] font-semibold text-slate-900">
           {isPct ? `${observed?.toFixed?.(1) ?? "—"}%` : fmtCount(observed)}
         </p>
       </div>
       <div className="text-right">
-        <p className="text-[10px] text-slate-400">
+        <p className="text-[10px] text-slate-500">
           Baseline {delta !== null && <span style={{ color: deltaColor }}>· {fmtPct(delta)}</span>}
         </p>
         <p className="text-[14px] font-semibold text-slate-600">
@@ -124,7 +124,7 @@ function FactorRow({ factor, igMediaId }) {
         </p>
         <ChevronDown
           size={14}
-          className="text-slate-400 transition-transform"
+          className="text-slate-500 transition-transform"
           style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
         />
       </button>
@@ -410,7 +410,7 @@ export default function PostDiagnosticDrawer({ media, onClose }) {
                   )}
 
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 mb-2">
+                    <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 mb-2">
                       Compared to your baseline (last 60 posts)
                     </p>
                     <div
@@ -442,7 +442,7 @@ export default function PostDiagnosticDrawer({ media, onClose }) {
 
                   {data.verdict_md && (
                     <div>
-                      <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 mb-2">
+                      <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 mb-2">
                         Verdict
                       </p>
                       <div
@@ -459,7 +459,7 @@ export default function PostDiagnosticDrawer({ media, onClose }) {
 
                   {data.factors?.length > 0 && (
                     <div>
-                      <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 mb-2">
+                      <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 mb-2">
                         Factors
                       </p>
                       <div className="space-y-2">
@@ -472,7 +472,7 @@ export default function PostDiagnosticDrawer({ media, onClose }) {
 
                   {data.recommendations_md && (
                     <div>
-                      <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 mb-2">
+                      <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 mb-2">
                         What to try next
                       </p>
                       <div

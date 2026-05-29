@@ -54,7 +54,7 @@ export default function GrowthDriversTable({ onSelectPost }) {
           <p className="text-sm text-slate-600 font-medium">
             No driver activity yet
           </p>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Needs at least 7 days of follower history.
           </p>
         </div>
@@ -78,7 +78,7 @@ export default function GrowthDriversTable({ onSelectPost }) {
                 onClick={() => onSelectPost?.(d)}
                 className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors text-left"
               >
-                <span className="w-5 text-[11px] font-mono text-slate-400 text-right shrink-0">
+                <span className="w-5 text-[11px] font-mono text-slate-500 text-right shrink-0">
                   #{i + 1}
                 </span>
                 <MediaThumb
@@ -106,7 +106,7 @@ export default function GrowthDriversTable({ onSelectPost }) {
                       {d.caption || "(no caption)"}
                     </p>
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
+                  <p className="text-[10px] text-slate-500 mt-0.5">
                     reach {fmtNum(d.reach)} · conv{" "}
                     <span
                       className="font-mono font-semibold px-1 py-0.5 rounded"
@@ -120,7 +120,7 @@ export default function GrowthDriversTable({ onSelectPost }) {
                   <p className="text-sm font-mono font-semibold text-emerald-600">
                     +{Math.round(d.attributed_follows ?? 0)}
                   </p>
-                  <p className="text-[10px] text-slate-400">followers</p>
+                  <p className="text-[10px] text-slate-500">followers</p>
                 </div>
               </motion.button>
             );
@@ -129,7 +129,7 @@ export default function GrowthDriversTable({ onSelectPost }) {
       )}
 
       {drivers.length > 0 && (
-        <p className="text-[10px] text-slate-400 mt-3 leading-relaxed">
+        <p className="text-[10px] text-slate-500 mt-3 leading-relaxed">
           Attribution is a share of the day's follower gain, not a causal claim.
           Rates use non-follower reach when available.
         </p>
