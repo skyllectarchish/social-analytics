@@ -22,3 +22,6 @@ dist/
 .DS_Store
 Thumbs.db
 backend/venv
+
+# Previous frontend, kept locally for reference only
+frontend-old/

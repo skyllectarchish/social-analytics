@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Instagram analytics dashboard for content creators. Users register/log in, connect a Business/Creator IG account via Meta OAuth, and the backend pulls profile + media data from the Graph API and stores it in ClickHouse for long-term retention beyond Meta's native 90-day window. See `analetic-idea.md` for product motivation and `implementation_plan.md` for the original spec.
 
-Monorepo layout: `backend/` (FastAPI + ClickHouse) and `frontend/` (React 19 + Vite 6 PWA + Tailwind v4 + Framer Motion).
+Monorepo layout: `backend/` (FastAPI + ClickHouse) and `frontend/` (React 19 + TypeScript + Vite 6 + Tailwind v4 + React Router 7 + Recharts + Framer Motion — the "InfluenceIQ" app). `frontend-old/` is the previous JavaScript frontend, kept untracked for reference only — don't edit it.
 
 ## Common commands
 
@@ -20,8 +20,8 @@ uvicorn app.main:app --reload        # dev server on :8000
 Frontend (run from `frontend/`):
 ```
 npm install
-npm run dev      # Vite dev server on :5173, proxies /api → http://localhost:8000
-npm run build
+npm run dev      # Vite dev server on :5173, proxies /api → http://127.0.0.1:8000
+npm run build    # tsc -b && vite build (type errors fail the build)
 npm run preview
 ```
 
@@ -51,31 +51,24 @@ Graph API base is `https://graph.instagram.com` (unversioned; constant in `app/c
 
 ### Frontend (`frontend/src/`)
 
-React 19 + React Router 7. Auth state is held in `context/AuthContext.jsx`; protected/guest routes are wrappers in `App.jsx`. Access tokens are stored in `localStorage` and injected via an axios interceptor in `api/client.js` — the same interceptor redirects to `/login` on any 401. All API calls go through that axios instance with `baseURL: "/api"`, which the Vite dev proxy forwards to `http://localhost:8000`.
+React 19 + TypeScript + React Router 7 ("InfluenceIQ"). Auth state is held in `context/AuthContext.tsx` (consumed via `hooks/useAuth.ts`); it restores the session with `GET /api/auth/me` on load. Access tokens live in `localStorage` (`tokenStore` in `api/client.ts`) and are injected via an axios request interceptor — the response interceptor normalizes FastAPI `detail` errors (string or 422 array → flat string) and redirects to `/login?next=…` on any 401. All API calls go through that axios instance with `baseURL: "/api"`, which the Vite dev proxy forwards to `http://127.0.0.1:8000`. `api/client.ts` also exports `safeGet<T>()` (resolves to `null` on any error so pages can fall back to mock data) and `errorMessage()`. API response types live in `api/types.ts`.
 
-**Routing.** `/` is `HomeRoute` in `App.jsx`: it renders `LandingPage` for guests and redirects authenticated users to `/dashboard`. Other routes: `/login`, `/register` (both wrapped in `GuestRoute`), `/connect`, `/callback`, `/dashboard` (all wrapped in `ProtectedRoute`). The OAuth callback page reads `?code=` from the URL and POSTs it to `/api/instagram/callback`.
+**Routing** (all in `App.tsx` — `ProtectedRoute` / `GuestRoute` / `HomeRoute` wrappers):
+- `/` — landing (`components/Landing.tsx`) for guests, redirect to `/dashboard` when signed in
+- `/login`, `/register` — guest-only
+- `/connect` — starts IG OAuth; `/auth/instagram/callback` — exchanges `?code&state` (this path must match `META_REDIRECT_URI` in `backend/.env`)
+- `/dashboard`, `/dashboard/content` (Content Lab), `/dashboard/reels` (Reels Studio), `/dashboard/audience` (Audience DNA), `/dashboard/competitors`, `/dashboard/copilot` — protected, all rendered inside `components/dashboard/DashboardLayout.tsx` (sidebar nav, profile chip, refresh/disconnect)
 
-Tailwind v4 is configured CSS-first via `@import "tailwindcss"` and an `@theme` block in `src/index.css` — there is no `tailwind.config.js`. The Vite plugin `@tailwindcss/vite` handles the build. PWA manifest + service worker come from `vite-plugin-pwa` configured in `vite.config.js`.
+A 404 from `/instagram/profile` means "not connected" and routes the user to `/connect`. Pages that lack real backend data fall back to mock fixtures in `data/mock.ts` / `data/labMock.ts` (via `safeGet` returning `null`). Authed media thumbnails load through the `/instagram/media/{id}/image` proxy via `hooks/useAuthedImage.ts`.
 
-### Landing page (`frontend/src/components/landing/`)
-
-The landing page has its **own design system, fonts, and visual language** distinct from the dashboard. They share the same React app and `index.css`, kept compatible by scoping.
-
-- **Scoped wrapping.** `LandingPage.jsx` wraps everything in `<div className="lumen-landing">`. All landing-only CSS (light theme colors, glassmorphism, mesh gradients, premium typography) lives under that selector or under classes only the landing uses (`.glass`, `.glass-strong`, `.glass-subtle`, `.text-gradient-aurora`, `.btn-primary-glow`, `.chip-soft`, `.grid-pattern`, `.aurora-bg`, `.divider-glow`, etc.). The existing dashboard styles (the `@theme` `--color-primary*` tokens, dark `body` background) are untouched. **Don't bleed landing classes into dashboard pages, or vice versa.**
-- **Body background swap.** `LandingPage`'s `useEffect` sets `document.body.style.backgroundColor = "#fafafb"` on mount and restores it on unmount, because the dashboard expects a dark body and the landing expects light. Keep this if the landing is mounted/unmounted from a multi-route app.
-- **Component layout.**
-  - `components/landing/background/` — `GradientMesh`, `Spotlight` (cinematic top light)
-  - `components/landing/hero/` — `DashboardMockup` (the realistic in-product hero centerpiece — chrome bar + sidebar + main canvas with chart/KPIs/reels)
-  - `components/landing/sections/` — one file per section (`HeroSection`, `FeaturesSection`, `AnalyticsPreview`, `CommunityShowcase`, `TrendingAudio`, `TipsSection`, `HowItWorks`, `PricingSection`, `TestimonialCarousel`, `CTASection`, `LandingFooter`, `SocialProofSection`, `LandingNav`)
-  - `components/landing/ui/` — reusable primitives: `GlassCard` (3D-tilt frosted glass), `MagneticButton` (`primary`/`gradient`/`ghost` variants), `AnimatedCounter`, `SectionHeading`
-- **Animations.** Framer Motion + CSS keyframes defined in `index.css` (`orbFloat`, `orbFloatSm`, `pulseGlow`, `meshShift`, `shimmer`, `marquee`, `waveform`, `drawLine`, `gradientText`). Reuse the existing keyframes before adding new ones.
-- **Fonts.** `index.html` loads **Clash Display + Satoshi + Cabinet Grotesk** from Fontshare and Inter from Google Fonts. CSS variables in `@theme`: `--font-display` (Clash Display, used via `.font-display` and tightened `tracking-[-0.04em]`), `--font-sans` (Satoshi for landing body via `.lumen-landing` selector), `--font-sans` falls back to Inter for the dashboard.
+**Design system.** One light, violet-primary (`#7c3aed`) design system shared by landing and dashboard — no scoped dual-theme split anymore. Tailwind v4 is configured CSS-first via `@import "tailwindcss"` and an `@theme inline` block in `src/index.css` (no `tailwind.config.js`); brand tokens are exposed as utilities (`violet`, `violet-deep`, `ink`, `lavender`, `mint`). Reusable CSS utilities live in `index.css`: `.glass`, `.card-hairline`, `.btn-glow`, `.chip`, `.bg-ig`/`.text-ig` (Instagram gradient), `.text-aurora`, `.num` (tabular mono digits), `.font-display`. Charts are Recharts (see `components/charts/` — `Sparkline`, `GlassTooltip`); scroll reveals use `components/ui/Reveal.tsx` and motion presets in `lib/motion.ts`. Fonts from `index.html`: Satoshi (body), Clash Display (`.font-display`, logo), Cormorant Garamond (italic serif accents), JetBrains Mono (numerals).
 
 ## Gotchas
 
-- **lucide-react brand icons.** The version installed (and current upstream) does **not** export `Instagram`, `Twitter`, `Youtube`, `Linkedin`, or `Github` — they were dropped. `LandingFooter.jsx` inlines them as small SVG components; mirror that approach if you need other brand glyphs. Other lucide icons (`Sparkles`, `Heart`, `TrendingUp`, etc.) are fine.
+- **lucide-react brand icons.** The installed version (0.469.0) still exports the deprecated brand icons (`Instagram` is imported in `DashboardLayout.tsx`), but upstream has removed them — don't upgrade lucide-react casually, and inline SVGs for any brand glyph the installed version lacks.
 - **Tailwind v4 spacing scale.** Integer + 0.5 increments are auto-generated; `h-4.5`/`w-4.5` will silently drop. Larger arbitrary values (`py-26`, `mt-14`, etc.) work via the dynamic spacing scale. Use `size={n}` props on lucide icons for precise icon sizing instead of fractional Tailwind classes.
-- **Vite optimizer cache after dep changes.** When adding new dependencies (e.g. `framer-motion`, `lucide-react`) while a dev server is running, the existing `node_modules/.vite` cache can leave the page styled inconsistently. After adding deps, kill the dev server, `rm -rf node_modules/.vite`, and restart.
+- **Vite optimizer cache after dep changes.** When adding new dependencies while a dev server is running, the existing `node_modules/.vite` cache can leave the page styled inconsistently. After adding deps, kill the dev server, `rm -rf node_modules/.vite`, and restart.
+- **`npm run build` runs `tsc -b` first** — TypeScript errors fail the build even if Vite would accept the code. The dev server does not type-check.
 
 ## Conventions
 
@@ -83,4 +76,5 @@ The landing page has its **own design system, fonts, and visual language** disti
 - When adding a protected endpoint, depend on `auth.dependencies.get_current_user` and read `current_user["id"]` for scoping.
 - New env vars: add to both `backend/app/config.py` (as a typed `Settings` field) and `backend/.env.example`.
 - The `_client` in `database.py` is a process-wide singleton; don't instantiate `clickhouse_connect.get_client()` directly elsewhere.
-- For new landing sections, compose existing primitives (`GlassCard`, `MagneticButton`, `SectionHeading`) and reuse the existing CSS keyframes; avoid adding scattered floating chips/ornaments — the established pattern is one focused composition per section, with at most 1–2 intentional floating overlay cards.
+- For new frontend UI, reuse the existing `index.css` utilities (`.glass`, `.card-hairline`, `.btn-glow`, `.chip`, `.text-aurora`) and motion presets in `lib/motion.ts` rather than adding new one-off styles; landing sections are one file each under `components/` composed in `Landing.tsx`.
+- New dashboard pages render inside `DashboardLayout` and get a route + sidebar entry (the `NAV` array in `DashboardLayout.tsx`).
