@@ -86,7 +86,6 @@ export default function DemographicsPanel() {
   return (
     <div
       className="rounded-2xl p-5 d-card"
-      style={{ height: "100%" }}
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-3">

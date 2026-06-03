@@ -1,8 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from "react";
-import { Activity, Users, Radio } from "lucide-react";
 import DashboardLayout from "../components/DashboardLayout";
 import PageHeader from "../components/shared/PageHeader";
-import { SectionDivider } from "../components/shared/SectionCard";
 import HeroCards from "../components/dashboard/HeroCards";
 import SyncButton from "../components/dashboard/SyncButton";
 import EngagementChart from "../components/dashboard/EngagementChart";
@@ -22,8 +20,6 @@ export default function DashboardPage() {
   const [diagnosticMedia, setDiagnosticMedia] = useState(null);
   const { data: overview } = useOverview();
 
-  // Memoize so a parent re-render doesn't hand HeroCards fresh array refs and
-  // cascade re-renders through every memoized card child.
   const sparklines = useMemo(
     () => ({
       total_views: (overview?.views?.data ?? []).map((d) => ({ v: d.value })),
@@ -43,37 +39,20 @@ export default function DashboardPage() {
           actions={<SyncButton />}
         />
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           <HeroCards sparklines={sparklines} />
 
-          <section className="space-y-3">
-            <SectionDivider icon={Activity} title="Performance Overview" />
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-              <div className="lg:col-span-8">
-                <EngagementChart />
-              </div>
-              <div className="lg:col-span-4">
-                <FollowerGrowthChart />
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-3 items-start">
+            <div className="space-y-3">
+              <EngagementChart />
+              <FollowerGrowthChart />
             </div>
-          </section>
-
-          <section className="space-y-3">
-            <SectionDivider icon={Users} title="Audience & Top Content" />
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-              <div className="lg:col-span-5">
-                <TopPostsGrid onSelect={setSelectedMedia} />
-              </div>
-              <div className="lg:col-span-7">
-                <DemographicsPanel />
-              </div>
+            <div className="space-y-3">
+              <TopPostsGrid onSelect={setSelectedMedia} />
+              <DemographicsPanel />
+              <StoriesPanel />
             </div>
-          </section>
-
-          <section className="space-y-3">
-            <SectionDivider icon={Radio} title="Live Stories" />
-            <StoriesPanel />
-          </section>
+          </div>
         </div>
       </div>
 
@@ -85,8 +64,6 @@ export default function DashboardPage() {
           setDiagnosticMedia(m);
         }}
       />
-      {/* Only mount the lazy drawer once the user actually triggers it, so
-          the chunk fetch waits until the click rather than on every page mount. */}
       {diagnosticMedia && (
         <Suspense fallback={null}>
           <PostDiagnosticDrawer media={diagnosticMedia} onClose={() => setDiagnosticMedia(null)} />

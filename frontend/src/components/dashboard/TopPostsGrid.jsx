@@ -244,7 +244,7 @@ export default function TopPostsGrid({ onSelect }) {
   return (
     <div
       className="rounded-2xl overflow-hidden d-card"
-      style={{ display: "flex", flexDirection: "column", height: "100%" }}
+      style={{ display: "flex", flexDirection: "column" }}
     >
       {/* Header */}
       <div

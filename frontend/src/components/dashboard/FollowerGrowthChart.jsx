@@ -69,7 +69,7 @@ function ChartSkeleton() {
   return (
     <div
       className="rounded-2xl p-5 animate-pulse d-card"
-      style={{ height: "100%", minHeight: 210 }}
+      style={{ minHeight: 180 }}
     >
       <div className="h-4 w-36 rounded mb-4" style={{ background: "rgba(0,0,0,0.07)" }} />
       <div className="h-8 w-20 rounded mb-2" style={{ background: "rgba(0,0,0,0.07)" }} />
@@ -98,7 +98,6 @@ export default function FollowerGrowthChart() {
   return (
     <div
       className="rounded-2xl p-5 d-card"
-      style={{ height: "100%" }}
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-3">

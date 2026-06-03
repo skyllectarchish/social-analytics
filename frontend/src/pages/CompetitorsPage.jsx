@@ -15,23 +15,22 @@ export default function CompetitorsPage() {
     <DashboardLayout>
       <PageHeader
         title="Competitors"
-        emoji="📈"
-        subtitle="Track public benchmarks across accounts in your niche."
+        subtitle="Public benchmarks across accounts in your niche."
         actions={<SyncButton />}
       />
 
-      <div className="space-y-3">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-          <div className="lg:col-span-4">
-            <CompetitorListPanel onAdd={() => setAddOpen(true)} />
-          </div>
-          <div className="lg:col-span-8">
-            <CompetitorMetricsTable />
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-3 items-start">
+        {/* Left: list + content mix */}
+        <div className="space-y-3">
+          <CompetitorListPanel onAdd={() => setAddOpen(true)} />
+          <ContentMixChart />
         </div>
 
-        <CompetitorTimelineChart />
-        <ContentMixChart />
+        {/* Right: metrics table + timeline */}
+        <div className="space-y-3">
+          <CompetitorMetricsTable />
+          <CompetitorTimelineChart />
+        </div>
       </div>
 
       <AddCompetitorDialog open={addOpen} onClose={() => setAddOpen(false)} />

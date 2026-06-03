@@ -1,8 +1,6 @@
 import { lazy, Suspense, useState } from "react";
-import { BarChart3, Clock, Hash } from "lucide-react";
 import DashboardLayout from "../components/DashboardLayout";
 import PageHeader from "../components/shared/PageHeader";
-import { SectionDivider } from "../components/shared/SectionCard";
 import LabStatStrip from "../components/content-lab/LabStatStrip";
 import FormatBreakdownChart from "../components/content-lab/FormatBreakdownChart";
 import AlgorithmScorePanel from "../components/content-lab/AlgorithmScorePanel";
@@ -18,10 +16,6 @@ const PostDiagnosticDrawer = lazy(() =>
   import("../components/copilot/PostDiagnosticDrawer"),
 );
 
-// Backend endpoints disagree on field names: algorithm-metrics rows ship
-// `caption` + a real `media_url`, while format-breakdown rows ship
-// `caption_preview` and no separate media URL. Normalize both into the
-// PostInsightsDrawer's expected shape via a single adapter with a flag.
 function adaptPostForDrawer(p, { preview = false } = {}) {
   if (!p) return null;
   return {
@@ -46,53 +40,41 @@ export default function ContentLabPage() {
   return (
     <DashboardLayout>
       <div className="lab-grid">
-      <PageHeader
-        title="Content Lab"
-        subtitle="Discover which formats, times, and styles the algorithm rewards most."
-        actions={<SyncButton />}
-      />
+        <PageHeader
+          title="Content Lab"
+          subtitle="Which formats, times, and styles the algorithm rewards most."
+          actions={<SyncButton />}
+        />
 
-      <div className="space-y-4">
-        <LabStatStrip />
+        <div className="space-y-3">
+          <LabStatStrip />
 
-        <section className="space-y-3">
-          <SectionDivider icon={BarChart3} title="Content Performance" />
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-            <div className="lg:col-span-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
+            {/* Left: format performance + timing */}
+            <div className="space-y-3">
               <FormatBreakdownChart
                 onSelectPost={(p) => setSelectedMedia(adaptFormatPost(p))}
               />
+              <BestTimeHeatmap />
             </div>
-            <div className="lg:col-span-4">
+
+            {/* Right: algorithm score + hashtags */}
+            <div className="space-y-3">
               <AlgorithmScorePanel
                 onSelectPost={(p) => setSelectedMedia(adaptAlgoPost(p))}
               />
+              <div className="grid grid-cols-[2fr_3fr] gap-3">
+                <HashtagPerformanceTable
+                  selected={selectedTag}
+                  onSelect={setSelectedTag}
+                />
+                <HashtagTrendChart tag={selectedTag} />
+              </div>
+              <HashtagComboHeatmap />
+              <BrandedHashtagsPanel />
             </div>
           </div>
-        </section>
-
-        <section className="space-y-3">
-          <SectionDivider icon={Clock} title="Posting Times" />
-          <BestTimeHeatmap />
-        </section>
-
-        <section className="space-y-3">
-          <SectionDivider icon={Hash} title="Hashtags" />
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-            <div className="lg:col-span-4">
-              <HashtagPerformanceTable
-                selected={selectedTag}
-                onSelect={setSelectedTag}
-              />
-            </div>
-            <div className="lg:col-span-8">
-              <HashtagTrendChart tag={selectedTag} />
-            </div>
-          </div>
-          <HashtagComboHeatmap />
-          <BrandedHashtagsPanel />
-        </section>
-      </div>
+        </div>
       </div>
 
       <PostInsightsDrawer

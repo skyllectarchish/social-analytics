@@ -63,13 +63,13 @@ export default function AudienceDNAPage() {
     <DashboardLayout>
       <PageHeader
         title="Audience DNA"
-        emoji="👥"
-        subtitle="Understand which follower segments are truly engaged vs dormant."
+        subtitle="Which follower segments are truly engaged vs dormant."
         actions={<SyncButton />}
       />
 
       <div className="space-y-3">
-        <div className="flex gap-2 flex-wrap">
+        {/* Breakdown selector */}
+        <div className="flex gap-1.5 flex-wrap">
           {BREAKDOWN_OPTIONS.map((opt) => {
             const active = breakdown === opt.value;
             return (
@@ -77,18 +77,13 @@ export default function AudienceDNAPage() {
                 key={opt.value}
                 onClick={() => setBreakdown(opt.value)}
                 className="relative px-4 py-1.5 rounded-full text-sm font-medium transition-colors"
-                style={{
-                  color: active ? "#6d28d9" : "#64748b",
-                }}
+                style={{ color: active ? "#6d28d9" : "#64748b" }}
               >
                 {active && (
                   <motion.span
                     layoutId="audience-breakdown-active"
                     className="absolute inset-0 rounded-full"
-                    style={{
-                      background: "rgba(139,92,246,0.10)",
-                      border: "1px solid rgba(139,92,246,0.25)",
-                    }}
+                    style={{ background: "rgba(139,92,246,0.10)", border: "1px solid rgba(139,92,246,0.25)" }}
                     transition={{ type: "spring", duration: 0.4, bounce: 0 }}
                   />
                 )}
@@ -100,51 +95,40 @@ export default function AudienceDNAPage() {
 
         <QualityHeroMetrics breakdown={breakdown} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-          <div className="lg:col-span-5">
+        {/* 2-column: quality/growth left, tables/voice right */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
+          {/* Left: radar + growth drivers + spike */}
+          <div className="space-y-3">
             <QualityRadar breakdown={breakdown} />
-          </div>
-          <div className="lg:col-span-7">
-            <CohortQualityTable breakdown={breakdown} />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-          <div className="lg:col-span-7">
             <GrowthDriversTable
               onSelectPost={(p) => setSelectedMedia(adaptDriver(p))}
             />
+            <SpikeTimeline
+              onSelectPost={(p) => setSelectedMedia(adaptDriver(p))}
+            />
           </div>
-          <div className="lg:col-span-5">
+
+          {/* Right: cohort table + correlation + audience voice */}
+          <div className="space-y-3">
+            <CohortQualityTable breakdown={breakdown} />
             <GrowthCorrelationChart />
-          </div>
-        </div>
 
-        <SpikeTimeline
-          onSelectPost={(p) => setSelectedMedia(adaptDriver(p))}
-        />
-
-        <div className="pt-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-            <span>💬</span> Audience Voice
-          </h2>
-          <VoiceEmptyBanner />
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 mb-4">
-            <div className="lg:col-span-5">
-              <SentimentDonut />
-            </div>
-            <div className="lg:col-span-7">
-              <TopicChips />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-            <div className="lg:col-span-7">
-              <SentimentTrendChart />
-            </div>
-            <div className="lg:col-span-5">
-              <QuestionPostsCard
-                onSelect={(p) => setSelectedMedia(adaptQuestionPost(p))}
-              />
+            {/* Audience Voice */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <span>💬</span> Audience Voice
+              </p>
+              <VoiceEmptyBanner />
+              <div className="grid grid-cols-[5fr_7fr] gap-3">
+                <SentimentDonut />
+                <TopicChips />
+              </div>
+              <div className="grid grid-cols-[7fr_5fr] gap-3">
+                <SentimentTrendChart />
+                <QuestionPostsCard
+                  onSelect={(p) => setSelectedMedia(adaptQuestionPost(p))}
+                />
+              </div>
             </div>
           </div>
         </div>

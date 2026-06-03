@@ -27,7 +27,7 @@ export default function ReelsStudioPage() {
       <PageHeader
         title="Reels Studio"
         emoji="🎬"
-        subtitle="Track hook strength, watch time, and retention across all your Reels."
+        subtitle="Hook strength, watch time, and retention across all your Reels."
         actions={
           <div className="flex items-center gap-2">
             {flagOn("ai_caption") && (
@@ -57,8 +57,11 @@ export default function ReelsStudioPage() {
 
       <div className="space-y-3">
         <ReelsHeroMetrics />
-        <HookStrengthTrend />
-        <ReelsRetentionTable onSelect={setSelectedMedia} />
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
+          <HookStrengthTrend />
+          <ReelsRetentionTable onSelect={setSelectedMedia} />
+        </div>
       </div>
 
       <PostInsightsDrawer
