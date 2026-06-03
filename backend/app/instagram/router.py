@@ -364,6 +364,25 @@ async def refresh(current_user: User = Depends(get_current_user)):
     return CallbackResponse(success=True, profile=profile)
 
 
+@router.post("/disconnect")
+def disconnect(current_user: User = Depends(get_current_user)):
+    """Disconnect the linked Instagram account: delete the stored profile + token.
+
+    Idempotent — returns success even if nothing is connected. Stored media /
+    insights are left intact (scoped by ig_user_id); call /purge first to also
+    wipe the data. After this the user is back to the not-connected state and
+    must re-run the OAuth flow to reconnect.
+    """
+    client = get_client()
+    user_id = str(current_user.id)
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        return {"success": True, "ig_user_id": ""}
+    instagram_repo.delete_profile(client, user_id, ig_profile.ig_user_id)
+    logger.info("Instagram disconnected for user %s (ig: %s)", user_id, ig_profile.ig_user_id)
+    return {"success": True, "ig_user_id": ig_profile.ig_user_id}
+
+
 # --- Insights endpoints ---
 
 _OVERVIEW_METRICS = [

@@ -238,6 +238,22 @@ def purge_user_ig_data(
     return {"media_deleted": len(media_ids)}
 
 
+def delete_profile(client: Client, user_id: str, ig_user_id: str) -> None:
+    """Remove the stored Instagram profile + encrypted token for this user.
+
+    Backs the disconnect/logout flow. Runs synchronously (``mutations_sync=2``)
+    so a subsequent ``find_profile`` reflects the disconnect immediately. Stored
+    media/insights are left in place (scoped by ``ig_user_id``) — call
+    :func:`purge_user_ig_data` first if the data should be wiped too.
+    """
+    client.command(
+        "ALTER TABLE instagram_profiles DELETE "
+        "WHERE user_id = {uid:UUID} AND ig_user_id = {iguid:String}",
+        parameters={"uid": user_id, "iguid": ig_user_id},
+        settings={"mutations_sync": 2},
+    )
+
+
 def upsert_profile(
     client: Client,
     user_id: str,
