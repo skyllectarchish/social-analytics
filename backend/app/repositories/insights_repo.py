@@ -18,6 +18,7 @@ from ..models.queries import (
     GET_DAILY_REACH_BY_POST_DAY,
     GET_ALGORITHM_METRICS_POSTS,
     GET_ALGORITHM_METRICS_SUMMARY,
+    GET_BEST_TIME_BY_FORMAT,
     GET_BEST_TIME_POSTS,
     GET_BEST_TIME_TO_POST,
     GET_DAILY_FOLLOWS,
@@ -364,6 +365,32 @@ def find_best_time_to_post(
     return [dict(zip(cols, r)) for r in rows.result_rows]
 
 
+def find_best_time_by_format(
+    client: Client,
+    user_id: str,
+    ig_user_id: str,
+    since: datetime,
+    min_sample: int = 3,
+    until: datetime | None = None,
+) -> list[dict]:
+    """Heatmap rows split by media_product_type (FEED vs REELS)."""
+    rows = client.query(
+        GET_BEST_TIME_BY_FORMAT,
+        parameters={
+            "user_id": user_id,
+            "ig_user_id": ig_user_id,
+            "since": since,
+            "until": until or _now_utc_naive(),
+            "min_sample": min_sample,
+        },
+    )
+    cols = [
+        "media_product_type", "day_of_week", "hour_of_day", "sample_size",
+        "avg_interactions", "avg_reach", "avg_engagement_rate",
+    ]
+    return [dict(zip(cols, r)) for r in rows.result_rows]
+
+
 # --- Feature 3: Algorithm Metrics ---
 
 def find_algorithm_metrics_posts(
@@ -653,6 +680,7 @@ def find_candidate_drivers_for_spikes(
                 "user_id": user_id,
                 "ig_user_id": ig_user_id,
                 "since": since_dt,
+                "until": _now_utc_naive(),
             },
         ).result_rows,
         fallback=[],
@@ -680,6 +708,7 @@ def find_growth_drivers(
     ig_user_id: str,
     since: datetime,
     limit: int = 10,
+    until: datetime | None = None,
 ) -> list[dict]:
     """Return top posts ranked by attributed follower acquisition.
 
@@ -691,23 +720,19 @@ def find_growth_drivers(
     Returns [] when any required table is missing — the attribution panel
     just stays empty rather than 500-ing the Audience DNA page.
     """
+    params = {
+        "user_id": user_id,
+        "ig_user_id": ig_user_id,
+        "since": since,
+        "until": until or _now_utc_naive(),
+    }
     follow_rows = safe_call(
-        lambda: client.query(
-            GET_DAILY_FOLLOWS,
-            parameters={"user_id": user_id, "ig_user_id": ig_user_id, "since": since},
-        ).result_rows,
+        lambda: client.query(GET_DAILY_FOLLOWS, parameters=params).result_rows,
         fallback=[],
         label="insights_repo.find_growth_drivers.daily_follows",
     )
     post_rows = safe_call(
-        lambda: client.query(
-            GET_POSTS_FOR_ATTRIBUTION,
-            parameters={
-                "user_id": user_id,
-                "ig_user_id": ig_user_id,
-                "since": since,
-            },
-        ).result_rows,
+        lambda: client.query(GET_POSTS_FOR_ATTRIBUTION, parameters=params).result_rows,
         fallback=[],
         label="insights_repo.find_growth_drivers.posts",
     )
@@ -801,6 +826,7 @@ def find_growth_correlation(
     user_id: str,
     ig_user_id: str,
     since: datetime,
+    until: datetime | None = None,
 ) -> dict[str, Any]:
     """Daily pairs of (follower_change, non_follower_reach) + Pearson r.
 
@@ -812,27 +838,19 @@ def find_growth_correlation(
     populated yet; the response carries `uses_non_follower_reach` so the FE
     can render a "rough estimate" tag accordingly.
     """
+    params = {
+        "user_id": user_id,
+        "ig_user_id": ig_user_id,
+        "since": since,
+        "until": until or _now_utc_naive(),
+    }
     follow_rows = safe_call(
-        lambda: client.query(
-            GET_DAILY_FOLLOWS,
-            parameters={
-                "user_id": user_id,
-                "ig_user_id": ig_user_id,
-                "since": since,
-            },
-        ).result_rows,
+        lambda: client.query(GET_DAILY_FOLLOWS, parameters=params).result_rows,
         fallback=[],
         label="insights_repo.find_growth_correlation.follows",
     )
     reach_rows = safe_call(
-        lambda: client.query(
-            GET_DAILY_REACH_BY_POST_DAY,
-            parameters={
-                "user_id": user_id,
-                "ig_user_id": ig_user_id,
-                "since": since,
-            },
-        ).result_rows,
+        lambda: client.query(GET_DAILY_REACH_BY_POST_DAY, parameters=params).result_rows,
         fallback=[],
         label="insights_repo.find_growth_correlation.reach",
     )

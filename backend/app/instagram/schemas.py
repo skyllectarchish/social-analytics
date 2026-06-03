@@ -269,10 +269,23 @@ class BestTimeSlot(BaseModel):
     avg_engagement_rate: float
 
 
+class BestTimeByFormatSlot(BaseModel):
+    media_product_type: str  # FEED | REELS
+    day_of_week: int
+    hour_of_day: int
+    sample_size: int
+    avg_interactions: float
+    avg_reach: float
+    avg_engagement_rate: float
+
+
 class BestTimeResponse(BaseModel):
     period_days: int
     min_sample: int
     data: list[BestTimeSlot]
+    # Same slots split per format, so the FE can offer an All/Reels/Feed
+    # toggle without a second request.
+    by_format: list[BestTimeByFormatSlot] = []
     prior: "BestTimeResponse | None" = None
 
 
@@ -459,6 +472,7 @@ class GrowthDriverItem(BaseModel):
 class GrowthDriversResponse(BaseModel):
     period_days: int
     drivers: list[GrowthDriverItem]
+    prior: "GrowthDriversResponse | None" = None
 
 
 class GrowthCorrelationPoint(BaseModel):
@@ -476,6 +490,7 @@ class GrowthCorrelationResponse(BaseModel):
     # True when the response used non_follower_reach; False means the
     # breakdown sync hasn't populated yet and we fell back to total reach.
     uses_non_follower_reach: bool
+    prior: "GrowthCorrelationResponse | None" = None
 
 
 class PostConversionResponse(BaseModel):

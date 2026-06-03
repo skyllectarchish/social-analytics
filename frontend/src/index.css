@@ -265,7 +265,33 @@ body {
   }
 }
 
+/* ---------- Skeletons ---------- */
+.skeleton {
+  border-radius: 0.5rem;
+  background: linear-gradient(90deg, #eceef6 25%, #f6f7fc 37%, #eceef6 63%);
+  background-size: 400% 100%;
+  animation: shimmerSweep 1.6s ease infinite;
+}
+
 /* ---------- Motion ---------- */
+@keyframes shimmerSweep {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+/* Soft ring pulse for "sweet spot" heatmap cells */
+@keyframes pulseSoft {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(139, 92, 246, 0);
+  }
+}
 @keyframes aurora {
   0%,
   100% {
@@ -290,7 +316,8 @@ body {
     scroll-behavior: auto;
   }
   .text-aurora,
-  .aurora-scene::before {
+  .aurora-scene::before,
+  .skeleton {
     animation: none !important;
   }
   *,

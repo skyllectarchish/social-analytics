@@ -21,6 +21,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import axios from "axios";
+import { motion } from "framer-motion";
 import { useAuth } from "../../hooks/useAuth";
 import api, { safeGet } from "../../api/client";
 import type { InstagramProfile, QuotaResponse } from "../../api/types";
@@ -43,12 +44,16 @@ function SidebarInner({
   quota,
   connected,
   onDisconnect,
+  variant = "desktop",
 }: {
   username: string;
   active: string;
   quota: Quota;
   connected: boolean | null;
   onDisconnect: () => void;
+  // Desktop sidebar and mobile drawer are mounted at the same time — the FLIP
+  // indicator needs a distinct layoutId per instance or it animates across them.
+  variant?: "desktop" | "mobile";
 }) {
   const pct = quota && quota.limit > 0 ? Math.min(100, Math.round((quota.used / quota.limit) * 100)) : 0;
   return (
@@ -80,25 +85,28 @@ function SidebarInner({
       )}
 
       <nav className="space-y-1">
-        {NAV.map((item) =>
-          item.label === active ? (
+        {NAV.map((item) => {
+          const isActive = item.label === active;
+          return (
             <Link
               key={item.label}
               to={item.to}
-              className="from-lavender to-pink/40 group flex items-center gap-3 rounded-xl bg-gradient-to-r px-3 py-2.5 text-sm font-semibold text-violet-deep shadow-sm ring-1 ring-violet/20 transition"
+              className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
+                isActive ? "font-semibold text-violet-deep" : "text-foreground/70 hover:bg-white/60"
+              }`}
             >
-              <item.icon className="h-4 w-4" /> {item.label}
+              {isActive && (
+                <motion.span
+                  layoutId={`sidebar-active-${variant}`}
+                  className="from-lavender to-pink/40 absolute inset-0 rounded-xl bg-gradient-to-r shadow-sm ring-1 ring-violet/20"
+                  transition={{ type: "spring", duration: 0.45, bounce: 0 }}
+                />
+              )}
+              <item.icon className="relative h-4 w-4" />
+              <span className="relative">{item.label}</span>
             </Link>
-          ) : (
-            <Link
-              key={item.label}
-              to={item.to}
-              className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-foreground/70 transition hover:bg-white/60"
-            >
-              <item.icon className="h-4 w-4" /> {item.label}
-            </Link>
-          ),
-        )}
+          );
+        })}
       </nav>
 
       <div className="mt-auto">
@@ -195,7 +203,7 @@ export default function DashboardLayout({
             <button onClick={() => setMobileOpen(false)} className="absolute right-3 top-3 z-10 rounded-full p-1.5 text-foreground/60 hover:bg-black/5">
               <X className="h-5 w-5" />
             </button>
-            <SidebarInner username={username} active={active} quota={quota} connected={connected} onDisconnect={disconnectInstagram} />
+            <SidebarInner username={username} active={active} quota={quota} connected={connected} onDisconnect={disconnectInstagram} variant="mobile" />
           </div>
         </div>
       )}

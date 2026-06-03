@@ -112,10 +112,31 @@ export interface BestTimeSlot {
   avg_reach: number;
   avg_engagement_rate: number;
 }
+export interface BestTimeByFormatSlot extends BestTimeSlot {
+  media_product_type: string; // FEED | REELS
+}
 export interface BestTimeResponse {
   period_days: number;
   min_sample: number;
   data: BestTimeSlot[];
+  by_format: BestTimeByFormatSlot[];
+}
+export interface BestTimePost {
+  ig_media_id: string;
+  media_product_type: string;
+  permalink: string;
+  thumbnail_url: string | null;
+  caption_preview: string;
+  timestamp: string;
+  reach: number;
+  total_interactions: number;
+  engagement_rate_pct: number;
+}
+export interface BestTimePostsResponse {
+  day_of_week: number;
+  hour_of_day: number;
+  period_days: number;
+  posts: BestTimePost[];
 }
 
 export interface FormatBreakdownItem {
@@ -128,9 +149,38 @@ export interface FormatBreakdownResponse {
   period_days: number;
   data: FormatBreakdownItem[];
 }
+export interface FormatBreakdownPost {
+  ig_media_id: string;
+  media_product_type: string;
+  media_type: string;
+  permalink: string;
+  thumbnail_url: string | null;
+  caption_preview: string;
+  timestamp: string;
+  reach: number;
+  likes: number;
+  saved: number;
+  shares: number;
+  algorithm_score_pct: number;
+}
+export interface FormatBreakdownPostsResponse {
+  format: string;
+  period_days: number;
+  posts: FormatBreakdownPost[];
+}
 
 export interface AlgorithmPostItem {
   ig_media_id: string;
+  media_product_type: string;
+  media_type: string;
+  permalink: string;
+  caption: string;
+  timestamp: string;
+  saved: number;
+  shares: number;
+  reach: number;
+  save_rate: number;
+  share_rate: number;
   algorithm_score: number;
 }
 export interface AlgorithmMetricsResponse {
@@ -182,6 +232,18 @@ export interface ReelsRetentionResponse {
   period_days: number;
   reels: ReelRetentionItem[];
 }
+export interface ReelsTrendPoint {
+  week_start: string;
+  reels_count: number;
+  avg_hook_strength_pct: number;
+  avg_watch_time_sec: number;
+  avg_reach: number;
+  avg_views: number;
+}
+export interface ReelsTrendResponse {
+  period_days: number;
+  trend: ReelsTrendPoint[];
+}
 
 /* ---------- Audience ---------- */
 export interface SentimentSummaryResponse {
@@ -204,9 +266,37 @@ export interface FollowerQualityResponse {
     quality_tier: string;
   }[];
 }
+export interface FollowerQualitySummary {
+  breakdown: string;
+  total_cohorts: number;
+  total_followers_tracked: number;
+  total_engaged_tracked: number;
+  overall_quality_pct: number;
+  high_quality_cohorts: number;
+  medium_quality_cohorts: number;
+  low_quality_cohorts: number;
+  dormant_cohorts: number;
+}
+export interface FollowerSpike {
+  spike_date: string;
+  follows_change: number;
+  interactions: number;
+  interaction_per_follow_ratio: number;
+  is_suspicious: boolean;
+}
 export interface FollowerSpikesResponse {
   period_days: number;
-  spikes: { spike_date: string; follows_change: number; interactions: number; is_suspicious: boolean }[];
+  spikes: FollowerSpike[];
+}
+
+/* ---------- Per-media insights (PostInsightsDrawer) ---------- */
+export interface MediaInsightItem {
+  metric_name: string;
+  value: number;
+}
+export interface MediaInsightsResponse {
+  ig_media_id: string;
+  insights: MediaInsightItem[];
 }
 
 /* ---------- Competitors ---------- */

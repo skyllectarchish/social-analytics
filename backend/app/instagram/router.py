@@ -62,6 +62,7 @@ from .schemas import (
     BrandedHashtagMentionsResponse,
     AlgorithmMetricsSummary,
     AlgorithmPostItem,
+    BestTimeByFormatSlot,
     BestTimePost,
     BestTimePostsResponse,
     BestTimeResponse,
@@ -969,10 +970,14 @@ def get_best_time_to_post(
     rows = insights_repo.find_best_time_to_post(
         client, user_id, ig_profile.ig_user_id, since, min_sample, until,
     )
+    format_rows = insights_repo.find_best_time_by_format(
+        client, user_id, ig_profile.ig_user_id, since, min_sample, until,
+    )
     response = BestTimeResponse(
         period_days=days,
         min_sample=min_sample,
         data=[BestTimeSlot(**r) for r in rows],
+        by_format=[BestTimeByFormatSlot(**r) for r in format_rows],
     )
 
     win = resolve_compare_window(compare_to, since, until)
@@ -981,10 +986,14 @@ def get_best_time_to_post(
         prior_rows = insights_repo.find_best_time_to_post(
             client, user_id, ig_profile.ig_user_id, prior_since, min_sample, prior_until,
         )
+        prior_format_rows = insights_repo.find_best_time_by_format(
+            client, user_id, ig_profile.ig_user_id, prior_since, min_sample, prior_until,
+        )
         response.prior = BestTimeResponse(
             period_days=max(1, (prior_until - prior_since).days),
             min_sample=min_sample,
             data=[BestTimeSlot(**r) for r in prior_rows],
+            by_format=[BestTimeByFormatSlot(**r) for r in prior_format_rows],
         )
 
     return response
@@ -1502,6 +1511,7 @@ def get_best_time_posts(
 def get_growth_drivers(
     days: int = Query(90, ge=7, le=INSIGHTS_MAX_LOOKBACK_DAYS),
     limit: int = Query(10, ge=1, le=50),
+    compare_to: str | None = Query(None, pattern=COMPARE_TO_PATTERN),
     current_user: User = Depends(get_current_user),
 ):
     """Top posts ranked by attributed follower acquisition over the period.
@@ -1515,17 +1525,38 @@ def get_growth_drivers(
     if ig_profile is None:
         raise InstagramNotConnectedError()
 
-    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+    until = datetime.now(timezone.utc).replace(tzinfo=None)
+    since = until - timedelta(days=days)
+    since, until = resolve_current_window(compare_to, since, until)
+    # Calendar presets (MTD/YTD) override the caller's window — recompute
+    # `days` so response.period_days reflects what we actually queried.
+    days = max(1, (until - since).days)
     rows = insights_repo.find_growth_drivers(
-        client, user_id, ig_profile.ig_user_id, since, limit,
+        client, user_id, ig_profile.ig_user_id, since, limit, until,
     )
-    drivers = [GrowthDriverItem(**r) for r in rows]
-    return GrowthDriversResponse(period_days=days, drivers=drivers)
+    response = GrowthDriversResponse(
+        period_days=days,
+        drivers=[GrowthDriverItem(**r) for r in rows],
+    )
+
+    win = resolve_compare_window(compare_to, since, until)
+    if win is not None:
+        prior_since, prior_until = win
+        prior_rows = insights_repo.find_growth_drivers(
+            client, user_id, ig_profile.ig_user_id, prior_since, limit, prior_until,
+        )
+        response.prior = GrowthDriversResponse(
+            period_days=max(1, (prior_until - prior_since).days),
+            drivers=[GrowthDriverItem(**r) for r in prior_rows],
+        )
+
+    return response
 
 
 @router.get("/insights/growth-correlation", response_model=GrowthCorrelationResponse)
 def get_growth_correlation(
     days: int = Query(90, ge=7, le=INSIGHTS_MAX_LOOKBACK_DAYS),
+    compare_to: str | None = Query(None, pattern=COMPARE_TO_PATTERN),
     current_user: User = Depends(get_current_user),
 ):
     """Daily pairs of follows vs non-follower reach + Pearson r.
@@ -1540,16 +1571,36 @@ def get_growth_correlation(
     if ig_profile is None:
         raise InstagramNotConnectedError()
 
-    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+    until = datetime.now(timezone.utc).replace(tzinfo=None)
+    since = until - timedelta(days=days)
+    since, until = resolve_current_window(compare_to, since, until)
+    # Calendar presets (MTD/YTD) override the caller's window — recompute
+    # `days` so response.period_days reflects what we actually queried.
+    days = max(1, (until - since).days)
     payload = insights_repo.find_growth_correlation(
-        client, user_id, ig_profile.ig_user_id, since,
+        client, user_id, ig_profile.ig_user_id, since, until,
     )
-    return GrowthCorrelationResponse(
+    response = GrowthCorrelationResponse(
         period_days=days,
         points=[GrowthCorrelationPoint(**p) for p in payload["points"]],
         correlation=payload["correlation"],
         uses_non_follower_reach=payload["uses_non_follower_reach"],
     )
+
+    win = resolve_compare_window(compare_to, since, until)
+    if win is not None:
+        prior_since, prior_until = win
+        prior_payload = insights_repo.find_growth_correlation(
+            client, user_id, ig_profile.ig_user_id, prior_since, prior_until,
+        )
+        response.prior = GrowthCorrelationResponse(
+            period_days=max(1, (prior_until - prior_since).days),
+            points=[GrowthCorrelationPoint(**p) for p in prior_payload["points"]],
+            correlation=prior_payload["correlation"],
+            uses_non_follower_reach=prior_payload["uses_non_follower_reach"],
+        )
+
+    return response
 
 
 # --- Tier 2 / F2: Hashtag Performance ---

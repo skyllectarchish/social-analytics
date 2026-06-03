@@ -209,9 +209,9 @@ SELECT
     avg(metrics.saved) AS avg_saves,
     avg(metrics.shares) AS avg_shares,
     avg(metrics.total_interactions) AS avg_interactions,
-    avgIf(metrics.total_interactions / metrics.reach, metrics.reach > 0) AS avg_engagement_rate,
-    avgIf(metrics.saved / metrics.reach, metrics.reach > 0) AS avg_save_rate,
-    avgIf(metrics.shares / metrics.reach, metrics.reach > 0) AS avg_share_rate
+    round(avgIf(metrics.total_interactions / metrics.reach, metrics.reach > 0) * 100, 2) AS avg_engagement_rate,
+    round(avgIf(metrics.saved / metrics.reach, metrics.reach > 0) * 100, 2) AS avg_save_rate,
+    round(avgIf(metrics.shares / metrics.reach, metrics.reach > 0) * 100, 2) AS avg_share_rate
 FROM instagram_media m FINAL
 INNER JOIN (
     SELECT
@@ -260,6 +260,36 @@ WHERE m.user_id = {user_id:UUID}
   AND m.timestamp <= {until:DateTime}
   AND m.media_product_type IN ('FEED', 'REELS')
 GROUP BY day_of_week, hour_of_day
+HAVING sample_size >= {min_sample:UInt32}
+ORDER BY avg_engagement_rate DESC
+"""
+
+# Same heatmap, additionally split by media_product_type (FEED vs REELS) so
+# the FE can offer an All/Reels/Feed toggle without re-querying.
+GET_BEST_TIME_BY_FORMAT = """
+SELECT
+    m.media_product_type,
+    toDayOfWeek(m.timestamp) AS day_of_week,
+    toHour(m.timestamp) AS hour_of_day,
+    count(DISTINCT m.ig_media_id) AS sample_size,
+    avg(metrics.total_interactions) AS avg_interactions,
+    avg(metrics.reach) AS avg_reach,
+    avgIf(metrics.total_interactions / metrics.reach * 100, metrics.reach > 0) AS avg_engagement_rate
+FROM instagram_media m FINAL
+INNER JOIN (
+    SELECT ig_media_id, user_id,
+        sumIf(metric_value, metric_name = 'reach') AS reach,
+        sumIf(metric_value, metric_name = 'total_interactions') AS total_interactions
+    FROM media_insights FINAL
+    WHERE user_id = {user_id:UUID}
+    GROUP BY ig_media_id, user_id
+) metrics ON m.ig_media_id = metrics.ig_media_id AND m.user_id = metrics.user_id
+WHERE m.user_id = {user_id:UUID}
+  AND m.ig_user_id = {ig_user_id:String}
+  AND m.timestamp >= {since:DateTime}
+  AND m.timestamp <= {until:DateTime}
+  AND m.media_product_type IN ('FEED', 'REELS')
+GROUP BY m.media_product_type, day_of_week, hour_of_day
 HAVING sample_size >= {min_sample:UInt32}
 ORDER BY avg_engagement_rate DESC
 """
@@ -570,6 +600,7 @@ WHERE user_id = {user_id:UUID}
   AND ig_user_id = {ig_user_id:String}
   AND metric_name = 'follows_and_unfollows'
   AND end_time >= {since:DateTime}
+  AND end_time <= {until:DateTime}
 GROUP BY day
 ORDER BY day
 """
@@ -597,6 +628,7 @@ INNER JOIN (
 WHERE m.user_id = {user_id:UUID}
   AND m.ig_user_id = {ig_user_id:String}
   AND m.timestamp >= {since:DateTime}
+  AND m.timestamp <= {until:DateTime}
   AND m.media_product_type IN ('FEED', 'REELS')
 GROUP BY day
 ORDER BY day
@@ -629,6 +661,7 @@ INNER JOIN (
 WHERE m.user_id = {user_id:UUID}
   AND m.ig_user_id = {ig_user_id:String}
   AND m.timestamp >= {since:DateTime}
+  AND m.timestamp <= {until:DateTime}
   AND m.media_product_type IN ('FEED', 'REELS')
 """
 
