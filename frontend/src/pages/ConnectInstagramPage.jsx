@@ -96,7 +96,7 @@ export default function ConnectInstagramPage() {
 
           <button
             onClick={logout}
-            className="mt-4 text-sm text-slate-400 hover:text-slate-600 hover:underline transition-colors"
+            className="mt-4 text-sm text-slate-500 hover:text-slate-600 hover:underline transition-colors"
           >
             Sign out
           </button>

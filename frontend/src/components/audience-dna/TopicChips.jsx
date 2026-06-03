@@ -35,7 +35,7 @@ export default function TopicChips() {
       </div>
 
       {topics.length === 0 ? (
-        <p className="text-xs text-slate-400 py-12 text-center">
+        <p className="text-xs text-slate-500 py-12 text-center">
           Need at least 50 analysed comments to detect topics.
         </p>
       ) : (
@@ -60,7 +60,7 @@ export default function TopicChips() {
                 style={{ background: bg, borderColor: border }}
               >
                 <span className="text-slate-800 font-medium">{t.label}</span>
-                <span className="text-slate-400 font-mono">{t.size ?? 0}</span>
+                <span className="text-slate-500 font-mono">{t.size ?? 0}</span>
                 {t.is_question && (
                   <HelpCircle size={11} className="text-amber-500" />
                 )}

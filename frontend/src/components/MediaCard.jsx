@@ -50,7 +50,7 @@ export default function MediaCard({ media, onInsightsClick }) {
           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           fallback={
             <div className="w-full h-full flex items-center justify-center bg-slate-100">
-              <span className="text-4xl text-slate-400">
+              <span className="text-4xl text-slate-500">
                 {media.media_type === "VIDEO" ? "▶" : "🖼"}
               </span>
             </div>
@@ -94,7 +94,7 @@ export default function MediaCard({ media, onInsightsClick }) {
             {media.caption}
           </p>
         )}
-        <div className="flex items-center gap-4 text-xs text-slate-400">
+        <div className="flex items-center gap-4 text-xs text-slate-500">
           <span className="flex items-center gap-1.5 text-rose-500">
             <HeartIcon /> {likes.toLocaleString()}
           </span>
@@ -102,7 +102,7 @@ export default function MediaCard({ media, onInsightsClick }) {
             <CommentIcon /> {comments.toLocaleString()}
           </span>
           {media.timestamp && (
-            <span className="ml-auto text-slate-400">
+            <span className="ml-auto text-slate-500">
               {new Date(media.timestamp).toLocaleDateString()}
             </span>
           )}

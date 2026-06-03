@@ -54,7 +54,7 @@ export default function SectionCard({
                 </h3>
               )}
               {subtitle && (
-                <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">{subtitle}</p>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">{subtitle}</p>
               )}
             </div>
           </div>
@@ -84,7 +84,7 @@ export function SectionDivider({ icon: Icon, title, hint }) {
           {title}
         </h2>
       </div>
-      {hint && <span className="text-[11px] text-slate-400 shrink-0">{hint}</span>}
+      {hint && <span className="text-[11px] text-slate-500 shrink-0">{hint}</span>}
       <div className="flex-1 h-px bg-gradient-to-r from-violet-300/70 via-slate-200 to-transparent" />
     </div>
   );

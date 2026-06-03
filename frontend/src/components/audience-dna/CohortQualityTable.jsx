@@ -110,11 +110,11 @@ export default function CohortQualityTable({ breakdown = "age" }) {
             Ranked by engagement rate — your highest-leverage follower segments.
           </p>
         </div>
-        <span className="text-[11px] text-slate-400">{rows.length} cohorts</span>
+        <span className="text-[11px] text-slate-500">{rows.length} cohorts</span>
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-xs text-slate-400 py-12 text-center">
+        <p className="text-xs text-slate-500 py-12 text-center">
           No cohorts available for this breakdown.
         </p>
       ) : (

@@ -69,7 +69,7 @@ export default function SentimentDonut() {
       </div>
 
       {total === 0 ? (
-        <p className="text-xs text-slate-400 py-12 text-center">
+        <p className="text-xs text-slate-500 py-12 text-center">
           No comments analysed yet.
         </p>
       ) : (
@@ -113,7 +113,7 @@ export default function SentimentDonut() {
                   ? `${(total / 1000).toFixed(1)}K`
                   : total.toLocaleString()}
               </span>
-              <span className="text-[9px] uppercase tracking-wider text-slate-400 mt-0.5">
+              <span className="text-[9px] uppercase tracking-wider text-slate-500 mt-0.5">
                 comments
               </span>
             </div>
@@ -131,19 +131,19 @@ export default function SentimentDonut() {
                     : TrendingDown;
               const deltaColor =
                 delta == null
-                  ? "text-slate-400"
+                  ? "text-slate-500"
                   : p.name === "negative"
                     ? // For negative comments, "down is good" — invert the colour.
                       delta > 0
                       ? "text-rose-500"
                       : delta < 0
                         ? "text-emerald-600"
-                        : "text-slate-400"
+                        : "text-slate-500"
                     : delta > 0
                       ? "text-emerald-600"
                       : delta < 0
                         ? "text-rose-500"
-                        : "text-slate-400";
+                        : "text-slate-500";
               return (
                 <div key={p.name}>
                   <div className="flex items-center justify-between text-xs mb-1">

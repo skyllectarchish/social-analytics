@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import AnimatedCounter from "../landing/ui/AnimatedCounter";
 import MediaThumb from "../shared/MediaThumb";
-import { UserPlus, Sparkles } from "lucide-react";
+import { UserPlus, Sparkles, X } from "lucide-react";
 import { useMediaInsights, useMediaConversion } from "../../hooks/useInsights";
 import { useMediaSentiment } from "../../hooks/useSentiment";
 import { flagOn } from "../../utils/featureFlags";
@@ -59,7 +59,7 @@ function ConversionSection({ mediaId }) {
           <p style={{ fontSize: 10, color: "#94A3B8" }}>reach off-followers</p>
         </div>
       </div>
-      <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">
+      <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">
         Rough estimate. Attribution splits the day&apos;s follower gain across
         same-day and prior-day posts in proportion to non-follower reach —
         not a causal claim.
@@ -109,7 +109,7 @@ function SentimentSection({ mediaId }) {
               <p className="font-mono font-semibold mt-1" style={{ color: SENTIMENT_COLORS[s], fontSize: 16 }}>
                 {pct}%
               </p>
-              <p className="text-[10px] text-slate-400 mt-0.5">{v}</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">{v}</p>
             </div>
           );
         })}
@@ -132,7 +132,7 @@ function SentimentSection({ mediaId }) {
                   {(c.text ?? "").length > 140 ? "…" : ""}"
                 </p>
                 {c.username && (
-                  <p className="text-[10px] text-slate-400 mt-0.5">— @{c.username}</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">— @{c.username}</p>
                 )}
               </div>
             </div>
@@ -341,10 +341,11 @@ export default function PostInsightsDrawer({ media, onClose, onDiagnose }) {
                 )}
                 <button
                   onClick={onClose}
-                  className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+                  aria-label="Close post insights"
+                  className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                   style={{ background: "rgba(0,0,0,0.06)", color: "#64748B", border: "none", cursor: "pointer" }}
                 >
-                  ✕
+                  <X size={15} aria-hidden="true" />
                 </button>
               </div>
 

@@ -66,12 +66,12 @@ export default function SentimentTrendChart() {
         : TrendingDown;
   const deltaColor =
     totalDelta == null
-      ? "text-slate-400"
+      ? "text-slate-500"
       : totalDelta > 0
         ? "text-emerald-600"
         : totalDelta < 0
           ? "text-rose-500"
-          : "text-slate-400";
+          : "text-slate-500";
 
   return (
     <AnimatedCard className="p-5" delay={0.12}>
@@ -86,14 +86,14 @@ export default function SentimentTrendChart() {
         </div>
         {prior && (
           <div className="text-right shrink-0">
-            <p className="text-[10px] uppercase tracking-wider text-slate-400">
+            <p className="text-[10px] uppercase tracking-wider text-slate-500">
               vs prior
             </p>
             <p className={`text-xs font-mono flex items-center justify-end gap-1 ${deltaColor}`}>
               <DeltaIcon size={11} />
               {totalDelta == null ? "—" : `${Math.abs(totalDelta).toFixed(1)}%`}
             </p>
-            <p className="text-[10px] text-slate-400">
+            <p className="text-[10px] text-slate-500">
               {totalPrior?.toLocaleString()} prior
             </p>
           </div>
@@ -101,7 +101,7 @@ export default function SentimentTrendChart() {
       </div>
 
       {trend.length === 0 ? (
-        <p className="text-xs text-slate-400 py-12 text-center">
+        <p className="text-xs text-slate-500 py-12 text-center">
           Not enough comment history yet.
         </p>
       ) : (

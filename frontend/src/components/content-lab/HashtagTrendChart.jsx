@@ -81,7 +81,7 @@ export default function HashtagTrendChart({ tag }) {
         ) : error ? (
           <p className="text-xs text-rose-500 py-10 text-center">{error}</p>
         ) : series.length === 0 ? (
-          <p className="text-xs text-slate-400 py-12 text-center">
+          <p className="text-xs text-slate-500 py-12 text-center">
             Not enough history for #{tag} yet.
           </p>
         ) : (

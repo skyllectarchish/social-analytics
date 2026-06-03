@@ -326,7 +326,7 @@ export default function WeeklyDigestCard({ weekOf, onWeekChange }) {
             )}
           </div>
           {freshness && (
-            <p className="text-[11px] text-slate-400 mt-1">{freshness}</p>
+            <p className="text-[11px] text-slate-500 mt-1">{freshness}</p>
           )}
         </div>
 
@@ -425,7 +425,7 @@ export default function WeeklyDigestCard({ weekOf, onWeekChange }) {
 
           {digest?.followups?.length > 0 && !showStreaming && (
             <div>
-              <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 mb-2">
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 mb-2">
                 Worth trying next
               </p>
               <div className="flex flex-wrap gap-2">

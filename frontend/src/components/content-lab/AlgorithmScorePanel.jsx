@@ -82,7 +82,7 @@ function RadialGauge({ score }) {
         >
           <AnimatedCounter value={score} decimals={1} duration={1300} />
         </motion.span>
-        <span className="text-[10px] uppercase tracking-wider text-slate-400 mt-0.5">
+        <span className="text-[10px] uppercase tracking-wider text-slate-500 mt-0.5">
           algo score / 10
         </span>
       </div>
@@ -129,7 +129,7 @@ function PostMiniRow({ post, index, onSelect }) {
             {post.caption || "(no caption)"}
           </p>
         </div>
-        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-400">
+        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500">
           <span className="flex items-center gap-0.5">
             <Bookmark size={9} /> {(post.save_rate ?? 0).toFixed(1)}%
           </span>
@@ -215,7 +215,7 @@ export default function AlgorithmScorePanel({ onSelectPost }) {
 
       <div className="border-t border-slate-100 pt-4 space-y-4">
         {topFeed.length === 0 && topReels.length === 0 ? (
-          <p className="text-xs text-slate-400 py-4 text-center">
+          <p className="text-xs text-slate-500 py-4 text-center">
             No posts yet — run a sync.
           </p>
         ) : (
@@ -226,7 +226,7 @@ export default function AlgorithmScorePanel({ onSelectPost }) {
               </p>
               <div className="space-y-1">
                 {topFeed.length === 0 ? (
-                  <p className="text-[11px] text-slate-400 px-2 py-2">
+                  <p className="text-[11px] text-slate-500 px-2 py-2">
                     No feed posts in this range.
                   </p>
                 ) : (
@@ -248,7 +248,7 @@ export default function AlgorithmScorePanel({ onSelectPost }) {
               </p>
               <div className="space-y-1">
                 {topReels.length === 0 ? (
-                  <p className="text-[11px] text-slate-400 px-2 py-2">
+                  <p className="text-[11px] text-slate-500 px-2 py-2">
                     No reels in this range.
                   </p>
                 ) : (

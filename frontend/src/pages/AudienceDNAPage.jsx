@@ -112,23 +112,34 @@ export default function AudienceDNAPage() {
           <div className="space-y-3">
             <CohortQualityTable breakdown={breakdown} />
             <GrowthCorrelationChart />
+          </div>
+        </div>
 
-            {/* Audience Voice */}
-            <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <span>💬</span> Audience Voice
-              </p>
-              <VoiceEmptyBanner />
-              <div className="grid grid-cols-[5fr_7fr] gap-3">
-                <SentimentDonut />
-                <TopicChips />
-              </div>
-              <div className="grid grid-cols-[7fr_5fr] gap-3">
-                <SentimentTrendChart />
-                <QuestionPostsCard
-                  onSelect={(p) => setSelectedMedia(adaptQuestionPost(p))}
-                />
-              </div>
+        <SpikeTimeline
+          onSelectPost={(p) => setSelectedMedia(adaptDriver(p))}
+        />
+
+        <div className="pt-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
+            <span>💬</span> Audience Voice
+          </h2>
+          <VoiceEmptyBanner />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 mb-4">
+            <div className="lg:col-span-5">
+              <SentimentDonut />
+            </div>
+            <div className="lg:col-span-7">
+              <TopicChips />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+            <div className="lg:col-span-7">
+              <SentimentTrendChart />
+            </div>
+            <div className="lg:col-span-5">
+              <QuestionPostsCard
+                onSelect={(p) => setSelectedMedia(adaptQuestionPost(p))}
+              />
             </div>
           </div>
         </div>

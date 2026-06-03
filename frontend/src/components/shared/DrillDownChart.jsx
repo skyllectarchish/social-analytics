@@ -52,7 +52,7 @@ export default function DrillDownChart({
               {title}
             </h3>
             {subtitle && (
-              <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">{subtitle}</p>
+              <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">{subtitle}</p>
             )}
           </div>
         </div>

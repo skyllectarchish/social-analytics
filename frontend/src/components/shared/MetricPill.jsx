@@ -22,7 +22,7 @@ export default function MetricPill({
   decimals = 0,
 }) {
   const deltaColor =
-    delta > 0 ? "text-emerald-600" : delta < 0 ? "text-rose-500" : "text-slate-400";
+    delta > 0 ? "text-emerald-600" : delta < 0 ? "text-rose-500" : "text-slate-500";
   const DeltaIcon = delta > 0 ? TrendingUp : delta < 0 ? TrendingDown : Minus;
 
   return (

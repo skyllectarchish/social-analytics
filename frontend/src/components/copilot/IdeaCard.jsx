@@ -99,7 +99,7 @@ export default function IdeaCard({ idea, onCopy, onFeedback, onSaveDraft, index 
       )}
 
       {idea.rationale && (
-        <p className="text-[11.5px] text-slate-400 italic leading-relaxed border-l-2 border-slate-100 pl-2">
+        <p className="text-[11.5px] text-slate-500 italic leading-relaxed border-l-2 border-slate-100 pl-2">
           {idea.rationale}
         </p>
       )}

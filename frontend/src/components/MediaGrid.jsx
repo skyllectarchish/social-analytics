@@ -5,7 +5,7 @@ export default function MediaGrid({ items = [], total = 0, page, pageSize, onPag
 
   if (!items.length) {
     return (
-      <div className="text-center py-20 text-slate-400">
+      <div className="text-center py-20 text-slate-500">
         No media found.
       </div>
     );

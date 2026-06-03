@@ -108,15 +108,16 @@ export default function ReelsRetentionTable({ onSelect }) {
             Sort any column to find your strongest hooks and biggest skips.
           </p>
         </div>
-        <span className="text-[11px] text-slate-400">{rows.length} reels</span>
+        <span className="text-[11px] text-slate-500">{rows.length} reels</span>
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-xs text-slate-400 py-12 text-center">
+        <p className="text-xs text-slate-500 py-12 text-center">
           No Reels in this window. Run a sync to populate.
         </p>
       ) : (
-        <>
+        <div className="overflow-x-auto">
+          <div className="min-w-[560px]">
           <div className="flex items-center gap-3 px-2 py-2 border-b border-slate-100">
             {COLUMNS.map((c) => (
               <div
@@ -166,7 +167,7 @@ export default function ReelsRetentionTable({ onSelect }) {
                   <p className="text-xs text-slate-800 truncate">
                     {r.caption_preview || "(no caption)"}
                   </p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
+                  <p className="text-[10px] text-slate-500 mt-0.5">
                     {new Date(r.timestamp).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
@@ -206,7 +207,8 @@ export default function ReelsRetentionTable({ onSelect }) {
               </motion.button>
             ))}
           </div>
-        </>
+          </div>
+        </div>
       )}
     </AnimatedCard>
   );

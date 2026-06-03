@@ -50,7 +50,7 @@ function AddRow({ onAdd, disabled }) {
     <div className="mb-3">
       <form onSubmit={submit} className="flex items-center gap-2">
         <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
             #
           </span>
           <input
@@ -66,7 +66,7 @@ function AddRow({ onAdd, disabled }) {
         <button
           type="submit"
           disabled={disabled || submitting || !value.trim()}
-          className="text-xs px-3 py-2 rounded-lg bg-violet-600 text-white font-medium hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed flex items-center gap-1"
+          className="text-xs px-3 py-2 rounded-lg bg-violet-600 text-white font-medium hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed flex items-center gap-1"
         >
           <Plus size={12} /> Track
         </button>
@@ -87,10 +87,10 @@ function MentionList({ hashtag }) {
   if (mentions.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-500">
           No mentions yet for #{hashtag}.
         </p>
-        <p className="text-[10px] text-slate-400 mt-1">
+        <p className="text-[10px] text-slate-500 mt-1">
           We scan your captions and comments on your posts. Run a refresh to
           sync the latest comments, then check back.
         </p>
@@ -138,7 +138,7 @@ function MentionList({ hashtag }) {
             <p className="text-xs text-slate-700 line-clamp-3 italic">
               "{m.text || ""}"
             </p>
-            <div className="flex items-center gap-3 mt-1 text-[10px] text-slate-400 font-mono">
+            <div className="flex items-center gap-3 mt-1 text-[10px] text-slate-500 font-mono">
               <span className="flex items-center gap-0.5">
                 <Heart size={9} /> {fmtNum(m.like_count)}
               </span>
@@ -172,7 +172,7 @@ export default function BrandedHashtagsPanel() {
       )}
 
       {branded.length === 0 ? (
-        <p className="text-xs text-slate-400 text-center py-6">
+        <p className="text-xs text-slate-500 text-center py-6">
           Add a branded hashtag to start tracking public mentions.
         </p>
       ) : (
@@ -202,7 +202,7 @@ export default function BrandedHashtagsPanel() {
                       <p className="text-xs text-violet-700 font-medium truncate">
                         #{t.hashtag}
                       </p>
-                      <p className="text-[10px] text-slate-400 font-mono">
+                      <p className="text-[10px] text-slate-500 font-mono">
                         {t.mention_count} mention{t.mention_count === 1 ? "" : "s"}
                         {" · "}
                         {t.unique_authors} author{t.unique_authors === 1 ? "" : "s"}
@@ -213,7 +213,7 @@ export default function BrandedHashtagsPanel() {
                         e.stopPropagation();
                         remove(t.hashtag);
                       }}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-rose-500 p-1 rounded hover:bg-rose-50"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-500 hover:text-rose-500 p-1 rounded hover:bg-rose-50"
                       aria-label={`Remove ${t.hashtag}`}
                     >
                       <X size={12} />
@@ -227,7 +227,7 @@ export default function BrandedHashtagsPanel() {
             {selected ? (
               <MentionList hashtag={selected} />
             ) : (
-              <p className="text-xs text-slate-400 text-center py-12">
+              <p className="text-xs text-slate-500 text-center py-12">
                 Select a tag to see recent mentions.
               </p>
             )}

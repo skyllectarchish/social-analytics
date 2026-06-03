@@ -42,7 +42,7 @@ export default function QuestionPostsCard({ onSelect }) {
       </div>
 
       {posts.length === 0 ? (
-        <p className="text-xs text-slate-400 py-10 text-center">
+        <p className="text-xs text-slate-500 py-10 text-center">
           No question comments detected in the current period.
         </p>
       ) : (
@@ -72,7 +72,7 @@ export default function QuestionPostsCard({ onSelect }) {
                 <p className="text-xs text-slate-800 truncate">
                   {p.caption || "(no caption)"}
                 </p>
-                <p className="text-[10px] text-slate-400 mt-0.5">
+                <p className="text-[10px] text-slate-500 mt-0.5">
                   {fmtDate(p.timestamp)} · {p.total_comments} comments
                 </p>
               </div>
@@ -80,7 +80,7 @@ export default function QuestionPostsCard({ onSelect }) {
                 <p className="text-sm font-mono font-semibold text-amber-600">
                   {p.question_count}
                 </p>
-                <p className="text-[10px] text-slate-400">questions</p>
+                <p className="text-[10px] text-slate-500">questions</p>
               </div>
               {p.permalink && (
                 <a
@@ -88,7 +88,7 @@ export default function QuestionPostsCard({ onSelect }) {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="text-slate-400 hover:text-violet-600 p-1 rounded"
+                  className="text-slate-500 hover:text-violet-600 p-1 rounded"
                   aria-label="Open on Instagram"
                 >
                   <ExternalLink size={12} />

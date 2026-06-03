@@ -95,7 +95,7 @@ export default function HookStrengthTrend() {
             Weekly average — are your openers getting better at holding viewers?
           </p>
         </div>
-        <div className="flex items-center gap-3 text-[10px] text-slate-400">
+        <div className="flex items-center gap-3 text-[10px] text-slate-500">
           <span className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full" style={{ background: "#8b5cf6" }} />
             Hook %
@@ -113,7 +113,7 @@ export default function HookStrengthTrend() {
       </div>
 
       {trend.length === 0 ? (
-        <p className="text-xs text-slate-400 py-12 text-center">
+        <p className="text-xs text-slate-500 py-12 text-center">
           Not enough Reels data yet. Run a sync to populate.
         </p>
       ) : (
