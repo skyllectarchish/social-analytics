@@ -1,28 +1,131 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CartesianGrid, Cell, Line, LineChart, Pie, PieChart, PolarAngleAxis, PolarGrid,
   Radar, RadarChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis,
 } from "recharts";
-import { ArrowDown, ArrowUp, ArrowUpDown, ShieldAlert } from "lucide-react";
+import {
+  ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ExternalLink, HelpCircle,
+  Loader2, MessageCircleQuestion, ShieldAlert, Sprout,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import DashboardLayout from "../components/dashboard/DashboardLayout";
 import { CardEmpty } from "../components/dashboard/States";
 import { PageSkeleton, StatSkeleton, Skeleton } from "../components/dashboard/Skeletons";
+import PostInsightsDrawer, { type DrawerMedia } from "../components/dashboard/PostInsightsDrawer";
 import GlassTooltip from "../components/charts/GlassTooltip";
 import { AnimatedCard, AnimatedNumber } from "../components/ui/Motion";
+import { usePeriodComparator } from "../context/PeriodComparatorContext";
+import { useAuthedImage } from "../hooks/useAuthedImage";
 import { useSync } from "../hooks/useSync";
-import { safeGet } from "../api/client";
+import api, { safeGet } from "../api/client";
 import type {
   FollowerQualityResponse, FollowerQualitySummary, FollowerSpike, FollowerSpikesResponse,
+  GrowthCorrelationResponse, GrowthDriverItem, GrowthDriversResponse,
+  QuestionPostsResponse, SeedDemoResponse, SentimentDiagnoseResponse,
   SentimentSummaryResponse, TopicsResponse,
 } from "../api/types";
 import { PALETTE } from "../data/mock";
 
 type Slice = { name: string; value: number; color: string };
 type Cohort = { label: string; followers: number; engaged: number; eng: number; tier: string };
-type SpikeDot = { t: number; gain: number; mag: number; date: string; interactions: number; ratio: number; suspicious: boolean };
+type SpikeDot = {
+  t: number; gain: number; mag: number; date: string; interactions: number;
+  ratio: number; suspicious: boolean; drivers: GrowthDriverItem[];
+};
 type SortKey = "followers" | "eng";
 const fmt = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : `${n}`);
+
+function MiniThumb({ igId, className = "h-10 w-10" }: { igId: string; className?: string }) {
+  const src = useAuthedImage(igId);
+  return src ? (
+    <img src={src} alt="" className={`${className} shrink-0 rounded-lg object-cover ring-1 ring-black/5`} />
+  ) : (
+    <div className={`bg-lavender ${className} shrink-0 rounded-lg`} />
+  );
+}
+
+// Conversion-rate chip: green ≥2%, amber ≥0.5%, muted below.
+const convChip = (pct: number) =>
+  pct >= 2
+    ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+    : pct >= 0.5
+      ? "bg-amber-50 text-amber-700 ring-amber-200"
+      : "bg-black/5 text-foreground/60 ring-black/10";
+
+// Pearson r → human interpretation, mirroring the old GrowthCorrelationChart.
+function describeCorrelation(r: number | null): { label: string; tone: string } {
+  if (r == null) return { label: "Not enough data", tone: "text-foreground/50" };
+  const a = Math.abs(r);
+  const dir = r >= 0 ? "positive" : "negative";
+  if (a < 0.2) return { label: "Effectively none", tone: "text-foreground/55" };
+  if (a < 0.4) return { label: `Weakly ${dir}`, tone: r >= 0 ? "text-emerald-600" : "text-rose-500" };
+  if (a < 0.7) return { label: `Moderately ${dir}`, tone: r >= 0 ? "text-emerald-600" : "text-rose-500" };
+  return { label: `Strongly ${dir}`, tone: r >= 0 ? "text-emerald-700" : "text-rose-600" };
+}
+
+// Diagnostic banner for an empty Audience Voice section, with the synthetic
+// data seeder so the section can be previewed before real comments arrive.
+function VoiceEmptyBanner({ diagnose, onSeeded }: { diagnose: SentimentDiagnoseResponse; onSeeded: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [seedMsg, setSeedMsg] = useState<string | null>(null);
+
+  const title =
+    diagnose.status === "scope_blocked"
+      ? "Comment data isn't reaching us yet"
+      : diagnose.status === "no_data"
+        ? "No comments to analyse yet"
+        : "Audience Voice is warming up";
+
+  async function seed() {
+    setSeeding(true);
+    setSeedMsg(null);
+    try {
+      const { data } = await api.post<SeedDemoResponse>("/instagram/insights/sentiment/seed-demo");
+      setSeedMsg(`Seeded ${data.comments} comments · ${data.sentiment} sentiment rows · ${data.topics} topics`);
+      onSeeded();
+    } catch {
+      setSeedMsg("Seeding failed — check the backend logs.");
+    } finally {
+      setSeeding(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+      <div className="flex flex-wrap items-start gap-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700">
+          <ShieldAlert className="h-4 w-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold text-amber-900">{title}</div>
+          <p className="mt-0.5 text-xs text-amber-800/80">{diagnose.reason}</p>
+          {diagnose.status === "scope_blocked" && (
+            <button onClick={() => setExpanded(!expanded)} className="mt-1.5 flex items-center gap-1 text-xs font-medium text-amber-900 hover:underline">
+              How to fix this <ChevronDown className={`h-3 w-3 transition ${expanded ? "rotate-180" : ""}`} />
+            </button>
+          )}
+          {expanded && (
+            <div className="mt-2 space-y-1 rounded-xl bg-white/60 p-3 text-xs text-amber-900/90">
+              <p>Meta filters comment payloads until the app has Advanced Access on <code className="rounded bg-black/5 px-1">instagram_business_manage_comments</code>. Two ways out:</p>
+              <p>1. Add this Instagram account as a <strong>tester</strong> of the Meta app (instant).</p>
+              <p>2. Submit the app for <strong>App Review</strong> on that permission (takes days, works for everyone).</p>
+            </div>
+          )}
+        </div>
+        <div className="text-right">
+          <button onClick={seed} disabled={seeding} className="btn-glow !px-3.5 !py-2 text-xs disabled:opacity-60">
+            {seeding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sprout className="h-3.5 w-3.5" />} Seed demo data
+          </button>
+          <p className="mt-1 max-w-[180px] text-[10px] text-amber-800/60">
+            Synthetic rows, tagged for clean-up via purge.
+          </p>
+        </div>
+      </div>
+      {seedMsg && <p className="mt-2 text-xs font-medium text-amber-900">{seedMsg}</p>}
+    </div>
+  );
+}
 
 const BREAKDOWNS = [
   { value: "age", label: "Age" },
@@ -54,6 +157,7 @@ function SpikeTooltip({ active, payload }: { active?: boolean; payload?: { paylo
 
 export default function AudienceDNAPage() {
   const [days, setDays] = useState(30);
+  const { compareTo } = usePeriodComparator();
   const { syncing, sync } = useSync();
   const [loading, setLoading] = useState(true);
   const [qualityLoading, setQualityLoading] = useState(true);
@@ -63,25 +167,44 @@ export default function AudienceDNAPage() {
   const [radar, setRadar] = useState<{ axis: string; followers: number; engaged: number }[]>([]);
   const [sentiment, setSentiment] = useState<Slice[]>([]);
   const [trend, setTrend] = useState<{ w: string; pos: number }[]>([]);
-  const [topics, setTopics] = useState<{ t: string; size: number }[]>([]);
+  const [topics, setTopics] = useState<{ t: string; size: number; isQuestion: boolean }[]>([]);
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [spikes, setSpikes] = useState<SpikeDot[]>([]);
   const [advisory, setAdvisory] = useState<SpikeDot | null>(null);
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "eng", dir: -1 });
+  const [drivers, setDrivers] = useState<GrowthDriversResponse | null>(null);
+  const [correlation, setCorrelation] = useState<GrowthCorrelationResponse | null>(null);
+  const [questions, setQuestions] = useState<QuestionPostsResponse | null>(null);
+  const [diagnose, setDiagnose] = useState<SentimentDiagnoseResponse | null>(null);
+  const [drawer, setDrawer] = useState<DrawerMedia>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  // Seeding triggers a refetch that should NOT blank the page to skeletons —
+  // the banner's confirmation message must stay visible.
+  const softReload = useRef(false);
 
-  // Window-dependent data (sentiment, topics, spikes).
+  // Window-dependent data (sentiment, topics, spikes, growth engine).
   useEffect(() => {
     let alive = true;
-    setLoading(true);
+    if (!softReload.current) setLoading(true);
+    softReload.current = false;
     setAdvisory(null);
     (async () => {
-      const [sent, tops, spk] = await Promise.all([
-        safeGet<SentimentSummaryResponse>("/instagram/insights/sentiment", { days }),
+      const cmp = compareTo ? { compare_to: compareTo } : {};
+      const [sent, tops, spk, drv, corr, qs, diag] = await Promise.all([
+        safeGet<SentimentSummaryResponse>("/instagram/insights/sentiment", { days, ...cmp }),
         safeGet<TopicsResponse>("/instagram/insights/sentiment/topics", { days }),
         // threshold=10 surfaces spikes for normal-sized accounts (default 50 hides most)
         safeGet<FollowerSpikesResponse>("/instagram/insights/follower-quality/spikes", { days, threshold: 10 }),
+        safeGet<GrowthDriversResponse>("/instagram/insights/growth-drivers", { days: Math.max(days, 7), limit: 10, ...cmp }),
+        safeGet<GrowthCorrelationResponse>("/instagram/insights/growth-correlation", { days: Math.max(days, 7), ...cmp }),
+        safeGet<QuestionPostsResponse>("/instagram/insights/sentiment/questions", { days, limit: 8 }),
+        safeGet<SentimentDiagnoseResponse>("/instagram/insights/sentiment/diagnose"),
       ]);
       if (!alive) return;
+      setDrivers(drv);
+      setCorrelation(corr);
+      setQuestions(qs);
+      setDiagnose(diag);
 
       if (sent && sent.total > 0) {
         const d = sent.distribution;
@@ -99,7 +222,7 @@ export default function AudienceDNAPage() {
 
       if (tops?.topics.length) {
         const sorted = [...tops.topics].sort((a, b) => b.size - a.size).slice(0, 12);
-        setTopics(sorted.map((t, i) => ({ t: t.label, size: +(1.23 - i * 0.04).toFixed(2) })));
+        setTopics(sorted.map((t, i) => ({ t: t.label, size: +(1.23 - i * 0.04).toFixed(2), isQuestion: t.is_question })));
       } else setTopics([]);
 
       const maxGain = Math.max(...(spk?.spikes ?? []).map((s) => Math.abs(s.follows_change)), 1);
@@ -112,13 +235,14 @@ export default function AudienceDNAPage() {
           interactions: s.interactions,
           ratio: s.interaction_per_follow_ratio,
           suspicious: s.is_suspicious,
+          drivers: s.candidate_drivers ?? [],
         })),
       );
 
       setLoading(false);
     })();
     return () => { alive = false; };
-  }, [days]);
+  }, [days, compareTo, reloadKey]);
 
   // Breakdown-dependent data (cohorts + summary).
   useEffect(() => {
@@ -234,6 +358,107 @@ export default function AudienceDNAPage() {
             )}
           </div>
 
+          {/* growth engine: which posts actually bring followers */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <AnimatedCard delay={0.08} className="card-hairline p-5">
+              <h2 className="text-lg font-semibold">Growth drivers</h2>
+              <p className="text-xs text-foreground/55">Posts ranked by attributed new followers</p>
+              {!drivers || drivers.drivers.length === 0 ? (
+                <CardEmpty label="No driver activity yet — needs at least 7 days of follower history." />
+              ) : (
+                <>
+                  <div className="mt-2 max-h-80 divide-y divide-black/5 overflow-y-auto pr-1">
+                    {drivers.drivers.map((d, i) => (
+                      <button
+                        key={d.ig_media_id}
+                        onClick={() => setDrawer({ igId: d.ig_media_id, title: d.caption, permalink: d.permalink })}
+                        className="flex w-full items-center gap-3 py-2.5 text-left transition hover:bg-violet/5"
+                      >
+                        <span className="num w-5 text-xs text-foreground/40">{i + 1}</span>
+                        <MiniThumb igId={d.ig_media_id} />
+                        <span className="min-w-0 flex-1">
+                          <span className="line-clamp-1 text-sm font-medium">{d.caption || "Untitled post"}</span>
+                          <span className="text-xs text-foreground/55">
+                            {d.media_product_type === "REELS" ? "Reel" : "Post"} · <span className="num">{fmt(d.reach)}</span> reach
+                          </span>
+                        </span>
+                        <span className="text-right">
+                          <span className="num block text-sm font-semibold text-emerald-600">
+                            +{Math.round(d.attributed_follows).toLocaleString()}
+                          </span>
+                          <span className={`num rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1 ${convChip(d.conversion_rate_pct)}`}>
+                            {d.conversion_rate_pct.toFixed(2)}%
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[10px] text-foreground/45">
+                    Rates use non-follower reach when available; conservative same-day/+1d attribution.
+                  </p>
+                </>
+              )}
+            </AnimatedCard>
+
+            <AnimatedCard delay={0.12} className="card-hairline p-5">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h2 className="text-lg font-semibold">Reach → follows correlation</h2>
+                  <p className="text-xs text-foreground/55">Do high-reach days actually convert?</p>
+                </div>
+                {correlation && (
+                  <div className="text-right">
+                    <div className={`text-sm font-semibold ${describeCorrelation(correlation.correlation).tone}`}>
+                      {describeCorrelation(correlation.correlation).label}
+                    </div>
+                    {correlation.correlation != null && (
+                      <div className="num text-xs text-foreground/50">r = {correlation.correlation.toFixed(2)}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+              {!correlation || correlation.points.length < 3 ? (
+                <CardEmpty label="Need at least 3 days of follower data to compute correlation." />
+              ) : (
+                <>
+                  <div className="mt-2 h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ScatterChart margin={{ top: 12, right: 12, bottom: 0, left: -4 }}>
+                        <CartesianGrid stroke={PALETTE.grid} vertical={false} />
+                        <XAxis
+                          dataKey="reach"
+                          type="number"
+                          name="Reach"
+                          tick={{ fontSize: 10, fill: PALETTE.muted }}
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={(v: number) => fmt(v)}
+                        />
+                        <YAxis dataKey="follows" type="number" name="Follows" tick={{ fontSize: 10, fill: PALETTE.muted }} tickLine={false} axisLine={false} width={40} />
+                        <Tooltip content={<GlassTooltip />} cursor={{ strokeDasharray: "3 3" }} />
+                        <Scatter data={correlation.points} fill={PALETTE.violet} fillOpacity={0.7} />
+                      </ScatterChart>
+                    </ResponsiveContainer>
+                  </div>
+                  {!correlation.uses_non_follower_reach && (
+                    <p className="mt-1 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[10px] text-amber-700 ring-1 ring-amber-200">
+                      Non-follower reach hasn't synced yet — using total reach as a rough proxy.
+                    </p>
+                  )}
+                </>
+              )}
+            </AnimatedCard>
+          </div>
+
+          {diagnose && (diagnose.status !== "ok" || diagnose.stored_comments === 0) && (
+            <AnimatedCard delay={0.1}>
+              <VoiceEmptyBanner
+                diagnose={diagnose}
+                onSeeded={() => { softReload.current = true; setReloadKey((k) => k + 1); }}
+              />
+            </AnimatedCard>
+          )}
+
           <div className="grid gap-4 lg:grid-cols-3">
             <AnimatedCard delay={0.1} className="card-hairline p-5">
               <h2 className="text-lg font-semibold">Cohort quality radar</h2>
@@ -306,15 +531,54 @@ export default function AudienceDNAPage() {
             </AnimatedCard>
           </div>
 
-          <AnimatedCard delay={0.25} className="card-hairline p-5">
-            <h2 className="text-lg font-semibold">Topic affinity</h2>
-            <p className="text-xs text-foreground/55">What your audience actually talks about</p>
-            {topics.length === 0 ? <CardEmpty label="No topics detected yet." /> : (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {topics.map((t) => <span key={t.t} className="chip" style={{ fontSize: `${t.size}rem` }}>{t.t}</span>)}
-              </div>
-            )}
-          </AnimatedCard>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <AnimatedCard delay={0.25} className="card-hairline p-5">
+              <h2 className="text-lg font-semibold">Topic affinity</h2>
+              <p className="text-xs text-foreground/55">What your audience actually talks about</p>
+              {topics.length === 0 ? <CardEmpty label="No topics detected yet." /> : (
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  {topics.map((t) => (
+                    <span key={t.t} className="chip" style={{ fontSize: `${t.size}rem` }}>
+                      {t.isQuestion && <HelpCircle className="h-[0.9em] w-[0.9em] text-amber-500" />}
+                      {t.t}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </AnimatedCard>
+
+            <AnimatedCard delay={0.28} className="card-hairline p-5">
+              <h2 className="flex items-center gap-2 text-lg font-semibold">
+                <MessageCircleQuestion className="h-4 w-4 text-amber-500" /> Posts sparking questions
+              </h2>
+              <p className="text-xs text-foreground/55">Your audience wants more — answer these in your next post</p>
+              {!questions || questions.posts.length === 0 ? (
+                <CardEmpty label="No question comments detected in this window." />
+              ) : (
+                <div className="mt-2 max-h-72 divide-y divide-black/5 overflow-y-auto pr-1">
+                  {questions.posts.map((q) => (
+                    <button
+                      key={q.ig_media_id}
+                      onClick={() => setDrawer({ igId: q.ig_media_id, title: q.caption, permalink: q.permalink })}
+                      className="flex w-full items-center gap-3 py-2.5 text-left transition hover:bg-violet/5"
+                    >
+                      <MiniThumb igId={q.ig_media_id} />
+                      <span className="min-w-0 flex-1">
+                        <span className="line-clamp-1 text-sm font-medium">{q.caption || "Untitled post"}</span>
+                        <span className="num text-xs text-foreground/55">
+                          {new Date(q.timestamp).toLocaleDateString(undefined, { month: "short", day: "2-digit" })} · {q.total_comments} comments
+                        </span>
+                      </span>
+                      <span className="num rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
+                        {q.question_count} ?
+                      </span>
+                      <ExternalLink className="h-3.5 w-3.5 shrink-0 text-foreground/30" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </AnimatedCard>
+          </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <AnimatedCard delay={0.3} className="card-hairline p-5">
@@ -380,7 +644,13 @@ export default function AudienceDNAPage() {
                         <YAxis dataKey="gain" tick={{ fontSize: 10, fill: PALETTE.muted }} tickLine={false} axisLine={false} width={44} tickFormatter={(v: number) => `+${fmt(v)}`} />
                         <ZAxis dataKey="mag" range={[40, 300]} />
                         <Tooltip content={<SpikeTooltip />} cursor={{ strokeDasharray: "3 3" }} />
-                        <Scatter data={spikes.filter((s) => !s.suspicious)} fill={PALETTE.violet} fillOpacity={0.75} onClick={() => setAdvisory(null)} />
+                        <Scatter
+                          data={spikes.filter((s) => !s.suspicious)}
+                          fill={PALETTE.violet}
+                          fillOpacity={0.75}
+                          onClick={(d) => setAdvisory((d as { payload?: SpikeDot }).payload ?? null)}
+                          cursor="pointer"
+                        />
                         <Scatter
                           data={spikes.filter((s) => s.suspicious)}
                           fill="#f43f5e"
@@ -392,13 +662,42 @@ export default function AudienceDNAPage() {
                     </ResponsiveContainer>
                   </div>
                   {advisory && (
-                    <div className="mt-2 flex items-start gap-2.5 rounded-xl bg-rose-50 p-3 text-xs text-rose-700 ring-1 ring-rose-200">
-                      <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span>
-                        <strong>{advisory.date}:</strong> +{advisory.gain.toLocaleString()} followers with only{" "}
-                        {advisory.interactions.toLocaleString()} interactions (ratio {advisory.ratio.toFixed(2)}). Low engagement on a big
-                        jump often means bot or giveaway followers — expect a quality dip in these cohorts.
-                      </span>
+                    <div className={`mt-2 rounded-xl p-3 text-xs ring-1 ${advisory.suspicious ? "bg-rose-50 text-rose-700 ring-rose-200" : "bg-violet/5 text-foreground/70 ring-violet/15"}`}>
+                      <div className="flex items-start gap-2.5">
+                        {advisory.suspicious && <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />}
+                        <span>
+                          <strong>{advisory.date}:</strong> +{advisory.gain.toLocaleString()} followers ·{" "}
+                          {advisory.interactions.toLocaleString()} interactions (ratio {advisory.ratio.toFixed(2)}).
+                          {advisory.suspicious &&
+                            " Low engagement on a big jump often means bot or giveaway followers — expect a quality dip in these cohorts."}
+                        </span>
+                      </div>
+                      <div className="mt-2 border-t border-black/5 pt-2">
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-foreground/50">
+                          Candidate driver posts (24h window)
+                        </div>
+                        {advisory.drivers.length === 0 ? (
+                          <p className="mt-1 text-foreground/50">No candidate posts in the 24h window before this spike.</p>
+                        ) : (
+                          <div className="mt-1.5 flex gap-2 overflow-x-auto pb-1">
+                            {advisory.drivers.map((d) => (
+                              <button
+                                key={d.ig_media_id}
+                                onClick={() => setDrawer({ igId: d.ig_media_id, title: d.caption, permalink: d.permalink })}
+                                className="flex w-56 shrink-0 items-center gap-2 rounded-xl bg-white p-2 text-left ring-1 ring-black/5 transition hover:ring-violet/40"
+                              >
+                                <MiniThumb igId={d.ig_media_id} className="h-9 w-9" />
+                                <span className="min-w-0 flex-1">
+                                  <span className="line-clamp-1 text-xs font-medium text-foreground/85">{d.caption || "Untitled post"}</span>
+                                  <span className="num text-[10px] font-semibold text-emerald-600">
+                                    +{Math.round(d.attributed_follows)} followers
+                                  </span>
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </>
@@ -407,6 +706,8 @@ export default function AudienceDNAPage() {
           </div>
         </div>
       )}
+
+      <PostInsightsDrawer media={drawer} onClose={() => setDrawer(null)} />
     </DashboardLayout>
   );
 }

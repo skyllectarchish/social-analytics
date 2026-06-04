@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { X } from "lucide-react";
 import DashboardLayout from "../components/dashboard/DashboardLayout";
 import { CardEmpty } from "../components/dashboard/States";
@@ -7,7 +7,9 @@ import { PageSkeleton, Skeleton } from "../components/dashboard/Skeletons";
 import PostInsightsDrawer, { type DrawerMedia } from "../components/dashboard/PostInsightsDrawer";
 import DrillDown from "../components/charts/DrillDown";
 import GlassTooltip from "../components/charts/GlassTooltip";
+import BrandedHashtags from "../components/dashboard/BrandedHashtags";
 import { AnimatedCard } from "../components/ui/Motion";
+import { usePeriodComparator } from "../context/PeriodComparatorContext";
 import { useSync } from "../hooks/useSync";
 import { useAuthedImage } from "../hooks/useAuthedImage";
 import { safeGet } from "../api/client";
@@ -21,6 +23,7 @@ import type {
   FormatBreakdownResponse,
   HashtagComboResponse,
   HashtagsResponse,
+  HashtagTrendResponse,
 } from "../api/types";
 import { HEAT_DAYS, HEAT_HOURS, PALETTE_BARS } from "../data/labMock";
 import { PALETTE } from "../data/mock";
@@ -29,7 +32,8 @@ import { mediaLabel } from "../lib/labels";
 const ARC = Math.PI * 70;
 const fmtReach = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : `${Math.round(n)}`);
 
-type Tag = { tag: string; reach: string; posts: number; trend: number; up: boolean };
+type TagStatus = "rising" | "cooling" | "new" | null;
+type Tag = { tag: string; reach: string; posts: number; trend: number; up: boolean; status: TagStatus };
 type Format = { format: string; rate: number; productType: string; posts: number };
 type HeatCell = { score: number; ratePct: number; n: number };
 type Slot = { day: number; bucket: number } | null;
@@ -204,8 +208,79 @@ function SlotPostsPanel({
   );
 }
 
+// Weekly engagement trend for one hashtag (shows when a table row is clicked).
+function HashtagTrendCard({ tag, days, onClose }: { tag: string; days: number; onClose: () => void }) {
+  const [points, setPoints] = useState<{ w: string; eng: number; posts: number }[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setPoints(null);
+    safeGet<HashtagTrendResponse>("/instagram/insights/hashtags/trend", {
+      tag: tag.replace(/^#/, ""),
+      // weekly buckets need some history — floor the window at 90d
+      days: Math.max(days, 90),
+    }).then((res) => {
+      if (!alive) return;
+      setPoints(
+        (res?.data ?? []).map((p) => ({
+          w: new Date(p.week_start).toLocaleDateString(undefined, { month: "short", day: "2-digit" }),
+          eng: +p.avg_engagement_rate_pct.toFixed(2),
+          posts: p.posts_used,
+        })),
+      );
+    });
+    return () => { alive = false; };
+  }, [tag, days]);
+
+  return (
+    <div className="card-hairline p-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">
+            Trend for <span className="text-violet-deep">{tag}</span>
+          </h2>
+          <p className="text-xs text-foreground/55">Weekly average engagement rate</p>
+        </div>
+        <button onClick={onClose} className="rounded-full p-1.5 text-foreground/50 transition hover:bg-black/5" aria-label="Close trend">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="mt-4 h-56">
+        {points === null ? (
+          <Skeleton className="h-full w-full" />
+        ) : points.length < 2 ? (
+          <CardEmpty label={`Not enough weekly history for ${tag} yet.`} />
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: -14 }}>
+              <defs>
+                <linearGradient id="tagTrendFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke={PALETTE.grid} vertical={false} />
+              <XAxis dataKey="w" tick={{ fontSize: 10, fill: PALETTE.muted }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: PALETTE.muted }} tickLine={false} axisLine={false} width={38} unit="%" />
+              <Tooltip content={<GlassTooltip unit="%" />} />
+              <Area type="monotone" dataKey="eng" name="Engagement" stroke="#8b5cf6" strokeWidth={2.5} fill="url(#tagTrendFill)" dot={false} activeDot={{ r: 4 }} />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const STATUS_BADGE: Record<Exclude<TagStatus, null>, string> = {
+  rising: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  cooling: "bg-rose-50 text-rose-600 ring-rose-200",
+  new: "bg-lavender text-violet-deep ring-violet/20",
+};
+
 export default function ContentLabPage() {
   const [days, setDays] = useState(30);
+  const { compareTo } = usePeriodComparator();
   const { syncing, sync } = useSync();
   const [loading, setLoading] = useState(true);
 
@@ -217,6 +292,7 @@ export default function ContentLabPage() {
   const [slot, setSlot] = useState<Slot>(null);
   const [formats, setFormats] = useState<Format[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [comboTags, setComboTags] = useState<string[]>([]);
   const [comboMatrix, setComboMatrix] = useState<number[][]>([]);
   const [drawer, setDrawer] = useState<DrawerMedia>(null);
@@ -231,7 +307,10 @@ export default function ContentLabPage() {
         safeGet<BestTimeResponse>("/instagram/insights/best-time", { days, min_sample: 1 }),
         safeGet<FormatBreakdownResponse>("/instagram/insights/format-breakdown", { days }),
         safeGet<AlgorithmMetricsResponse>("/instagram/insights/algorithm-metrics", { days }),
-        safeGet<HashtagsResponse>("/instagram/insights/hashtags", { days, limit: 100, min_uses: 1 }),
+        safeGet<HashtagsResponse>("/instagram/insights/hashtags", {
+          days, limit: 100, min_uses: 1,
+          ...(compareTo ? { compare_to: compareTo } : {}),
+        }),
         safeGet<HashtagComboResponse>("/instagram/insights/hashtags/combos", { days }),
       ]);
       if (!alive) return;
@@ -281,7 +360,19 @@ export default function ContentLabPage() {
       }
 
       if (ht?.data.length) {
-        setTags(ht.data.map((h) => ({ tag: h.hashtag.startsWith("#") ? h.hashtag : `#${h.hashtag}`, reach: fmtReach(h.avg_reach), posts: h.post_count, trend: Math.round(h.avg_engagement_rate_pct), up: h.avg_engagement_rate_pct >= 0 })));
+        // Rising / Cooling / New badges from the prior-window comparison.
+        const prior = new Map((ht.prior?.data ?? []).map((p) => [p.hashtag.replace(/^#/, ""), p.avg_engagement_rate_pct]));
+        setTags(ht.data.map((h) => {
+          const key = h.hashtag.replace(/^#/, "");
+          let status: TagStatus = null;
+          if (ht.prior) {
+            const prev = prior.get(key);
+            if (prev == null) status = "new";
+            else if (prev > 0 && h.avg_engagement_rate_pct >= prev * 1.1) status = "rising";
+            else if (prev > 0 && h.avg_engagement_rate_pct <= prev * 0.9) status = "cooling";
+          }
+          return { tag: h.hashtag.startsWith("#") ? h.hashtag : `#${h.hashtag}`, reach: fmtReach(h.avg_reach), posts: h.post_count, trend: Math.round(h.avg_engagement_rate_pct), up: h.avg_engagement_rate_pct >= 0, status };
+        }));
       } else setTags([]);
 
       if (hc?.data.length) {
@@ -309,7 +400,7 @@ export default function ContentLabPage() {
       setLoading(false);
     })();
     return () => { alive = false; };
-  }, [days]);
+  }, [days, compareTo]);
 
   // Heatmap grid for the selected format filter. Recomputed client-side from
   // the single best-time response (data = all formats, by_format = split).
@@ -518,7 +609,7 @@ export default function ContentLabPage() {
 
             <AnimatedCard delay={0.2} className="card-hairline p-5">
               <h2 className="text-lg font-semibold">Hashtag performance</h2>
-              <p className="text-xs text-foreground/55">All tags in this window</p>
+              <p className="text-xs text-foreground/55">All tags in this window — click one for its trend</p>
               {tags.length === 0 ? (
                 <CardEmpty label="No hashtag data yet." />
               ) : (
@@ -534,8 +625,19 @@ export default function ContentLabPage() {
                     </thead>
                     <tbody>
                       {tags.map((h) => (
-                        <tr key={h.tag} className="border-t border-black/5">
-                          <td className="py-2.5 font-medium text-violet-deep">{h.tag}</td>
+                        <tr
+                          key={h.tag}
+                          onClick={() => setSelectedTag(selectedTag === h.tag ? null : h.tag)}
+                          className={`cursor-pointer border-t border-black/5 transition hover:bg-violet/5 ${selectedTag === h.tag ? "bg-violet/5" : ""}`}
+                        >
+                          <td className="py-2.5 font-medium text-violet-deep">
+                            {h.tag}
+                            {h.status && (
+                              <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase ring-1 ${STATUS_BADGE[h.status]}`}>
+                                {h.status}
+                              </span>
+                            )}
+                          </td>
                           <td className="num py-2.5">{h.reach}</td>
                           <td className="num py-2.5">{h.posts}</td>
                           <td className="num py-2.5 font-medium text-emerald-600">{h.trend}%</td>
@@ -563,6 +665,16 @@ export default function ContentLabPage() {
               )}
             </AnimatedCard>
           </div>
+
+          {selectedTag && (
+            <AnimatedCard>
+              <HashtagTrendCard tag={selectedTag} days={days} onClose={() => setSelectedTag(null)} />
+            </AnimatedCard>
+          )}
+
+          <AnimatedCard delay={0.3}>
+            <BrandedHashtags days={days} />
+          </AnimatedCard>
         </div>
       )}
 

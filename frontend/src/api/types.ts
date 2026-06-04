@@ -64,6 +64,14 @@ export interface TopPost {
   interactions: number;
 }
 
+/* Scalar metric with optional prior-period comparison (compare_to param). */
+export interface ComparisonValue {
+  current: number;
+  prior: number | null;
+  delta_pct: number | null;
+  significant: boolean | null;
+}
+
 export interface DashboardSummary {
   period_days: number;
   total_views: number;
@@ -72,6 +80,7 @@ export interface DashboardSummary {
   total_accounts_engaged: number;
   net_follower_growth: number;
   top_posts: TopPost[];
+  comparisons?: Record<string, ComparisonValue> | null;
 }
 
 export interface InsightDataPoint {
@@ -90,6 +99,21 @@ export interface OverviewResponse {
   follows_and_unfollows: MetricTimeSeries;
   total_interactions: MetricTimeSeries;
   accounts_engaged: MetricTimeSeries;
+  prior?: OverviewResponse | null;
+}
+
+/* ---------- Stories ---------- */
+export interface StoryWithInsights {
+  ig_media_id: string;
+  media_type: string;
+  media_url: string;
+  thumbnail_url: string;
+  permalink: string;
+  timestamp: string;
+  insights: { metric_name: string; value: number }[];
+}
+export interface StoriesResponse {
+  stories: StoryWithInsights[];
 }
 
 export interface DemographicBreakdown {
@@ -205,6 +229,47 @@ export interface HashtagPerformanceItem {
 export interface HashtagsResponse {
   period_days: number;
   data: HashtagPerformanceItem[];
+  prior?: HashtagsResponse | null;
+}
+export interface HashtagTrendPoint {
+  week_start: string;
+  posts_used: number;
+  avg_reach: number;
+  avg_engagement_rate_pct: number;
+}
+export interface HashtagTrendResponse {
+  tag: string;
+  period_days: number;
+  data: HashtagTrendPoint[];
+}
+
+/* ---------- Branded hashtags ---------- */
+export interface BrandedHashtagItem {
+  hashtag: string;
+  last_synced_at: string | null;
+  mention_count: number;
+  total_likes: number;
+  unique_authors: number;
+  latest_mention: string | null;
+}
+export interface BrandedHashtagListResponse {
+  period_days: number;
+  branded: BrandedHashtagItem[];
+}
+export interface BrandedHashtagMention {
+  ig_comment_id: string;
+  ig_media_id: string;
+  permalink: string;
+  username: string;
+  text: string;
+  like_count: number;
+  timestamp: string;
+  source: "post" | "comment";
+}
+export interface BrandedHashtagMentionsResponse {
+  hashtag: string;
+  period_days: number;
+  mentions: BrandedHashtagMention[];
 }
 export interface HashtagComboItem {
   tag_a: string;
@@ -231,6 +296,7 @@ export interface ReelRetentionItem {
 export interface ReelsRetentionResponse {
   period_days: number;
   reels: ReelRetentionItem[];
+  prior?: ReelsRetentionResponse | null;
 }
 export interface ReelsTrendPoint {
   week_start: string;
@@ -251,6 +317,63 @@ export interface SentimentSummaryResponse {
   total: number;
   distribution: { positive: number; neutral: number; negative: number };
   trend: { week_start: string; positive: number; neutral: number; negative: number }[];
+  prior?: SentimentSummaryResponse | null;
+}
+export interface SentimentDiagnoseResponse {
+  ig_comments_total: number;
+  stored_comments: number;
+  stored_sentiment: number;
+  stored_topics: number;
+  status: "ok" | "no_data" | "scope_blocked" | "not_connected";
+  reason: string;
+}
+export interface SeedDemoResponse {
+  comments: number;
+  sentiment: number;
+  topics: number;
+}
+export interface QuestionPostItem {
+  ig_media_id: string;
+  permalink: string;
+  thumbnail_url: string | null;
+  caption: string;
+  timestamp: string;
+  question_count: number;
+  total_comments: number;
+}
+export interface QuestionPostsResponse {
+  period_days: number;
+  posts: QuestionPostItem[];
+}
+
+/* ---------- Growth drivers ---------- */
+export interface GrowthDriverItem {
+  ig_media_id: string;
+  media_product_type: string;
+  permalink: string;
+  thumbnail_url: string | null;
+  caption: string;
+  reach: number;
+  non_follower_reach: number;
+  attributed_follows: number;
+  conversion_rate_pct: number;
+}
+export interface GrowthDriversResponse {
+  period_days: number;
+  drivers: GrowthDriverItem[];
+  prior?: GrowthDriversResponse | null;
+}
+export interface GrowthCorrelationPoint {
+  day: string;
+  follows: number;
+  reach: number;
+}
+export interface GrowthCorrelationResponse {
+  period_days: number;
+  points: GrowthCorrelationPoint[];
+  correlation: number | null;
+  uses_non_follower_reach: boolean;
+  prior?: GrowthCorrelationResponse | null;
 }
 export interface TopicsResponse {
   period_days: number;
@@ -283,6 +406,8 @@ export interface FollowerSpike {
   interactions: number;
   interaction_per_follow_ratio: number;
   is_suspicious: boolean;
+  // Posts in the 24h window before the spike that likely drove it.
+  candidate_drivers: GrowthDriverItem[];
 }
 export interface FollowerSpikesResponse {
   period_days: number;
@@ -310,6 +435,16 @@ export interface CompetitorItem {
   display_name: string;
   profile_picture_url: string;
   latest_snapshot: CompetitorSnapshot | null;
+  // Failed daily syncs in a row; auto-removed at 3 (stale-data warning).
+  consecutive_failures: number;
+}
+export interface CompetitorLookupPreview {
+  handle: string;
+  username: string;
+  display_name: string | null;
+  followers_count: number;
+  media_count: number;
+  profile_picture_url: string | null;
 }
 export interface SelfSnapshot {
   followers_count: number;
@@ -341,11 +476,74 @@ export interface Idea {
   body_md: string;
   suggested_format: string;
   rationale: string;
+  adjacent: boolean;
+}
+export interface IdeasSourcePost {
+  ig_media_id: string;
+  permalink: string | null;
+  thumbnail_url: string | null;
+  caption_preview: string | null;
+  algorithm_score_pct: number;
 }
 export interface ContentIdeasResponse {
   period_days: number;
+  generated_at: string;
+  source_posts: IdeasSourcePost[];
   themes_detected: string[];
   ideas: Idea[];
+}
+
+/* Weekly digest */
+export interface DigestBullet {
+  kind: "win" | "warning" | "trend" | "experiment";
+  headline: string;
+  detail_md: string;
+  link: { route: string; query: Record<string, string> } | null;
+}
+export interface WeeklyDigestResponse {
+  week_of: string;
+  generated_at: string;
+  status: "ready" | "stale" | "generating" | "not_enough_data";
+  cached: boolean;
+  narrative_md: string;
+  bullets: DigestBullet[];
+  metrics_snapshot: {
+    save_rate_pct_delta: number | null;
+    reach_pct_delta: number | null;
+    follows_delta: number | null;
+    posts_count: number;
+  };
+  followups: string[];
+}
+
+/* Post diagnostic */
+export interface BaselineMetrics {
+  avg_reach: number;
+  avg_engagement_rate_pct: number;
+  avg_save_rate_pct: number;
+}
+export interface DiagnosticFactor {
+  key: "format" | "timing" | "hashtags" | "topic" | "duration" | "hook";
+  severity: "high" | "medium" | "low" | "neutral";
+  headline: string;
+  detail_md: string;
+  evidence: { metric: string; value: number; comparison: string };
+}
+export interface DiagnosticResponse {
+  ig_media_id: string;
+  baseline: BaselineMetrics;
+  observed: BaselineMetrics;
+  underperformed: boolean;
+  verdict_md: string;
+  factors: DiagnosticFactor[];
+  recommendations_md: string;
+}
+
+export interface FeedbackRequest {
+  feature: "digest" | "ideas" | "diagnostic" | "caption";
+  ref_id: string;
+  rating: "up" | "down";
+  note?: string | null;
 }
 export interface CaptionVariant {
   id: string;
@@ -354,6 +552,7 @@ export interface CaptionVariant {
   rationale: string;
 }
 export interface CaptionSuggestResponse {
+  draft: string;
   scores: { hook_strength: number; cta_presence: number; length_fit: number; overall: number };
   variants: CaptionVariant[];
   notes_md: string;

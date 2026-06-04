@@ -5,6 +5,7 @@ import {
   Bell,
   Bot,
   Calendar,
+  GitCompareArrows,
   Dna,
   Film,
   FlaskConical,
@@ -23,6 +24,11 @@ import {
 import axios from "axios";
 import { motion } from "framer-motion";
 import { useAuth } from "../../hooks/useAuth";
+import {
+  COMPARE_OPTIONS,
+  usePeriodComparator,
+  type CompareMode,
+} from "../../context/PeriodComparatorContext";
 import api, { safeGet } from "../../api/client";
 import type { InstagramProfile, QuotaResponse } from "../../api/types";
 import { avatar } from "../../data/mock";
@@ -149,6 +155,7 @@ export default function DashboardLayout({
   fill?: boolean;
 }) {
   const { user, logout } = useAuth();
+  const { compareMode, setCompareMode, customRange, setCustomRange, calendarPreset } = usePeriodComparator();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [quota, setQuota] = useState<Quota>(null);
@@ -222,11 +229,12 @@ export default function DashboardLayout({
               />
             </div>
             <div className="ml-auto flex items-center gap-2">
-              <div className="chip">
+              <div className={`chip ${calendarPreset ? "opacity-50" : ""}`} title={calendarPreset ? "Window is set by the calendar comparison preset" : undefined}>
                 <Calendar className="h-3.5 w-3.5" />
                 <select
                   className="bg-transparent text-xs outline-none"
                   value={days}
+                  disabled={calendarPreset}
                   onChange={(e) => onDaysChange(Number(e.target.value))}
                 >
                   <option value={7}>7 days</option>
@@ -235,11 +243,42 @@ export default function DashboardLayout({
                   <option value={365}>1 year</option>
                 </select>
               </div>
+              <div className="chip" title="Overlay a prior period for comparison">
+                <GitCompareArrows className="h-3.5 w-3.5" />
+                <select
+                  className="max-w-[110px] bg-transparent text-xs outline-none"
+                  value={compareMode}
+                  onChange={(e) => setCompareMode(e.target.value as CompareMode)}
+                >
+                  {COMPARE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              {compareMode === "custom" && (
+                <div className="chip hidden items-center gap-1 lg:flex">
+                  <input
+                    type="date"
+                    className="bg-transparent text-xs outline-none"
+                    value={customRange.from}
+                    onChange={(e) => setCustomRange({ ...customRange, from: e.target.value })}
+                    aria-label="Compare from"
+                  />
+                  <span className="text-foreground/40">→</span>
+                  <input
+                    type="date"
+                    className="bg-transparent text-xs outline-none"
+                    value={customRange.to}
+                    onChange={(e) => setCustomRange({ ...customRange, to: e.target.value })}
+                    aria-label="Compare to"
+                  />
+                </div>
+              )}
               <button onClick={onSync} disabled={syncing} className="chip cursor-pointer disabled:opacity-60">
                 <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} /> Sync
               </button>
               <button className="chip !bg-gradient-to-r !from-violet !to-pink-500 !text-white">
-                <Zap className="h-3.5 w-3.5" /> 412 / 500
+                <Zap className="h-3.5 w-3.5" /> {quota ? `${Math.max(0, quota.limit - quota.used)} / ${quota.limit}` : "AI"}
               </button>
               <button className="grid h-9 w-9 place-items-center rounded-full bg-white ring-1 ring-black/5" aria-label="Notifications">
                 <Bell className="h-4 w-4" />

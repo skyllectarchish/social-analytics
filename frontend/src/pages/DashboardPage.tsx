@@ -5,6 +5,8 @@ import {
   AreaChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
+  Line,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -13,17 +15,22 @@ import {
   YAxis,
 } from "recharts";
 import axios from "axios";
-import { Eye, Heart, Loader2, TrendingDown, TrendingUp } from "lucide-react";
-import api, { errorMessage } from "../api/client";
+import { Eye, Heart, Loader2, Radio, TrendingDown, TrendingUp } from "lucide-react";
+import api, { errorMessage, safeGet } from "../api/client";
 import type {
   DashboardSummary,
   DemographicResponse,
   InstagramProfile,
   MetricTimeSeries,
   OverviewResponse,
+  StoriesResponse,
+  StoryWithInsights,
 } from "../api/types";
 import DashboardLayout from "../components/dashboard/DashboardLayout";
 import { CardEmpty } from "../components/dashboard/States";
+import PostInsightsDrawer, { type DrawerMedia } from "../components/dashboard/PostInsightsDrawer";
+import ComparisonPill from "../components/ui/ComparisonPill";
+import { usePeriodComparator } from "../context/PeriodComparatorContext";
 import { mediaLabel } from "../lib/labels";
 import Sparkline from "../components/charts/Sparkline";
 import GlassTooltip from "../components/charts/GlassTooltip";
@@ -62,15 +69,46 @@ function MediaThumb({ id }: { id: string }) {
   return <img src={src} alt="" className="h-full w-full object-cover transition-transform group-hover:scale-105" />;
 }
 
+// Live story ring: Instagram-gradient border + view count overlay.
+function StoryRing({ story }: { story: StoryWithInsights }) {
+  const src = useAuthedImage(story.ig_media_id);
+  const views = story.insights.find((i) => i.metric_name === "views" || i.metric_name === "reach")?.value ?? 0;
+  const inner = (
+    <span className="relative block h-16 w-16 overflow-hidden rounded-full ring-2 ring-white">
+      {src ? <img src={src} alt="" className="h-full w-full object-cover" /> : <span className="bg-lavender block h-full w-full" />}
+    </span>
+  );
+  const body = (
+    <>
+      <span className="bg-ig grid place-items-center rounded-full p-[3px] shadow-lg shadow-pink-500/20">{inner}</span>
+      <span className="mt-1.5 flex items-center gap-1 text-[10px] text-foreground/60">
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+        <Eye className="h-2.5 w-2.5" /> <span className="num">{fmt(views)}</span>
+      </span>
+    </>
+  );
+  return story.permalink ? (
+    <a href={story.permalink} target="_blank" rel="noreferrer" className="flex shrink-0 flex-col items-center">
+      {body}
+    </a>
+  ) : (
+    <span className="flex shrink-0 flex-col items-center">{body}</span>
+  );
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [days, setDays] = useState(30);
 
+  const { compareTo } = usePeriodComparator();
   const [profile, setProfile] = useState<InstagramProfile | null>(null);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [ageDemo, setAgeDemo] = useState<DemographicResponse | null>(null);
   const [genderDemo, setGenderDemo] = useState<DemographicResponse | null>(null);
+  const [stories, setStories] = useState<StoryWithInsights[]>([]);
+  const [drawer, setDrawer] = useState<DrawerMedia>(null);
+  const [hideSeries, setHideSeries] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -81,12 +119,16 @@ export default function DashboardPage() {
       const { data: prof } = await api.get<InstagramProfile>("/instagram/profile");
       setProfile(prof);
 
-      const [sum, ov] = await Promise.all([
-        api.get<DashboardSummary>("/instagram/insights/dashboard", { params: { days, top_n: 8 } }),
-        api.get<OverviewResponse>("/instagram/insights/overview", { params: { days } }),
+      const cmp = compareTo ? { compare_to: compareTo } : {};
+      const [sum, ov, st] = await Promise.all([
+        api.get<DashboardSummary>("/instagram/insights/dashboard", { params: { days, top_n: 8, ...cmp } }),
+        api.get<OverviewResponse>("/instagram/insights/overview", { params: { days, ...cmp } }),
+        // Stories are optional — accounts without active stories just hide the strip.
+        safeGet<StoriesResponse>("/instagram/stories"),
       ]);
       setSummary(sum.data);
       setOverview(ov.data);
+      setStories(st?.stories ?? []);
 
       // Demographics are optional — don't fail the page if they're empty.
       const [age, gender] = await Promise.allSettled([
@@ -104,7 +146,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [days, navigate]);
+  }, [days, compareTo, navigate]);
 
   useEffect(() => {
     load();
@@ -138,11 +180,61 @@ export default function DashboardPage() {
   const followSpark = cumulative(overview?.follows_and_unfollows);
   const engagement = summary && summary.total_reach > 0 ? (summary.total_interactions / summary.total_reach) * 100 : 0;
 
+  // Per-metric comparison values (populated only when compare_to is active).
+  const comp = (key: string) => summary?.comparisons?.[key] ?? null;
+  const engagementCmp = (() => {
+    const ci = comp("total_interactions");
+    const cr = comp("total_reach");
+    if (ci?.prior == null || !cr?.prior) return null;
+    return { current: engagement, prior: (ci.prior / cr.prior) * 100, delta_pct: null, significant: null };
+  })();
+
   const kpis = [
-    { label: "Followers", value: profile ? fmt(profile.followers_count) : "—", spark: followSpark, trend: trendPct(followSpark), color: PALETTE.violet },
-    { label: "Engagement", value: `${engagement.toFixed(2)}%`, spark: interSpark, trend: trendPct(interSpark), color: PALETTE.pink },
-    { label: "Reach", value: summary ? fmt(summary.total_reach) : "—", spark: reachSpark, trend: trendPct(reachSpark), color: PALETTE.violet },
-    { label: "Views", value: summary ? fmt(summary.total_views) : "—", spark: viewsSpark, trend: trendPct(viewsSpark), color: PALETTE.blue },
+    { label: "Followers", value: profile ? fmt(profile.followers_count) : "—", spark: followSpark, trend: trendPct(followSpark), color: PALETTE.violet, cmp: comp("net_follower_growth") },
+    { label: "Engagement", value: `${engagement.toFixed(2)}%`, spark: interSpark, trend: trendPct(interSpark), color: PALETTE.pink, cmp: engagementCmp },
+    { label: "Reach", value: summary ? fmt(summary.total_reach) : "—", spark: reachSpark, trend: trendPct(reachSpark), color: PALETTE.violet, cmp: comp("total_reach") },
+    { label: "Views", value: summary ? fmt(summary.total_views) : "—", spark: viewsSpark, trend: trendPct(viewsSpark), color: PALETTE.blue, cmp: comp("total_views") },
+  ];
+
+  // Engagement overview chart: views/reach/interactions aligned by calendar
+  // date (timestamps differ per metric), with the prior window zipped on by
+  // index when a comparison is active.
+  type EngRow = { d: string; label: string; [k: string]: string | number | null };
+  const buildEngRows = (ov: OverviewResponse): EngRow[] => {
+    const byDate = new Map<string, EngRow>();
+    const add = (s: MetricTimeSeries | undefined, key: string) => {
+      for (const p of s?.data ?? []) {
+        const d = p.end_time.slice(0, 10);
+        const row = byDate.get(d) ?? { d, label: "" };
+        row[key] = ((row[key] as number) ?? 0) + p.value;
+        byDate.set(d, row);
+      }
+    };
+    add(ov.views, "views");
+    add(ov.reach, "reach");
+    add(ov.total_interactions, "interactions");
+    const rows = [...byDate.values()].sort((a, b) => a.d.localeCompare(b.d));
+    rows.forEach((r) => { r.label = new Date(r.d).toLocaleDateString(undefined, { month: "short", day: "numeric" }); });
+    return rows;
+  };
+  const engRows = overview ? buildEngRows(overview) : [];
+  if (overview?.prior) {
+    const priorRows = buildEngRows(overview.prior);
+    engRows.forEach((r, i) => {
+      r.p_views = (priorRows[i]?.views as number) ?? null;
+      r.p_reach = (priorRows[i]?.reach as number) ?? null;
+    });
+  }
+  const toggleSeries = (key: string) =>
+    setHideSeries((s) => {
+      const next = new Set(s);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  const SERIES: { key: string; label: string; color: string }[] = [
+    { key: "views", label: "Views", color: PALETTE.blue },
+    { key: "reach", label: "Reach", color: PALETTE.violet },
+    { key: "interactions", label: "Interactions", color: PALETTE.pink },
   ];
 
   // follower-growth area
@@ -197,9 +289,20 @@ export default function DashboardPage() {
               <div key={k.label} className="card-hairline p-5">
                 <div className="text-xs font-medium uppercase tracking-wider text-foreground/55">{k.label}</div>
                 <div className="num mt-2 text-3xl font-semibold">{k.value}</div>
-                <div className={`mt-1 flex items-center gap-1 text-xs font-medium ${up ? "text-emerald-600" : "text-rose-500"}`}>
-                  {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                  {up ? "+" : ""}{k.trend.toFixed(1)}% vs last period
+                <div className="mt-1">
+                  {k.cmp && k.cmp.prior != null ? (
+                    <ComparisonPill
+                      current={k.cmp.current}
+                      prior={k.cmp.prior}
+                      deltaPct={k.cmp.delta_pct}
+                      significant={k.cmp.significant}
+                    />
+                  ) : (
+                    <span className={`flex items-center gap-1 text-xs font-medium ${up ? "text-emerald-600" : "text-rose-500"}`}>
+                      {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                      {up ? "+" : ""}{k.trend.toFixed(1)}% vs last period
+                    </span>
+                  )}
                 </div>
                 <div className="mt-3 h-10">
                   <Sparkline data={k.spark} color={k.color} />
@@ -208,6 +311,77 @@ export default function DashboardPage() {
             );
           })}
         </div>
+
+        {/* live stories */}
+        {stories.length > 0 && (
+          <div className="card-hairline p-5">
+            <div className="flex items-center gap-2">
+              <Radio className="h-4 w-4 text-emerald-500" />
+              <h2 className="text-lg font-semibold">Live stories</h2>
+              <span className="chip !px-2 !py-0.5 !text-[10px]">{stories.length} active</span>
+            </div>
+            <div className="mt-4 flex gap-5 overflow-x-auto pb-1">
+              {stories.map((s) => <StoryRing key={s.ig_media_id} story={s} />)}
+            </div>
+          </div>
+        )}
+
+        {/* engagement overview */}
+        {engRows.length > 1 && (
+          <div className="card-hairline p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-semibold">Engagement overview</h2>
+                <p className="text-xs text-foreground/55">
+                  Views, reach and interactions per day{overview?.prior ? " — dashed = prior period" : ""}
+                </p>
+              </div>
+              <div className="flex gap-1.5">
+                {SERIES.map((s) => (
+                  <button
+                    key={s.key}
+                    onClick={() => toggleSeries(s.key)}
+                    className={`chip !px-2.5 !py-1 !text-[10px] transition ${hideSeries.has(s.key) ? "opacity-40" : ""}`}
+                  >
+                    <span className="h-2 w-2 rounded-full" style={{ background: s.color }} /> {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mt-4 h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={engRows} margin={{ top: 8, right: 6, bottom: 0, left: -8 }}>
+                  <defs>
+                    <linearGradient id="viewsFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={PALETTE.blue} stopOpacity={0.25} />
+                      <stop offset="100%" stopColor={PALETTE.blue} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke={PALETTE.grid} vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: PALETTE.muted }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={28} />
+                  <YAxis yAxisId="vol" tick={{ fontSize: 10, fill: PALETTE.muted }} tickLine={false} axisLine={false} width={42} tickFormatter={(v) => fmt(v as number)} />
+                  <YAxis yAxisId="int" orientation="right" tick={{ fontSize: 10, fill: PALETTE.muted }} tickLine={false} axisLine={false} width={40} tickFormatter={(v) => fmt(v as number)} />
+                  <Tooltip content={<GlassTooltip />} />
+                  {!hideSeries.has("views") && (
+                    <Area yAxisId="vol" type="monotone" dataKey="views" name="Views" stroke={PALETTE.blue} strokeWidth={2} fill="url(#viewsFill)" dot={false} connectNulls />
+                  )}
+                  {!hideSeries.has("reach") && (
+                    <Line yAxisId="vol" type="monotone" dataKey="reach" name="Reach" stroke={PALETTE.violet} strokeWidth={2} dot={false} connectNulls />
+                  )}
+                  {!hideSeries.has("interactions") && (
+                    <Line yAxisId="int" type="monotone" dataKey="interactions" name="Interactions" stroke={PALETTE.pink} strokeWidth={2} dot={false} connectNulls />
+                  )}
+                  {overview?.prior && !hideSeries.has("views") && (
+                    <Line yAxisId="vol" type="monotone" dataKey="p_views" name="Views (prior)" stroke={PALETTE.blue} strokeWidth={1.5} strokeDasharray="5 4" strokeOpacity={0.5} dot={false} connectNulls />
+                  )}
+                  {overview?.prior && !hideSeries.has("reach") && (
+                    <Line yAxisId="vol" type="monotone" dataKey="p_reach" name="Reach (prior)" stroke={PALETTE.violet} strokeWidth={1.5} strokeDasharray="5 4" strokeOpacity={0.5} dot={false} connectNulls />
+                  )}
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
 
         {/* growth + audience */}
         <div className="grid gap-4 lg:grid-cols-3">
@@ -309,12 +483,10 @@ export default function DashboardPage() {
           {summary && summary.top_posts.length > 0 ? (
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {summary.top_posts.map((p) => (
-                <a
+                <button
                   key={p.ig_media_id}
-                  href={p.permalink || "#"}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="group overflow-hidden rounded-2xl ring-1 ring-black/5 transition hover:ring-violet/40"
+                  onClick={() => setDrawer({ igId: p.ig_media_id, title: p.caption, permalink: p.permalink })}
+                  className="group overflow-hidden rounded-2xl text-left ring-1 ring-black/5 transition hover:ring-violet/40"
                 >
                   <div className="relative aspect-square overflow-hidden">
                     <MediaThumb id={p.ig_media_id} />
@@ -330,7 +502,7 @@ export default function DashboardPage() {
                       </span>
                     </div>
                   </div>
-                </a>
+                </button>
               ))}
             </div>
           ) : (
@@ -338,6 +510,8 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      <PostInsightsDrawer media={drawer} onClose={() => setDrawer(null)} />
     </DashboardLayout>
   );
 }

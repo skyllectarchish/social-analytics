@@ -8,6 +8,8 @@ import {
 } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { AuthProvider } from "./context/AuthContext";
+import { PeriodComparatorProvider } from "./context/PeriodComparatorContext";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { useAuth } from "./hooks/useAuth";
 import Landing from "./components/Landing";
 import LoginPage from "./pages/LoginPage";
@@ -89,10 +91,14 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <PeriodComparatorProvider>
+            <AppRoutes />
+          </PeriodComparatorProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
