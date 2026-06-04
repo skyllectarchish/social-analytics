@@ -97,6 +97,30 @@ function SidebarInner({
         })}
       </nav>
 
+      {/* Platform switcher */}
+      <div className="mt-3 border-t border-black/5 pt-3">
+        <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-foreground/35">
+          Platforms
+        </p>
+        <Link
+          to="/dashboard"
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-foreground/60 transition hover:bg-white/60"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            <path d="M8 3C5.24 3 3 5.24 3 8v8c0 2.76 2.24 5 5 5h8c2.76 0 5-2.24 5-5V8c0-2.76-2.24-5-5-5H8zm0 2h8c1.65 0 3 1.35 3 3v8c0 1.65-1.35 3-3 3H8c-1.65 0-3-1.35-3-3V8c0-1.65 1.35-3 3-3zm9 1.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm-5 1C9.34 7.5 7.5 9.34 7.5 12S9.34 16.5 12 16.5 16.5 14.66 16.5 12 14.66 7.5 12 7.5zm0 2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z" />
+          </svg>
+          Instagram
+        </Link>
+        <Link
+          to="/youtube"
+          className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-[#dc2626] bg-red-50/60"
+          aria-current="page"
+        >
+          <YTIcon className="h-4 w-4" />
+          YouTube
+        </Link>
+      </div>
+
       <div className="mt-auto">
         <div className="card-hairline p-4">
           <div className="flex items-center gap-2 text-xs font-medium text-red-600">

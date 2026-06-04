@@ -115,6 +115,30 @@ function SidebarInner({
         })}
       </nav>
 
+      {/* Platform switcher */}
+      <div className="mt-3 border-t border-black/5 pt-3">
+        <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-foreground/35">
+          Platforms
+        </p>
+        <Link
+          to="/dashboard"
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-violet-deep bg-lavender/60"
+          aria-current="page"
+        >
+          <Instagram className="h-4 w-4" />
+          Instagram
+        </Link>
+        <Link
+          to="/youtube"
+          className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-foreground/60 transition hover:bg-white/60"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8ZM9.8 15.5V8.5l6.3 3.5-6.3 3.5Z" />
+          </svg>
+          YouTube
+        </Link>
+      </div>
+
       <div className="mt-auto">
         <div className="card-hairline p-4">
           <div className="flex items-center gap-2 text-xs font-medium text-violet-deep">
