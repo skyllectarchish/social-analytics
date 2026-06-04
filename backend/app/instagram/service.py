@@ -11,7 +11,6 @@ from typing import Any
 from urllib.parse import urlencode
 
 import httpx
-from jose import JWTError, jwt
 
 from ..config import settings
 from ..constants import (
