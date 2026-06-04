@@ -1506,3 +1506,89 @@ SELECT count()
 FROM comment_topics FINAL
 WHERE user_id = {user_id:UUID}
 """
+
+# --- YouTube Tokens ---
+
+GET_YOUTUBE_TOKEN = """
+SELECT yt_channel_id, refresh_token
+FROM youtube_tokens FINAL
+WHERE user_id = {user_id:UUID}
+ORDER BY updated_at DESC
+LIMIT 1
+"""
+
+# --- YouTube Channels ---
+
+GET_YOUTUBE_CHANNEL = """
+SELECT yt_channel_id, title, description, thumbnail_url,
+       subscriber_count, video_count, view_count, hidden_subscriber_count, fetched_at
+FROM youtube_channels FINAL
+WHERE user_id = {user_id:UUID}
+ORDER BY fetched_at DESC
+LIMIT 1
+"""
+
+# --- YouTube Videos ---
+
+COUNT_YOUTUBE_VIDEOS = """
+SELECT count()
+FROM youtube_videos FINAL
+WHERE user_id = {user_id:UUID}
+  AND yt_channel_id = {yt_channel_id:String}
+"""
+
+GET_YOUTUBE_VIDEOS_PAGE = """
+SELECT video_id, title, thumbnail_url, published_at,
+       duration_seconds, video_format, view_count, like_count, comment_count
+FROM youtube_videos FINAL
+WHERE user_id = {user_id:UUID}
+  AND yt_channel_id = {yt_channel_id:String}
+ORDER BY published_at DESC
+LIMIT {limit:UInt32}
+OFFSET {offset:UInt32}
+"""
+
+# --- YouTube Daily Metrics ---
+
+GET_YOUTUBE_DAILY_METRICS = """
+SELECT metric_name, metric_value, end_time
+FROM youtube_daily_metrics FINAL
+WHERE user_id = {user_id:UUID}
+  AND yt_channel_id = {yt_channel_id:String}
+  AND metric_name IN {metrics:Array(String)}
+  AND end_time >= {since:DateTime}
+ORDER BY metric_name, end_time ASC
+"""
+
+# --- YouTube Retention ---
+
+GET_YOUTUBE_RETENTION_CURVE = """
+SELECT elapsed_video_time_ratio, audience_watch_ratio,
+       relative_retention_performance, fetched_at
+FROM youtube_retention_curves FINAL
+WHERE user_id = {user_id:UUID}
+  AND video_id = {video_id:String}
+ORDER BY elapsed_video_time_ratio ASC
+"""
+
+GET_YOUTUBE_RETENTION_ANNOTATIONS = """
+SELECT timestamp_seconds, annotation_text, drop_pct, model, generated_at
+FROM youtube_retention_annotations FINAL
+WHERE user_id = {user_id:UUID}
+  AND video_id = {video_id:String}
+ORDER BY timestamp_seconds ASC
+"""
+
+GET_YOUTUBE_LATEST_RETENTION_FETCH = """
+SELECT max(fetched_at)
+FROM youtube_retention_curves FINAL
+WHERE user_id = {user_id:UUID}
+  AND video_id = {video_id:String}
+"""
+
+GET_YOUTUBE_LATEST_ANNOTATION_GENERATED = """
+SELECT max(generated_at)
+FROM youtube_retention_annotations FINAL
+WHERE user_id = {user_id:UUID}
+  AND video_id = {video_id:String}
+"""
