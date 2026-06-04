@@ -204,7 +204,33 @@ export const testimonials = [
 
 // ---------- Footer ----------
 export const footerColumns = [
-  { title: "Product", links: ["Features", "Pricing", "Changelog", "Roadmap"] },
-  { title: "Company", links: ["About", "Careers", "Press", "Contact"] },
-  { title: "Resources", links: ["Blog", "Docs", "Help center", "API"] },
+  {
+    title: "Product",
+    links: [
+      { label: "Features", href: "#" },
+      { label: "Pricing", href: "#" },
+      { label: "Changelog", href: "#" },
+      { label: "Roadmap", href: "#" },
+    ],
+  },
+  {
+    title: "Company",
+    links: [
+      { label: "About", href: "#" },
+      { label: "Careers", href: "#" },
+      { label: "Press", href: "#" },
+      { label: "Contact", href: "#" },
+      { label: "Privacy Policy", href: "/privacy" },
+      { label: "Terms of Service", href: "/terms" },
+    ],
+  },
+  {
+    title: "Resources",
+    links: [
+      { label: "Blog", href: "#" },
+      { label: "Docs", href: "#" },
+      { label: "Help center", href: "#" },
+      { label: "API", href: "#" },
+    ],
+  },
 ];

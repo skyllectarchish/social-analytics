@@ -387,6 +387,31 @@ def bulk_insert_media(
     _insert_hashtags_for_media(client, user_id, media_list, now)
 
 
+def update_media_urls(
+    client: Client,
+    user_id: str,
+    ig_media_id: str,
+    media_url: str,
+    thumbnail_url: str,
+) -> None:
+    """Update the media_url and thumbnail_url for a single media item.
+    Used when CDN URLs expire and we fetch fresh ones.
+    """
+    client.command(
+        "ALTER TABLE instagram_media UPDATE "
+        "media_url = {murl:String}, thumbnail_url = {turl:String} "
+        "WHERE user_id = {uid:UUID} AND ig_media_id = {mid:String}",
+        parameters={
+            "uid": user_id,
+            "mid": ig_media_id,
+            "murl": media_url,
+            "turl": thumbnail_url,
+        },
+        settings={"mutations_sync": 2},
+    )
+    logger.info("Updated media URLs for %s", ig_media_id)
+
+
 def _insert_hashtags_for_media(
     client: Client,
     user_id: str,

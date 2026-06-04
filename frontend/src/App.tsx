@@ -25,6 +25,8 @@ import CopilotPage from "./pages/CopilotPage";
 import MediaKitPage from "./pages/MediaKitPage";
 import InboxPage from "./pages/InboxPage";
 import PostsPage from "./pages/PostsPage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import TermsOfServicePage from "./pages/TermsOfServicePage";
 
 function Splash() {
   return (
@@ -77,6 +79,8 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<HomeRoute />} />
+      <Route path="/privacy" element={<PrivacyPolicyPage />} />
+      <Route path="/terms" element={<TermsOfServicePage />} />
       <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
       <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
       <Route path="/connect" element={<ProtectedRoute><ConnectInstagramPage /></ProtectedRoute>} />
