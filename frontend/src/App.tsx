@@ -22,6 +22,10 @@ import ReelsStudioPage from "./pages/ReelsStudioPage";
 import AudienceDNAPage from "./pages/AudienceDNAPage";
 import CompetitorsPage from "./pages/CompetitorsPage";
 import CopilotPage from "./pages/CopilotPage";
+import YoutubeConnectPage from "./pages/YoutubeConnectPage";
+import YoutubeCallbackPage from "./pages/YoutubeCallbackPage";
+import YoutubeDashboardPage from "./pages/YoutubeDashboardPage";
+import YoutubeRetentionPage from "./pages/YoutubeRetentionPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsOfServicePage from "./pages/TermsOfServicePage";
 
@@ -88,6 +92,10 @@ function AppRoutes() {
       <Route path="/dashboard/audience" element={<ProtectedRoute><AudienceDNAPage /></ProtectedRoute>} />
       <Route path="/dashboard/competitors" element={<ProtectedRoute><CompetitorsPage /></ProtectedRoute>} />
       <Route path="/dashboard/copilot" element={<ProtectedRoute><CopilotPage /></ProtectedRoute>} />
+      <Route path="/youtube/connect" element={<ProtectedRoute><YoutubeConnectPage /></ProtectedRoute>} />
+      <Route path="/auth/youtube/callback" element={<ProtectedRoute><YoutubeCallbackPage /></ProtectedRoute>} />
+      <Route path="/youtube" element={<ProtectedRoute><YoutubeDashboardPage /></ProtectedRoute>} />
+      <Route path="/youtube/retention" element={<ProtectedRoute><YoutubeRetentionPage /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
