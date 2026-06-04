@@ -314,14 +314,20 @@ async def fetch_media(
     ig_user_id: str,
     token: str,
     limit: int = DEFAULT_MEDIA_FETCH_LIMIT,
+    max_pages: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Fetch all media items for an Instagram user (handles pagination).
+    """Fetch media items for an Instagram user (handles pagination).
 
     Each page is fetched with transient-error retry. If retries on a page are
     exhausted mid-pagination, returns the items already collected rather than
     failing the entire refresh — the user gets partial data and a warning log
     rather than a 502. A non-transient error (auth failure, malformed query)
     still raises `InstagramAPIError`.
+
+    Args:
+        max_pages: cap on pages fetched. None = everything (full sync);
+            the live-mode endpoints pass 1 to grab just the newest posts
+            in a single Graph call.
     """
     media_items: list[dict[str, Any]] = []
     url = f"{GRAPH_BASE_URL}/{ig_user_id}/media"
@@ -334,7 +340,7 @@ async def fetch_media(
     # Hard cap on pagination iterations — defensive against a malformed Meta
     # response that returns both `paging.next` and a stable `after` cursor
     # forever. At MAX_PAGES * limit items, no realistic account is unfetched.
-    MAX_PAGES = 200
+    MAX_PAGES = max_pages if max_pages is not None else 200
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
         page = 0
         seen_cursors: set[str] = set()
@@ -372,10 +378,13 @@ async def fetch_media(
             seen_cursors.add(after_cursor)
             params["after"] = after_cursor
         else:
-            logger.warning(
-                "Media pagination hit MAX_PAGES=%d for %s — returning %d items",
-                MAX_PAGES, ig_user_id, len(media_items),
-            )
+            if max_pages is None:
+                # Only alarming when we *intended* a full fetch — live mode
+                # passes max_pages=1 and stopping early is the whole point.
+                logger.warning(
+                    "Media pagination hit MAX_PAGES=%d for %s — returning %d items",
+                    MAX_PAGES, ig_user_id, len(media_items),
+                )
 
     logger.info("Fetched %d media items for ig_user %s", len(media_items), ig_user_id)
     return media_items

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { Heart, Loader2, MessageCircle } from "lucide-react";
+import { FileUp, Heart, Loader2, MessageCircle } from "lucide-react";
 import api, { errorMessage } from "../api/client";
 import type { InstagramMedia, MediaListResponse } from "../api/types";
 import DashboardLayout from "../components/dashboard/DashboardLayout";
@@ -85,7 +85,9 @@ export default function PostsPage() {
     setError(null);
     try {
       const { data } = await api.get<MediaListResponse>("/instagram/media", {
-        params: { page: pageNum, page_size: PAGE_SIZE },
+        // live: page 1 pulls the newest posts straight from Instagram before
+        // serving, so new posts / fresh counts show without a manual Sync.
+        params: { page: pageNum, page_size: PAGE_SIZE, live: pageNum === 1 },
       });
       setTotal(data.total);
       setItems((prev) => (pageNum === 1 ? data.items : [...prev, ...data.items]));
@@ -147,7 +149,7 @@ export default function PostsPage() {
               <span className="num">{total}</span> posts stored · click any post for its insights
             </p>
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             {TYPE_FILTERS.map((f) => (
               <button
                 key={f.key}
@@ -157,6 +159,9 @@ export default function PostsPage() {
                 {f.label}
               </button>
             ))}
+            <Link to="/dashboard/import" className="chip !border-violet/25 !text-violet-deep" title="Import your Instagram data export">
+              <FileUp className="h-3.5 w-3.5" /> Import archive
+            </Link>
           </div>
         </div>
 

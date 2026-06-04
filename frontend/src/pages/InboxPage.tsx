@@ -284,7 +284,13 @@ export default function InboxPage() {
         {/* comment list */}
         {comments.length === 0 ? (
           <div className="card-hairline p-5">
-            <CardEmpty label="No comments here yet — hit Sync to pull the latest from Instagram." />
+            <CardEmpty
+              label={
+                filter === "all"
+                  ? "No comments synced yet. Note: Meta only returns real comments once the app has Advanced Access on manage_comments (Meta App Review) — until it's approved, this inbox stays empty even when your posts have comments."
+                  : "No comments match this filter."
+              }
+            />
           </div>
         ) : (
           <ul className="space-y-3">

@@ -8,8 +8,6 @@ import {
   Dna,
   Film,
   FlaskConical,
-  IdCard,
-  Inbox,
   Instagram,
   LayoutDashboard,
   LayoutGrid,
@@ -44,9 +42,7 @@ const NAV: { label: string; icon: LucideIcon; to: string }[] = [
   { label: "Reels Studio", icon: Film, to: "/dashboard/reels" },
   { label: "Audience DNA", icon: Dna, to: "/dashboard/audience" },
   { label: "Competitors", icon: Swords, to: "/dashboard/competitors" },
-  { label: "Inbox", icon: Inbox, to: "/dashboard/inbox" },
   { label: "AI Copilot", icon: Bot, to: "/dashboard/copilot" },
-  { label: "Media Kit", icon: IdCard, to: "/dashboard/media-kit" },
 ];
 
 function SidebarInner({

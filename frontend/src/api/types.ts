@@ -83,6 +83,96 @@ export interface DashboardSummary {
   comparisons?: Record<string, ComparisonValue> | null;
 }
 
+/* ---------- AI content factory ---------- */
+export interface ReelScriptBeat {
+  seconds: number;
+  action: string;
+  voiceover: string;
+  on_screen_text: string;
+}
+
+export interface ReelScriptResponse {
+  title: string;
+  hook: string;
+  beats: ReelScriptBeat[];
+  cta: string;
+  duration_s: number;
+  rationale: string;
+}
+
+export interface RepurposeResponse {
+  reel_script_md: string;
+  carousel_md: string;
+  story_sequence_md: string;
+  tweet_thread_md: string;
+}
+
+export interface DemandTopic {
+  id: string;
+  topic: string;
+  question_count: number;
+  sample_questions: string[];
+  content_pitch: string;
+  suggested_format: "REELS" | "CAROUSEL" | "IMAGE" | "STORY";
+}
+
+export interface QuestionMiningResponse {
+  period_days: number;
+  questions_analyzed: number;
+  demo: boolean;
+  topics: DemandTopic[];
+}
+
+export interface FormatWeekPoint {
+  week: string;
+  posts: number;
+  avg_engagement: number;
+}
+
+export interface FormatFatigueItem {
+  format: string;
+  status: "declining" | "improving" | "steady";
+  weeks_analyzed: number;
+  consecutive: number;
+  change_pct: number | null;
+  message: string;
+  weekly: FormatWeekPoint[];
+}
+
+export interface FormatFatigueResponse {
+  weeks: number;
+  formats: FormatFatigueItem[];
+}
+
+export interface ArchiveImportResponse {
+  posts_imported: number;
+  stories_imported: number;
+  followers_imported: number;
+}
+
+export interface ArchiveGrowthPoint {
+  month: string;
+  joins: number;
+  cumulative: number;
+}
+
+export interface ArchiveContentPoint {
+  month: string;
+  posts: number;
+  stories: number;
+}
+
+export interface ArchiveSummaryResponse {
+  posts: number;
+  posts_from: string | null;
+  stories: number;
+  stories_from: string | null;
+  followers: number;
+  followers_from: string | null;
+  follower_growth: ArchiveGrowthPoint[];
+  content_by_month: ArchiveContentPoint[];
+}
+
 export interface InboxComment {
   ig_comment_id: string;
   ig_media_id: string;
@@ -588,7 +678,7 @@ export interface DiagnosticResponse {
 }
 
 export interface FeedbackRequest {
-  feature: "digest" | "ideas" | "diagnostic" | "caption";
+  feature: "digest" | "ideas" | "diagnostic" | "caption" | "comment_reply" | "reel_script" | "repurpose" | "question_mining";
   ref_id: string;
   rating: "up" | "down";
   note?: string | null;

@@ -141,6 +141,60 @@ class CaptionSuggestResponse(BaseModel):
     notes_md: str = ""
 
 
+# --- Content factory: reel scripts --------------------------------------
+
+class ReelScriptRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+    summary: str | None = Field(default=None, max_length=2000)
+
+
+class ReelScriptBeat(BaseModel):
+    seconds: int = Field(ge=0, le=90)
+    action: str
+    voiceover: str = ""
+    on_screen_text: str = ""
+
+
+class ReelScriptResponse(BaseModel):
+    title: str
+    hook: str
+    beats: list[ReelScriptBeat] = Field(default_factory=list)
+    cta: str
+    duration_s: int = 30
+    rationale: str = ""
+
+
+# --- Content factory: repurposer -----------------------------------------
+
+class RepurposeRequest(BaseModel):
+    content: str = Field(min_length=20, max_length=6000)
+
+
+class RepurposeResponse(BaseModel):
+    reel_script_md: str
+    carousel_md: str
+    story_sequence_md: str
+    tweet_thread_md: str
+
+
+# --- Content factory: audience-question mining ---------------------------
+
+class DemandTopic(BaseModel):
+    id: str
+    topic: str
+    question_count: int
+    sample_questions: list[str] = Field(default_factory=list)
+    content_pitch: str
+    suggested_format: Literal["REELS", "CAROUSEL", "IMAGE", "STORY"]
+
+
+class QuestionMiningResponse(BaseModel):
+    period_days: int
+    questions_analyzed: int
+    demo: bool = False           # True when synthetic seed comments were mined
+    topics: list[DemandTopic] = Field(default_factory=list)
+
+
 # --- Comment Reply Suggester ----------------------------------------------
 
 class CommentReplySuggestRequest(BaseModel):
@@ -169,7 +223,10 @@ class QuotaResponse(BaseModel):
 # --- Feedback ------------------------------------------------------------
 
 class FeedbackRequest(BaseModel):
-    feature: Literal["digest", "ideas", "diagnostic", "caption", "comment_reply"]
+    feature: Literal[
+        "digest", "ideas", "diagnostic", "caption", "comment_reply",
+        "reel_script", "repurpose", "question_mining",
+    ]
     ref_id: str = Field(min_length=1, max_length=256)
     rating: Literal["up", "down"]
     note: str | None = Field(default=None, max_length=2000)

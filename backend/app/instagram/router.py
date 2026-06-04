@@ -4,7 +4,7 @@ import logging
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Response, UploadFile
 
 from ..auth.dependencies import get_current_user
 from ..config import settings
@@ -15,6 +15,7 @@ from ..constants import (
     INSIGHTS_INITIAL_FETCH_DAYS,
     INSIGHTS_LOOKBACK_DAYS,
     INSIGHTS_MAX_LOOKBACK_DAYS,
+    MAX_ARCHIVE_UPLOAD_BYTES,
     MAX_PAGE_SIZE,
 )
 from ..crypto import decrypt_token, encrypt_token
@@ -39,6 +40,7 @@ from ..models.queries import (
 from ..models.user import User
 from ..jobs import seed_demo_sentiment
 from ..repositories import (
+    archive_repo,
     branded_hashtag_repo,
     comment_repo,
     competitor_repo,
@@ -51,12 +53,16 @@ from ..repositories.comparison import (
     resolve_current_window,
 )
 from ..stats import pct_delta, rate_significance, sample_significance
-from . import competitors, service
+from . import archive, competitors, service
 from .schemas import (
     AddBrandedHashtagRequest,
     AddCompetitorRequest,
     AlertItem,
     AlertsResponse,
+    ArchiveContentPoint,
+    ArchiveGrowthPoint,
+    ArchiveImportResponse,
+    ArchiveSummaryResponse,
     AlgorithmMetricsResponse,
     BrandedHashtagItem,
     BrandedHashtagListResponse,
@@ -97,6 +103,9 @@ from .schemas import (
     FormatBreakdownPost,
     FormatBreakdownPostsResponse,
     FormatBreakdownResponse,
+    FormatFatigueItem,
+    FormatFatigueResponse,
+    FormatWeekPoint,
     GrowthCorrelationPoint,
     GrowthCorrelationResponse,
     GrowthDriverItem,
@@ -219,22 +228,60 @@ async def callback(
 
 
 @router.get("/profile", response_model=InstagramProfile)
-def get_profile(current_user: User = Depends(get_current_user)):
-    """Return the stored Instagram profile for the current user."""
+async def get_profile(
+    live: bool = Query(
+        False,
+        description="Fetch fresh from the Instagram Graph API (1 call), store the "
+                    "snapshot, and return it. Falls back to stored data on any "
+                    "Graph failure so the page never breaks on a Meta hiccup.",
+    ),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the Instagram profile for the current user (stored or live)."""
     client = get_client()
-    ig_profile = instagram_repo.find_profile(client, str(current_user.id))
+    user_id = str(current_user.id)
+    ig_profile = instagram_repo.find_profile(client, user_id)
     if ig_profile is None:
         raise InstagramNotConnectedError()
+
+    if live:
+        token_data = instagram_repo.find_token(client, user_id)
+        if token_data is not None:
+            try:
+                token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
+                profile_data = await service.fetch_profile(token_data.ig_user_id, token)
+                # Persist the fresh snapshot (token + expiry pass through
+                # unchanged) so analytics see the same numbers the user does.
+                instagram_repo.upsert_profile(
+                    client, user_id, token_data.ig_user_id, profile_data,
+                    token_data.access_token, token_data.token_expires_at,
+                )
+                return InstagramProfile.from_api_data(
+                    user_id, token_data.ig_user_id, profile_data,
+                )
+            except Exception:
+                logger.warning(
+                    "Live profile fetch failed for user %s — serving stored record",
+                    user_id,
+                )
+
     return InstagramProfile.from_model(ig_profile)
 
 
 @router.get("/media", response_model=MediaListResponse)
-def get_media(
+async def get_media(
     page: int = Query(1, ge=1),
     page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+    live: bool = Query(
+        False,
+        description="Pull the newest posts from the Instagram Graph API (1 call) "
+                    "and store them before serving, so brand-new posts and fresh "
+                    "like/comment counts appear without a manual Sync. Only "
+                    "applies to page 1; falls back to stored data on Graph errors.",
+    ),
     current_user: User = Depends(get_current_user),
 ):
-    """Return a paginated list of stored Instagram media for the current user."""
+    """Return a paginated list of Instagram media for the current user."""
     client = get_client()
     user_id = str(current_user.id)
     offset = (page - 1) * page_size
@@ -243,6 +290,20 @@ def get_media(
     if ig_profile is None:
         raise InstagramNotConnectedError()
     ig_user_id = ig_profile.ig_user_id
+
+    if live and page == 1:
+        token_data = instagram_repo.find_token(client, user_id)
+        if token_data is not None:
+            try:
+                token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
+                latest = await service.fetch_media(ig_user_id, token, max_pages=1)
+                if latest:
+                    instagram_repo.bulk_insert_media(client, user_id, ig_user_id, latest)
+            except Exception:
+                logger.warning(
+                    "Live media fetch failed for user %s — serving stored records",
+                    user_id,
+                )
 
     total = instagram_repo.count_media(client, user_id, ig_user_id)
     media_models = instagram_repo.find_media_page(client, user_id, ig_user_id, page_size, offset)
@@ -498,6 +559,192 @@ def get_overview(
         current.prior = prior
 
     return current
+
+
+# --- Data-export archive import ---
+
+@router.post("/import/archive", response_model=ArchiveImportResponse)
+async def import_archive(
+    files: list[UploadFile] = File(..., description="Instagram data-export ZIP or individual JSON files"),
+    current_user: User = Depends(get_current_user),
+):
+    """Import an Instagram "Download your information" export (JSON format).
+
+    Accepts the whole ZIP (media inside is skipped unread) or individual
+    JSON files. Files are classified by shape, so export-version path
+    differences don't matter. Re-importing the same export is idempotent —
+    the archive tables dedupe on natural keys during background merges.
+    """
+    client = get_client()
+    user_id = str(current_user.id)
+
+    totals = {"posts": 0, "stories": 0, "followers": 0}
+    for f in files:
+        blob = await f.read()
+        if len(blob) > MAX_ARCHIVE_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    f"{f.filename} is larger than "
+                    f"{MAX_ARCHIVE_UPLOAD_BYTES // (1024 * 1024)}MB. Upload just the JSON "
+                    "files from the export (posts_1.json, stories.json, followers_1.json) "
+                    "instead of the full ZIP."
+                ),
+            )
+        try:
+            parsed = archive.extract(f.filename or "", blob)
+        except Exception:
+            logger.exception("Archive import: failed to parse %s", f.filename)
+            raise HTTPException(
+                status_code=422,
+                detail=f"Could not parse {f.filename} — is it an Instagram JSON export?",
+            )
+        totals["posts"] += archive_repo.insert_posts(client, user_id, parsed["posts"])
+        totals["stories"] += archive_repo.insert_stories(client, user_id, parsed["stories"])
+        totals["followers"] += archive_repo.insert_followers(client, user_id, parsed["followers"])
+
+    logger.info(
+        "Archive import for user %s: %d posts, %d stories, %d followers",
+        user_id, totals["posts"], totals["stories"], totals["followers"],
+    )
+    if not any(totals.values()):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "No recognizable data found. Make sure you requested the export in "
+                "JSON format (not HTML) and uploaded the ZIP or its JSON files."
+            ),
+        )
+    return ArchiveImportResponse(
+        posts_imported=totals["posts"],
+        stories_imported=totals["stories"],
+        followers_imported=totals["followers"],
+    )
+
+
+@router.get("/import/summary", response_model=ArchiveSummaryResponse)
+def get_archive_summary(current_user: User = Depends(get_current_user)):
+    """Counts, date ranges, and monthly series for the imported archive."""
+    client = get_client()
+    user_id = str(current_user.id)
+
+    s = archive_repo.summary(client, user_id)
+    growth = [
+        ArchiveGrowthPoint(
+            month=m.isoformat() if hasattr(m, "isoformat") else str(m),
+            joins=int(j or 0),
+            cumulative=int(c or 0),
+        )
+        for m, j, c in archive_repo.follower_growth(client, user_id)
+    ]
+    content = [
+        ArchiveContentPoint(
+            month=m.isoformat() if hasattr(m, "isoformat") else str(m),
+            posts=int(p or 0),
+            stories=int(st or 0),
+        )
+        for m, p, st in archive_repo.content_by_month(client, user_id)
+    ]
+    return ArchiveSummaryResponse(**s, follower_growth=growth, content_by_month=content)
+
+
+# --- Format fatigue ---
+
+_FATIGUE_LABELS = {"REELS": "reels", "CAROUSEL": "carousels", "IMAGE": "image posts"}
+# Minimum weekly data points for a verdict; below this we stay quiet.
+_FATIGUE_MIN_WEEKS = 4
+# |change| ≥ this (recent vs baseline mean) also triggers a verdict.
+_FATIGUE_CHANGE_THRESHOLD_PCT = 25.0
+
+
+@router.get("/insights/format-fatigue", response_model=FormatFatigueResponse)
+def get_format_fatigue(
+    weeks: int = Query(12, ge=4, le=52),
+    current_user: User = Depends(get_current_user),
+):
+    """Deterministic per-format trend verdicts over the last `weeks` weeks.
+
+    A format is *declining* when its weekly average engagement has dropped
+    ≥3 posting-weeks in a row, or its recent two-week mean sits ≥25% under
+    its earlier baseline — *improving* for the mirror conditions. Uses
+    likes + comments from instagram_media so it works even where Meta
+    blocks per-media insights.
+    """
+    client = get_client()
+    user_id = str(current_user.id)
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+
+    since = (datetime.now(timezone.utc) - timedelta(weeks=weeks)).replace(tzinfo=None)
+    rows = insights_repo.find_weekly_format_engagement(
+        client, user_id, ig_profile.ig_user_id, since,
+    )
+
+    by_format: dict[str, list[tuple]] = {}
+    for week, fmt, posts, avg_eng in rows:
+        by_format.setdefault(fmt, []).append((week, int(posts or 0), float(avg_eng or 0)))
+
+    items: list[FormatFatigueItem] = []
+    for fmt, series in by_format.items():
+        series.sort(key=lambda r: r[0])
+        if len(series) < _FATIGUE_MIN_WEEKS:
+            continue
+        values = [v for _, _, v in series]
+
+        # Consecutive movement at the tail (gaps between posting weeks are
+        # fine — we compare consecutive *posting* weeks).
+        down = up = 0
+        for prev, cur in zip(values[:-1], values[1:]):
+            down = down + 1 if cur < prev else 0
+            up = up + 1 if cur > prev else 0
+
+        recent = sum(values[-2:]) / len(values[-2:])
+        baseline_vals = values[:-2] or values
+        baseline = sum(baseline_vals) / len(baseline_vals)
+        change = pct_delta(recent, baseline)
+
+        label = _FATIGUE_LABELS.get(fmt, fmt.lower())
+        if down >= 3 or (change is not None and change <= -_FATIGUE_CHANGE_THRESHOLD_PCT):
+            status = "declining"
+            if down >= 3:
+                message = f"Your {label} have declined {down} posting-weeks in a row."
+            else:
+                message = f"Your {label} are running {abs(change):.0f}% under their usual engagement."
+            consecutive = down
+        elif up >= 3 or (change is not None and change >= _FATIGUE_CHANGE_THRESHOLD_PCT):
+            status = "improving"
+            if up >= 3:
+                message = f"Your {label} have improved {up} posting-weeks in a row."
+            else:
+                message = f"Your {label} are running {change:.0f}% above their usual engagement."
+            consecutive = up
+        else:
+            status = "steady"
+            message = f"Your {label} are holding steady."
+            consecutive = max(down, up)
+
+        items.append(FormatFatigueItem(
+            format=fmt,
+            status=status,
+            weeks_analyzed=len(series),
+            consecutive=consecutive,
+            change_pct=round(change, 1) if change is not None else None,
+            message=message,
+            weekly=[
+                FormatWeekPoint(
+                    week=w.isoformat() if hasattr(w, "isoformat") else str(w),
+                    posts=p,
+                    avg_engagement=round(v, 1),
+                )
+                for w, p, v in series
+            ],
+        ))
+
+    # Declining formats first — they're the actionable ones.
+    order = {"declining": 0, "improving": 1, "steady": 2}
+    items.sort(key=lambda i: order.get(i.status, 3))
+    return FormatFatigueResponse(weeks=weeks, formats=items)
 
 
 # --- Comment inbox ---

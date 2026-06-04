@@ -119,7 +119,9 @@ export default function DashboardPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const { data: prof } = await api.get<InstagramProfile>("/instagram/profile");
+      // live: one Graph call so the greeting/KPIs always show the current
+      // follower count (falls back to the stored snapshot server-side).
+      const { data: prof } = await api.get<InstagramProfile>("/instagram/profile", { params: { live: true } });
       setProfile(prof);
 
       const cmp = compareTo ? { compare_to: compareTo } : {};

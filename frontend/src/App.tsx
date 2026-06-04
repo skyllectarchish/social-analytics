@@ -25,6 +25,7 @@ import CopilotPage from "./pages/CopilotPage";
 import MediaKitPage from "./pages/MediaKitPage";
 import InboxPage from "./pages/InboxPage";
 import PostsPage from "./pages/PostsPage";
+import ImportPage from "./pages/ImportPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsOfServicePage from "./pages/TermsOfServicePage";
 
@@ -87,6 +88,7 @@ function AppRoutes() {
       <Route path="/auth/instagram/callback" element={<ProtectedRoute><CallbackPage /></ProtectedRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/dashboard/posts" element={<ProtectedRoute><PostsPage /></ProtectedRoute>} />
+      <Route path="/dashboard/import" element={<ProtectedRoute><ImportPage /></ProtectedRoute>} />
       <Route path="/dashboard/content" element={<ProtectedRoute><ContentLabPage /></ProtectedRoute>} />
       <Route path="/dashboard/reels" element={<ProtectedRoute><ReelsStudioPage /></ProtectedRoute>} />
       <Route path="/dashboard/audience" element={<ProtectedRoute><AudienceDNAPage /></ProtectedRoute>} />

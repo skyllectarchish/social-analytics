@@ -202,6 +202,87 @@ ORDER BY interactions DESC
 LIMIT {limit:UInt32}
 """
 
+# --- AI content factory ---
+
+# Question comments for the audience-demand miner. Excludes spam; synthetic
+# demo rows are excluded unless include_demo=1 (used to demo the feature
+# before Meta App Review unlocks real comment data).
+GET_QUESTION_COMMENTS = """
+SELECT c.text, c.ig_media_id, coalesce(m.caption, '') AS media_caption
+FROM instagram_comments c FINAL
+INNER JOIN comment_sentiment s FINAL
+    ON s.user_id = c.user_id AND s.ig_comment_id = c.ig_comment_id
+LEFT JOIN instagram_media m FINAL
+    ON m.user_id = c.user_id AND m.ig_media_id = c.ig_media_id
+WHERE c.user_id = {user_id:UUID}
+  AND s.is_question = 1
+  AND s.is_spam = 0
+  AND ({include_demo:UInt8} = 1 OR c.ig_comment_id NOT LIKE 'synth_%')
+  AND c.timestamp >= {since:DateTime}
+ORDER BY c.timestamp DESC
+LIMIT {limit:UInt32}
+"""
+
+# Weekly average engagement (likes + comments per post) per format — feeds
+# the deterministic format-fatigue detector. Uses instagram_media counts so
+# it works even where per-media insights are blocked by Meta.
+GET_WEEKLY_FORMAT_ENGAGEMENT = """
+SELECT
+    toStartOfWeek(timestamp) AS week,
+    multiIf(
+        media_product_type = 'REELS', 'REELS',
+        media_type = 'CAROUSEL_ALBUM', 'CAROUSEL',
+        'IMAGE'
+    ) AS format,
+    count() AS posts,
+    avg(like_count + comments_count) AS avg_engagement
+FROM instagram_media FINAL
+WHERE user_id = {user_id:UUID}
+  AND ig_user_id = {ig_user_id:String}
+  AND media_product_type != 'STORY'
+  AND timestamp >= {since:DateTime}
+GROUP BY week, format
+ORDER BY format, week
+"""
+
+# --- Data-export archive import ---
+
+GET_ARCHIVE_SUMMARY = """
+SELECT
+    (SELECT count() FROM archive_posts FINAL WHERE user_id = {user_id:UUID}) AS posts,
+    (SELECT min(taken_at) FROM archive_posts FINAL WHERE user_id = {user_id:UUID}) AS posts_from,
+    (SELECT count() FROM archive_stories FINAL WHERE user_id = {user_id:UUID}) AS stories,
+    (SELECT min(taken_at) FROM archive_stories FINAL WHERE user_id = {user_id:UUID}) AS stories_from,
+    (SELECT count() FROM follower_events FINAL WHERE user_id = {user_id:UUID}) AS followers,
+    (SELECT min(followed_at) FROM follower_events FINAL WHERE user_id = {user_id:UUID}) AS followers_from
+"""
+
+# Cumulative follower curve by month — the real historical growth line the
+# Graph API can never provide (it has no per-follower timestamps at all).
+GET_ARCHIVE_FOLLOWER_GROWTH = """
+SELECT month, joins, sum(joins) OVER (ORDER BY month) AS cumulative
+FROM (
+    SELECT toStartOfMonth(followed_at) AS month, count() AS joins
+    FROM follower_events FINAL
+    WHERE user_id = {user_id:UUID}
+    GROUP BY month
+)
+ORDER BY month
+"""
+
+GET_ARCHIVE_CONTENT_BY_MONTH = """
+SELECT month, sumIf(n, kind = 'post') AS posts, sumIf(n, kind = 'story') AS stories
+FROM (
+    SELECT toStartOfMonth(taken_at) AS month, 'post' AS kind, count() AS n
+    FROM archive_posts FINAL WHERE user_id = {user_id:UUID} GROUP BY month
+    UNION ALL
+    SELECT toStartOfMonth(taken_at) AS month, 'story' AS kind, count() AS n
+    FROM archive_stories FINAL WHERE user_id = {user_id:UUID} GROUP BY month
+)
+GROUP BY month
+ORDER BY month
+"""
+
 # --- Comment inbox ---
 
 # Filters are parameterized as "off" sentinels ('' / 0) so one centralized
@@ -209,10 +290,14 @@ LIMIT {limit:UInt32}
 # sentiment batch) is always excluded; the creator's own top-level comments
 # are excluded via self_username. `replied` = the creator has a reply under
 # the comment (their own replies are synced like any other comment).
+# Synthetic demo rows (seed_demo_sentiment, ig_comment_id 'synth_*') are
+# excluded — the inbox is an action surface and replying to them would 400
+# at Meta; they remain visible in the Audience Voice demo sections.
 _COMMENT_INBOX_FILTERS = """
 WHERE c.user_id = {user_id:UUID}
   AND c.parent_comment_id = ''
   AND c.username != {self_username:String}
+  AND c.ig_comment_id NOT LIKE 'synth_%'
   AND coalesce(s.is_spam, 0) = 0
   AND ({sentiment:String} = '' OR s.sentiment = {sentiment:String})
   AND ({questions_only:UInt8} = 0 OR s.is_question = 1)
@@ -271,6 +356,7 @@ LEFT JOIN instagram_media m FINAL
     ON m.user_id = c.user_id AND m.ig_media_id = c.ig_media_id
 WHERE c.user_id = {user_id:UUID}
   AND c.ig_comment_id = {ig_comment_id:String}
+  AND c.ig_comment_id NOT LIKE 'synth_%'
 LIMIT 1
 """
 
@@ -281,6 +367,7 @@ FROM instagram_comments FINAL
 WHERE user_id = {user_id:UUID}
   AND parent_comment_id != ''
   AND username = {self_username:String}
+  AND ig_comment_id NOT LIKE 'synth_%'
 ORDER BY timestamp DESC
 LIMIT {limit:UInt32}
 """

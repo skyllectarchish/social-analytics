@@ -46,6 +46,7 @@ from ..models.queries import (
     GET_SENTIMENT_TREND,
     GET_TOP_HASHTAGS,
     GET_TOPICS,
+    GET_WEEKLY_FORMAT_ENGAGEMENT,
 )
 
 logger = logging.getLogger(__name__)
@@ -172,6 +173,19 @@ def find_daily_metric_samples(
         if metric_name in out:
             out[metric_name].append(float(daily_value or 0))
     return out
+
+
+def find_weekly_format_engagement(
+    client: Client,
+    user_id: str,
+    ig_user_id: str,
+    since: datetime,
+) -> list[tuple]:
+    """(week, format, posts, avg_engagement) rows — format-fatigue input."""
+    return client.query(
+        GET_WEEKLY_FORMAT_ENGAGEMENT,
+        parameters={"user_id": user_id, "ig_user_id": ig_user_id, "since": since},
+    ).result_rows
 
 
 # --- Anomaly alerts ---

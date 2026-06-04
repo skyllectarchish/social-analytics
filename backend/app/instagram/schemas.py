@@ -183,6 +183,66 @@ class PurgeResponse(BaseModel):
     media_deleted: int
 
 
+# --- Data-export archive import ---
+
+class ArchiveImportResponse(BaseModel):
+    """Response for POST /api/instagram/import/archive."""
+
+    posts_imported: int
+    stories_imported: int
+    followers_imported: int
+
+
+class ArchiveGrowthPoint(BaseModel):
+    month: str                   # ISO date (first of month)
+    joins: int
+    cumulative: int
+
+
+class ArchiveContentPoint(BaseModel):
+    month: str
+    posts: int
+    stories: int
+
+
+class ArchiveSummaryResponse(BaseModel):
+    """Response for GET /api/instagram/import/summary."""
+
+    posts: int
+    posts_from: str | None = None
+    stories: int
+    stories_from: str | None = None
+    followers: int
+    followers_from: str | None = None
+    follower_growth: list[ArchiveGrowthPoint] = Field(default_factory=list)
+    content_by_month: list[ArchiveContentPoint] = Field(default_factory=list)
+
+
+# --- Format fatigue ---
+
+class FormatWeekPoint(BaseModel):
+    week: str                    # ISO date (Monday of week)
+    posts: int
+    avg_engagement: float
+
+
+class FormatFatigueItem(BaseModel):
+    format: str                  # REELS | CAROUSEL | IMAGE
+    status: str                  # declining | improving | steady
+    weeks_analyzed: int
+    consecutive: int             # weeks moving in the `status` direction
+    change_pct: float | None = None
+    message: str
+    weekly: list[FormatWeekPoint] = Field(default_factory=list)
+
+
+class FormatFatigueResponse(BaseModel):
+    """Response for GET /api/instagram/insights/format-fatigue."""
+
+    weeks: int
+    formats: list[FormatFatigueItem] = Field(default_factory=list)
+
+
 # --- Comment inbox ---
 
 class InboxComment(BaseModel):

@@ -226,7 +226,19 @@
       "PowerShell($conns = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue; $conns | ForEach-Object { $p = Get-CimInstance Win32_Process -Filter \"ProcessId = $\\($_.OwningProcess\\)\"; \"PID $\\($p.ProcessId\\) | started $\\($p.CreationDate\\) | $\\($p.CommandLine\\)\" } | Sort-Object -Unique)",
       "PowerShell(Start-Sleep -Seconds 6; try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8000/api/instagram/comments/inbox\" -UseBasicParsing; $code = $r.StatusCode } catch { $code = [int]$_.Exception.Response.StatusCode }; \"inbox route: $code\"; try { $h = Invoke-WebRequest -Uri \"http://127.0.0.1:8000/api/health\" -UseBasicParsing; \"health: $\\($h.Content\\)\" } catch { \"health: down\" })",
       "PowerShell($env:PYTHONIOENCODING='utf-8'; .\\\\venv\\\\Scripts\\\\python.exe _check_media.py)",
-      "PowerShell(Set-Location C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend; $env:PYTHONIOENCODING='utf-8'; .\\\\venv\\\\Scripts\\\\python.exe _check_media.py)"
+      "PowerShell(Set-Location C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend; $env:PYTHONIOENCODING='utf-8'; .\\\\venv\\\\Scripts\\\\python.exe _check_media.py)",
+      "PowerShell($env:PYTHONIOENCODING='utf-8'; .\\\\venv\\\\Scripts\\\\python.exe _check_comments.py)",
+      "PowerShell(Set-Location C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend; $env:PYTHONIOENCODING='utf-8'; .\\\\venv\\\\Scripts\\\\python.exe _check_comments.py)",
+      "PowerShell($env:PYTHONIOENCODING='utf-8'; .\\\\venv\\\\Scripts\\\\python.exe _check_comments.py; Set-Location ..\\\\frontend; .\\\\node_modules\\\\.bin\\\\tsc -b; if \\($?\\) { Write-Output \"tsc OK\" })",
+      "PowerShell($env:PYTHONIOENCODING='utf-8'; .\\\\venv\\\\Scripts\\\\python.exe run_migrations.py; .\\\\venv\\\\Scripts\\\\python.exe _test_archive.py)",
+      "PowerShell(Set-Location C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend; $env:PYTHONIOENCODING='utf-8'; .\\\\venv\\\\Scripts\\\\python.exe run_migrations.py; .\\\\venv\\\\Scripts\\\\python.exe _test_archive.py)",
+      "PowerShell($env:PYTHONIOENCODING='utf-8'; .\\\\venv\\\\Scripts\\\\python.exe _check_migrations.py; Get-ChildItem migrations | Select-Object -ExpandProperty Name)",
+      "PowerShell($env:PYTHONIOENCODING='utf-8'; .\\\\venv\\\\Scripts\\\\python.exe _check_migrations.py)",
+      "PowerShell(Rename-Item *)",
+      "PowerShell(Set-Location ..\\\\backend; $env:PYTHONIOENCODING='utf-8'; .\\\\venv\\\\Scripts\\\\python.exe _test_factory.py)",
+      "PowerShell($env:PYTHONIOENCODING='utf-8'; .\\\\venv\\\\Scripts\\\\python.exe _test_factory.py)",
+      "PowerShell(Set-Location ..\\\\backend; $env:PYTHONIOENCODING='utf-8'; .\\\\venv\\\\Scripts\\\\python.exe _test_qm.py)",
+      "PowerShell($env:PYTHONIOENCODING='utf-8'; .\\\\venv\\\\Scripts\\\\python.exe _test_qm.py)"
     ]
   }
 }

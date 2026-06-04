@@ -33,6 +33,7 @@ from ..database import get_client
 from ..models.user import User
 from . import caption as caption_service
 from . import comment_reply as comment_reply_service
+from . import content_factory as content_factory_service
 from . import diagnostic as diagnostic_service
 from . import digest as digest_service
 from . import feedback as feedback_service
@@ -44,6 +45,11 @@ from .schemas import (
     CaptionSuggestResponse,
     CommentReplySuggestRequest,
     CommentReplySuggestResponse,
+    QuestionMiningResponse,
+    ReelScriptRequest,
+    ReelScriptResponse,
+    RepurposeRequest,
+    RepurposeResponse,
     ContentIdeasResponse,
     DiagnoseRequest,
     DiagnosticResponse,
@@ -267,6 +273,62 @@ async def diagnose_post(
         quota_service.enforce(client, user_id)
         return await diagnostic_service.synthesize(
             client, user_id=user_id, ig_media_id=payload.ig_media_id,
+        )
+
+
+# --- Content factory -------------------------------------------------------
+
+@router.post("/api/ai/reel-script", response_model=ReelScriptResponse)
+async def write_reel_script(
+    payload: ReelScriptRequest,
+    current_user: User = Depends(get_current_user),
+) -> ReelScriptResponse:
+    """Turn a content idea into a ready-to-shoot reel script, modeled on the
+    creator's top-performing reels. One quota call, no cache."""
+    client = get_client()
+    user_id = str(current_user.id)
+    async with quota_service.user_lock(user_id):
+        quota_service.enforce(client, user_id)
+        return await content_factory_service.synthesize_reel_script(
+            client, user_id=user_id, title=payload.title, summary=payload.summary,
+        )
+
+
+@router.post("/api/ai/repurpose", response_model=RepurposeResponse)
+async def repurpose_content(
+    payload: RepurposeRequest,
+    current_user: User = Depends(get_current_user),
+) -> RepurposeResponse:
+    """One piece of content → reel script + carousel + stories + tweet thread.
+    One quota call, no cache."""
+    client = get_client()
+    user_id = str(current_user.id)
+    async with quota_service.user_lock(user_id):
+        quota_service.enforce(client, user_id)
+        return await content_factory_service.synthesize_repurpose(
+            client, user_id=user_id, content=payload.content,
+        )
+
+
+@router.post("/api/ai/question-mining", response_model=QuestionMiningResponse)
+async def mine_questions(
+    days: int = Query(default=90, ge=7, le=365),
+    demo: bool = Query(
+        default=False,
+        description="Also mine the synthetic seed comments — demos the feature "
+                    "before Meta App Review unlocks real comment data. The "
+                    "response is flagged demo=true.",
+    ),
+    current_user: User = Depends(get_current_user),
+) -> QuestionMiningResponse:
+    """Cluster audience questions into demand topics + content pitches.
+    Charges one quota call (skipped when there are <3 questions to mine)."""
+    client = get_client()
+    user_id = str(current_user.id)
+    async with quota_service.user_lock(user_id):
+        quota_service.enforce(client, user_id)
+        return await content_factory_service.synthesize_question_mining(
+            client, user_id=user_id, period_days=days, include_demo=demo,
         )
 
 
