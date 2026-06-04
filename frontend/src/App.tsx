@@ -22,6 +22,8 @@ import ReelsStudioPage from "./pages/ReelsStudioPage";
 import AudienceDNAPage from "./pages/AudienceDNAPage";
 import CompetitorsPage from "./pages/CompetitorsPage";
 import CopilotPage from "./pages/CopilotPage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import TermsOfServicePage from "./pages/TermsOfServicePage";
 
 function Splash() {
   return (
@@ -74,6 +76,8 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<HomeRoute />} />
+      <Route path="/privacy" element={<PrivacyPolicyPage />} />
+      <Route path="/terms" element={<TermsOfServicePage />} />
       <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
       <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
       <Route path="/connect" element={<ProtectedRoute><ConnectInstagramPage /></ProtectedRoute>} />

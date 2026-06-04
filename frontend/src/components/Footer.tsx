@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Instagram, Sparkles } from "lucide-react";
 import { footerColumns } from "../data/mock";
 
@@ -13,7 +14,7 @@ export default function Footer() {
             <span className="font-display text-lg font-semibold">InfluenceIQ</span>
           </div>
           <p className="mt-3 max-w-xs text-sm text-foreground/55">
-            Premium Instagram analytics. Built in Lisbon for the creator economy.
+            Premium Instagram & YouTube analytics. Built for the creator economy.
           </p>
           <div className="mt-4 flex gap-2">
             <Instagram className="h-4 w-4 text-foreground/50" />
@@ -27,10 +28,16 @@ export default function Footer() {
             </div>
             <ul className="mt-3 space-y-2 text-sm text-foreground/70">
               {col.links.map((l) => (
-                <li key={l}>
-                  <a className="hover:text-foreground" href="#">
-                    {l}
-                  </a>
+                <li key={l.label}>
+                  {l.href.startsWith("/") ? (
+                    <Link className="hover:text-foreground" to={l.href}>
+                      {l.label}
+                    </Link>
+                  ) : (
+                    <a className="hover:text-foreground" href={l.href}>
+                      {l.label}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>
@@ -39,9 +46,14 @@ export default function Footer() {
       </div>
 
       <div className="mx-auto mt-10 flex max-w-6xl flex-wrap items-center justify-between gap-3 border-t border-black/5 pt-6 text-xs text-foreground/55">
-        <span>© 2026 InfluenceIQ Labs · Made with 💜 in Lisbon</span>
-        <span>Privacy · Terms · Cookies</span>
+        <span>© 2026 InfluenceIQ Labs</span>
+        <div className="flex gap-3">
+          <Link to="/privacy" className="transition hover:text-foreground">Privacy</Link>
+          <span>·</span>
+          <Link to="/terms" className="transition hover:text-foreground">Terms</Link>
+        </div>
       </div>
     </footer>
   );
 }
+
