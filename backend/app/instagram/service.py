@@ -351,6 +351,43 @@ async def fetch_media(
     return media_items
 
 
+async def fetch_fresh_media_urls(ig_media_id: str, ig_user_id: str, token: str) -> dict[str, str]:
+    """Fetch fresh media_url and thumbnail_url for a single media item.
+    The new Instagram API does not support GET /{media_id} directly, so we
+    paginate through the user's recent media to find the fresh URL.
+    """
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+        url = f"{GRAPH_BASE_URL}/{ig_user_id}/media"
+        params = {
+            "fields": "id,media_url,thumbnail_url",
+            "access_token": token,
+            "limit": 50,
+        }
+        for _ in range(5):  # limit search depth
+            try:
+                resp = await client.get(url, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+                
+                for item in data.get("data", []):
+                    if item.get("id") == ig_media_id:
+                        return {
+                            "media_url": item.get("media_url", ""),
+                            "thumbnail_url": item.get("thumbnail_url", ""),
+                        }
+                        
+                after = data.get("paging", {}).get("cursors", {}).get("after")
+                if not after:
+                    break
+                params["after"] = after
+                
+            except httpx.HTTPError as exc:
+                logger.error("Failed to fetch fresh URLs for %s: %s", ig_media_id, exc)
+                break
+                
+    raise InstagramAPIError(f"Media {ig_media_id} not found in recent feed to refresh URL")
+
+
 async def _fetch_reach_follower_breakdown(
     http: httpx.AsyncClient,
     media_id: str,

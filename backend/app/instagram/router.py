@@ -271,7 +271,39 @@ async def get_media_image(
     if not url:
         raise EntityNotFoundError("Media has no image URL")
 
-    content, content_type = await service.fetch_image(url)
+    try:
+        content, content_type = await service.fetch_image(url)
+    except InstagramAPIError as exc:
+        if "403" in str(exc):
+            logger.info("CDN URL expired for %s, fetching fresh URL", ig_media_id)
+            # URL expired. Fetch fresh URL from Graph API.
+            token_data = instagram_repo.find_token(client, str(current_user.id))
+            if not token_data:
+                raise
+            token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
+            try:
+                fresh_urls = await service.fetch_fresh_media_urls(
+                    ig_media_id, token_data.ig_user_id, token
+                )
+            except InstagramAPIError as refresh_exc:
+                if "not found" in str(refresh_exc):
+                    logger.warning("Media %s deleted or too old to refresh URL", ig_media_id)
+                    raise HTTPException(status_code=404, detail="Image unavailable")
+                raise
+            
+            new_media_url = fresh_urls.get("media_url", "")
+            new_thumb_url = fresh_urls.get("thumbnail_url", "")
+            if not new_media_url and not new_thumb_url:
+                raise EntityNotFoundError("Fresh media has no image URL")
+
+            instagram_repo.update_media_urls(
+                client, str(current_user.id), ig_media_id, new_media_url, new_thumb_url,
+            )
+            url = new_thumb_url or new_media_url
+            content, content_type = await service.fetch_image(url)
+        else:
+            raise
+
     # Private + cacheable: the bytes are user-scoped but immutable for the URL's
     # lifetime, so let the browser cache them rather than re-proxy on every render.
     return Response(
