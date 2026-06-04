@@ -215,7 +215,11 @@
       "Bash(dir C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics *)",
       "Bash(Select-Object -ExpandProperty FullName)",
       "PowerShell(Set-Location \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\frontend\"; npx tsc -b 2>&1 | Select-Object -First 30; \"exit: $LASTEXITCODE\")",
-      "PowerShell(Set-Location \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\frontend\"; npx tsc -b; \"exit: $LASTEXITCODE\")"
+      "PowerShell(Set-Location \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\frontend\"; npx tsc -b; \"exit: $LASTEXITCODE\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git checkout *)",
+      "Bash(git commit *)"
     ]
   }
 }
