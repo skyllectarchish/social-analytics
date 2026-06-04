@@ -14,6 +14,7 @@ from .config import settings
 from .database import close_client, ping
 from .exception_handlers import register_exception_handlers
 from .instagram.router import router as instagram_router
+from .youtube.router import router as youtube_router
 from .logging_config import setup_logging
 from .scheduler import shutdown_scheduler, start_scheduler
 
@@ -56,6 +57,7 @@ register_exception_handlers(app)
 
 app.include_router(auth_router)
 app.include_router(instagram_router)
+app.include_router(youtube_router)
 app.include_router(ai_router)
 
 # Tier 4 / Phase F — admin endpoints. Mounted only when ADMIN_API_KEY is
