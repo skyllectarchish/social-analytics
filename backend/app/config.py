@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     meta_system_token: str = ""
     meta_system_ig_user_id: str = ""
 
+    # Google / YouTube
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = ""   # must match /auth/youtube/callback registered in Google Cloud Console
+
     # OAuth state CSRF token (signed JWT, scoped to the IG connect flow)
     oauth_state_ttl_seconds: int = 600
 
