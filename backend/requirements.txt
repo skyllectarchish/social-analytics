@@ -8,7 +8,7 @@ pydantic-settings>=2.0
 clickhouse-connect>=0.8.0
 clickhouse-migrations>=0.4.0
 cryptography>=44.0.0
-httpx>=0.28.0
+httpx>=0.28.0          # HTTP client for Meta (Instagram) and Google (YouTube) API calls
 python-multipart>=0.0.18
 python-dotenv>=1.0.0
 
