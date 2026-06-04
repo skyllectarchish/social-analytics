@@ -1,19 +1,21 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowUpRight,
-  Bell,
   Bot,
   Calendar,
   GitCompareArrows,
   Dna,
   Film,
   FlaskConical,
+  IdCard,
+  Inbox,
   Instagram,
   LayoutDashboard,
+  LayoutGrid,
+  LogOut,
   Menu,
   RefreshCw,
-  Search,
   Sparkles,
   Swords,
   Unplug,
@@ -37,11 +39,14 @@ type Quota = { used: number; limit: number } | null;
 
 const NAV: { label: string; icon: LucideIcon; to: string }[] = [
   { label: "Overview", icon: LayoutDashboard, to: "/dashboard" },
+  { label: "Posts", icon: LayoutGrid, to: "/dashboard/posts" },
   { label: "Content Lab", icon: FlaskConical, to: "/dashboard/content" },
   { label: "Reels Studio", icon: Film, to: "/dashboard/reels" },
   { label: "Audience DNA", icon: Dna, to: "/dashboard/audience" },
   { label: "Competitors", icon: Swords, to: "/dashboard/competitors" },
+  { label: "Inbox", icon: Inbox, to: "/dashboard/inbox" },
   { label: "AI Copilot", icon: Bot, to: "/dashboard/copilot" },
+  { label: "Media Kit", icon: IdCard, to: "/dashboard/media-kit" },
 ];
 
 function SidebarInner({
@@ -158,6 +163,8 @@ export default function DashboardLayout({
   const { compareMode, setCompareMode, customRange, setCustomRange, calendarPreset } = usePeriodComparator();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
   const [quota, setQuota] = useState<Quota>(null);
   // null = unknown/loading, true = connected, false = no IG account linked
   const [connected, setConnected] = useState<boolean | null>(null);
@@ -176,6 +183,22 @@ export default function DashboardLayout({
   }
 
   useEffect(() => {
+    if (!profileOpen) return;
+    function onPointerDown(e: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setProfileOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [profileOpen]);
+
+  useEffect(() => {
     safeGet<QuotaResponse>("/ai/quota").then((q) => {
       if (q) setQuota({ used: q.used, limit: q.limit });
     });
@@ -191,14 +214,14 @@ export default function DashboardLayout({
 
   return (
     <div className="aurora-scene min-h-dvh" style={{ backgroundColor: "#F5F6FA" }}>
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+      <div aria-hidden className="no-print pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute -top-32 -left-24 h-[480px] w-[480px] rounded-full opacity-60 blur-3xl" style={{ background: "radial-gradient(circle, #c4b5fd, transparent 60%)", animation: "drift 22s ease-in-out infinite" }} />
         <div className="absolute top-20 -right-32 h-[520px] w-[520px] rounded-full opacity-50 blur-3xl" style={{ background: "radial-gradient(circle, #fbcfe8, transparent 60%)", animation: "drift 28s ease-in-out infinite reverse" }} />
         <div className="absolute bottom-0 left-1/3 h-[420px] w-[420px] rounded-full opacity-40 blur-3xl" style={{ background: "radial-gradient(circle, #dbeafe, transparent 60%)", animation: "drift 32s ease-in-out infinite" }} />
       </div>
 
       {/* desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden md:block">
+      <aside className="no-print fixed inset-y-0 left-0 z-30 hidden md:block">
         <SidebarInner username={username} active={active} quota={quota} connected={connected} onDisconnect={disconnectInstagram} />
       </aside>
 
@@ -215,19 +238,12 @@ export default function DashboardLayout({
         </div>
       )}
 
-      <div className="md:pl-64">
-        <header className="sticky top-0 z-20 border-b border-black/5 bg-white/60 backdrop-blur-xl">
+      <div className="print-flat md:pl-64">
+        <header className="no-print sticky top-0 z-20 bg-transparent">
           <div className="flex h-14 items-center gap-3 px-4 md:px-6">
             <button className="md:hidden" aria-label="Open navigation" onClick={() => setMobileOpen(true)}>
               <Menu className="h-5 w-5" />
             </button>
-            <div className="hidden flex-1 items-center gap-2 sm:flex">
-              <Search className="h-4 w-4 text-foreground/40" />
-              <input
-                placeholder="Search posts, hashtags, competitors…"
-                className="w-full max-w-md bg-transparent text-sm outline-none placeholder:text-foreground/40"
-              />
-            </div>
             <div className="ml-auto flex items-center gap-2">
               <div className={`chip ${calendarPreset ? "opacity-50" : ""}`} title={calendarPreset ? "Window is set by the calendar comparison preset" : undefined}>
                 <Calendar className="h-3.5 w-3.5" />
@@ -280,12 +296,50 @@ export default function DashboardLayout({
               <button className="chip !bg-gradient-to-r !from-violet !to-pink-500 !text-white">
                 <Zap className="h-3.5 w-3.5" /> {quota ? `${Math.max(0, quota.limit - quota.used)} / ${quota.limit}` : "AI"}
               </button>
-              <button className="grid h-9 w-9 place-items-center rounded-full bg-white ring-1 ring-black/5" aria-label="Notifications">
-                <Bell className="h-4 w-4" />
-              </button>
-              <button onClick={logout} title="Sign out" aria-label="Sign out">
-                <img src={avatar(47)} className="h-9 w-9 rounded-full ring-2 ring-white" alt="" />
-              </button>
+              <div ref={profileRef} className="relative">
+                <button
+                  onClick={() => setProfileOpen((o) => !o)}
+                  aria-label="Profile menu"
+                  aria-haspopup="menu"
+                  aria-expanded={profileOpen}
+                >
+                  <img src={avatar(47)} className="h-9 w-9 rounded-full ring-2 ring-white" alt="" />
+                </button>
+                {profileOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.15, ease: "easeOut" }}
+                    role="menu"
+                    className="glass-strong absolute right-0 top-full mt-2 w-56 rounded-2xl p-1.5 shadow-lg ring-1 ring-black/5"
+                  >
+                    <div className="px-3 py-2 text-xs">
+                      <div className="truncate font-semibold">@{username}</div>
+                      {user?.email && <div className="truncate text-foreground/55">{user.email}</div>}
+                    </div>
+                    <div className="my-1 h-px bg-black/5" />
+                    {connected && (
+                      <button
+                        role="menuitem"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          disconnectInstagram();
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-foreground/70 transition hover:bg-white/60 hover:text-red-500"
+                      >
+                        <Unplug className="h-3.5 w-3.5" /> Disconnect Instagram
+                      </button>
+                    )}
+                    <button
+                      role="menuitem"
+                      onClick={logout}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-foreground/70 transition hover:bg-white/60"
+                    >
+                      <LogOut className="h-3.5 w-3.5" /> Sign out
+                    </button>
+                  </motion.div>
+                )}
+              </div>
             </div>
           </div>
         </header>
@@ -293,7 +347,7 @@ export default function DashboardLayout({
         {(() => {
           const banner =
             connected === false ? (
-              <div className="mb-6 flex shrink-0 flex-wrap items-center gap-3 rounded-2xl border border-violet/20 bg-lavender/60 px-4 py-3">
+              <div className="no-print mb-6 flex shrink-0 flex-wrap items-center gap-3 rounded-2xl border border-violet/20 bg-lavender/60 px-4 py-3">
                 <span className="bg-ig grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white">
                   <Instagram className="h-4 w-4" />
                 </span>
@@ -315,7 +369,7 @@ export default function DashboardLayout({
               <div className="min-h-0 flex-1">{children}</div>
             </main>
           ) : (
-            <main className="px-4 py-6 md:px-6 md:py-8">
+            <main className="print-flat px-4 py-6 md:px-6 md:py-8">
               {banner}
               {children}
             </main>

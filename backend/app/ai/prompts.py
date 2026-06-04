@@ -348,6 +348,68 @@ def render_caption_user_block(ctx: dict[str, Any]) -> str:
     return _stable_json(ctx)
 
 
+# --- Comment reply suggester ---------------------------------------------
+
+COMMENT_REPLY_SYSTEM = """\
+You write Instagram comment replies in one creator's voice. You receive:
+- The incoming comment (text, sentiment label, whether it's a question)
+- The caption of the post the comment was left on
+- Up to 5 of the creator's own recent replies (voice samples; may be empty)
+
+Your task: propose 3 ready-to-post replies with distinct tones.
+
+Rules:
+- Output is a strict JSON object matching the supplied schema. No prose
+  outside the JSON.
+- Each reply is 1-2 short sentences, specific to the comment — never a
+  generic "Thanks so much!" unless the comment itself is a bare emoji.
+- Mirror the voice samples when present: their emoji habits, formality,
+  punctuation. With no samples, default to warm and casual.
+- Never invent facts, prices, discounts, links, or commitments. If the
+  comment asks something the caption doesn't answer, acknowledge and
+  promise a follow-up instead of fabricating an answer.
+- For negative comments: de-escalate, stay gracious, never argue.
+- No hashtags. At most one emoji per reply unless the voice samples use more.
+- The three `tone` values MUST be exactly: "friendly", "playful",
+  "professional" — one reply each.
+- Each reply MUST stay under 500 characters.
+- The output object MUST use exactly these keys — a top-level
+  "suggestions" array whose items have "tone" and "reply":
+  {"suggestions":[{"tone":"friendly","reply":"..."},
+  {"tone":"playful","reply":"..."},{"tone":"professional","reply":"..."}]}
+"""
+
+COMMENT_REPLY_OUTPUT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["suggestions"],
+    "properties": {
+        "suggestions": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["tone", "reply"],
+                "properties": {
+                    "tone": {
+                        "type": "string",
+                        "enum": ["friendly", "playful", "professional"],
+                    },
+                    "reply": {"type": "string"},
+                },
+            },
+        },
+    },
+}
+
+
+def render_comment_reply_user_block(ctx: dict[str, Any]) -> str:
+    """Render the comment-reply context as deterministic JSON."""
+    return _stable_json(ctx)
+
+
 # --- Helpers -------------------------------------------------------------
 
 def _stable_json(obj: Any) -> str:

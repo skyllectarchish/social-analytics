@@ -32,6 +32,7 @@ from ..config import settings
 from ..database import get_client
 from ..models.user import User
 from . import caption as caption_service
+from . import comment_reply as comment_reply_service
 from . import diagnostic as diagnostic_service
 from . import digest as digest_service
 from . import feedback as feedback_service
@@ -41,6 +42,8 @@ from . import telemetry as telemetry_service
 from .schemas import (
     CaptionSuggestRequest,
     CaptionSuggestResponse,
+    CommentReplySuggestRequest,
+    CommentReplySuggestResponse,
     ContentIdeasResponse,
     DiagnoseRequest,
     DiagnosticResponse,
@@ -264,6 +267,25 @@ async def diagnose_post(
         quota_service.enforce(client, user_id)
         return await diagnostic_service.synthesize(
             client, user_id=user_id, ig_media_id=payload.ig_media_id,
+        )
+
+
+@router.post("/api/ai/comment-reply", response_model=CommentReplySuggestResponse)
+async def suggest_comment_reply(
+    payload: CommentReplySuggestRequest,
+    current_user: User = Depends(get_current_user),
+) -> CommentReplySuggestResponse:
+    """Return 3 reply suggestions for one comment, in the creator's voice.
+
+    No caching — each comment is its own keyspace. Charges one quota
+    slot per call. 404 when the comment isn't in the user's synced data.
+    """
+    client = get_client()
+    user_id = str(current_user.id)
+    async with quota_service.user_lock(user_id):
+        quota_service.enforce(client, user_id)
+        return await comment_reply_service.synthesize(
+            client, user_id=user_id, ig_comment_id=payload.ig_comment_id,
         )
 
 

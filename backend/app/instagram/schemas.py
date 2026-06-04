@@ -183,6 +183,68 @@ class PurgeResponse(BaseModel):
     media_deleted: int
 
 
+# --- Comment inbox ---
+
+class InboxComment(BaseModel):
+    """One top-level comment in the unified inbox."""
+
+    ig_comment_id: str
+    ig_media_id: str
+    username: str
+    text: str
+    like_count: int
+    timestamp: str               # ISO-8601
+    sentiment: str               # 'positive' | 'neutral' | 'negative' | '' (unscored)
+    is_question: bool
+    replied: bool                # creator has a reply under this comment
+    permalink: str               # post permalink ('' if media row missing)
+
+
+class CommentInboxResponse(BaseModel):
+    """Response for GET /api/instagram/comments/inbox."""
+
+    total: int
+    comments: list[InboxComment]
+
+
+class CommentReplyRequest(BaseModel):
+    """Body for POST /api/instagram/comments/{comment_id}/reply."""
+
+    message: str = Field(min_length=1, max_length=2200)
+
+
+class CommentReplyResponse(BaseModel):
+    """Response for POST /api/instagram/comments/{comment_id}/reply."""
+
+    success: bool
+    reply_id: str
+
+
+# --- Anomaly alerts ---
+
+class AlertItem(BaseModel):
+    """One detected anomaly — a metric shift or an overperforming post."""
+
+    id: str                      # stable key, e.g. "metric:reach" / "post:<media_id>"
+    kind: str                    # "metric_drop" | "metric_surge" | "post_overperform"
+    severity: str                # "warning" (negative) | "positive"
+    title: str
+    detail: str
+    metric: str | None = None
+    delta_pct: float | None = None
+    ig_media_id: str | None = None
+    permalink: str | None = None
+    caption: str | None = None
+
+
+class AlertsResponse(BaseModel):
+    """Response for GET /api/instagram/insights/alerts."""
+
+    period_days: int
+    baseline_days: int
+    alerts: list[AlertItem]
+
+
 class TopPost(BaseModel):
     """A top-performing media post."""
 

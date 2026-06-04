@@ -55,6 +55,8 @@ from . import competitors, service
 from .schemas import (
     AddBrandedHashtagRequest,
     AddCompetitorRequest,
+    AlertItem,
+    AlertsResponse,
     AlgorithmMetricsResponse,
     BrandedHashtagItem,
     BrandedHashtagListResponse,
@@ -68,6 +70,9 @@ from .schemas import (
     BestTimeResponse,
     BestTimeSlot,
     CallbackResponse,
+    CommentInboxResponse,
+    CommentReplyRequest,
+    CommentReplyResponse,
     CompetitorItem,
     CompetitorListResponse,
     CompetitorLookupPreview,
@@ -102,6 +107,7 @@ from .schemas import (
     HashtagsResponse,
     HashtagTrendPoint,
     HashtagTrendResponse,
+    InboxComment,
     InsightDataPoint,
     InstagramMedia,
     InstagramProfile,
@@ -460,6 +466,219 @@ def get_overview(
         current.prior = prior
 
     return current
+
+
+# --- Comment inbox ---
+
+@router.get("/comments/inbox", response_model=CommentInboxResponse)
+def get_comment_inbox(
+    sentiment: Literal["", "positive", "neutral", "negative"] = Query(""),
+    questions_only: bool = Query(False),
+    unanswered_only: bool = Query(False),
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+):
+    """Unified comment inbox: top-level comments across all posts, newest
+    first, joined with sentiment + replied status. Spam is always excluded."""
+    client = get_client()
+    user_id = str(current_user.id)
+
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+
+    filters = {
+        "sentiment": sentiment,
+        "questions_only": questions_only,
+        "unanswered_only": unanswered_only,
+    }
+    rows = comment_repo.find_inbox_page(
+        client, user_id, ig_profile.username, **filters, limit=limit, offset=offset,
+    )
+    total = comment_repo.count_inbox(client, user_id, ig_profile.username, **filters)
+
+    return CommentInboxResponse(
+        total=total,
+        comments=[
+            InboxComment(
+                ig_comment_id=r[0],
+                ig_media_id=r[1],
+                username=r[2],
+                text=r[3],
+                like_count=int(r[4] or 0),
+                timestamp=r[5].isoformat() if hasattr(r[5], "isoformat") else str(r[5]),
+                sentiment=r[6],
+                is_question=bool(r[7]),
+                replied=bool(r[8]),
+                permalink=r[9],
+            )
+            for r in rows
+        ],
+    )
+
+
+@router.post("/comments/{comment_id}/reply", response_model=CommentReplyResponse)
+async def reply_to_comment(
+    comment_id: str,
+    payload: CommentReplyRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Post a reply under a comment (Graph POST /{comment-id}/replies).
+
+    The comment must exist in the user's own synced data — that lookup is
+    the ownership check. On success the reply is also stored locally so the
+    inbox flips to `replied` without waiting for the next comment sync.
+    """
+    client = get_client()
+    user_id = str(current_user.id)
+
+    ctx = comment_repo.find_comment_with_context(client, user_id, comment_id)
+    if ctx is None:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
+    token_data = instagram_repo.find_token(client, user_id)
+    if token_data is None:
+        raise InstagramNotConnectedError()
+    token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
+
+    message = payload.message.strip()
+    reply_id = await service.post_comment_reply(comment_id, message, token)
+
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    comment_repo.bulk_insert_comments(
+        client, user_id, ctx["ig_media_id"],
+        [{
+            "id": reply_id or f"local_{comment_id}",
+            "_parent_id": comment_id,
+            "username": ig_profile.username if ig_profile else "",
+            "text": message,
+            "like_count": 0,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }],
+    )
+
+    logger.info("Comment reply posted for user %s under %s", user_id, comment_id)
+    return CommentReplyResponse(success=True, reply_id=reply_id)
+
+
+# --- Anomaly alerts ---
+
+_ALERT_METRICS = ["reach", "views", "total_interactions", "accounts_engaged"]
+_ALERT_METRIC_LABELS = {
+    "reach": "Reach",
+    "views": "Views",
+    "total_interactions": "Interactions",
+    "accounts_engaged": "Engaged accounts",
+}
+# Only flag metric shifts at least this large (and statistically significant) —
+# below this, day-to-day noise produces alert fatigue.
+_ALERT_DELTA_THRESHOLD_PCT = 20.0
+# A post must beat the trailing-post median by this multiple to be flagged.
+_POST_OVERPERFORM_MULTIPLE = 2.0
+# Minimum trailing posts for a meaningful median.
+_POST_BASELINE_MIN = 5
+
+
+def _median(values: list[int]) -> float:
+    s = sorted(values)
+    n = len(s)
+    mid = n // 2
+    return float(s[mid]) if n % 2 else (s[mid - 1] + s[mid]) / 2.0
+
+
+@router.get("/insights/alerts", response_model=AlertsResponse)
+def get_alerts(
+    days: int = Query(7, ge=3, le=30, description="Recent window to scan for anomalies."),
+    current_user: User = Depends(get_current_user),
+):
+    """Detect anomalies: significant account-metric shifts vs a trailing
+    baseline, and recent posts overperforming the user's median engagement.
+
+    Metric shifts use Welch's t-test on daily samples (recent `days` vs the
+    preceding `4 × days`) and are only reported when both significant at 95%
+    and ≥ 20% in magnitude. Post overperformance compares likes + comments
+    against the median of the trailing 50 posts.
+    """
+    client = get_client()
+    user_id = str(current_user.id)
+
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+    ig_user_id = ig_profile.ig_user_id
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    since = now - timedelta(days=days)
+    baseline_days = days * 4
+    baseline_since = since - timedelta(days=baseline_days)
+
+    alerts: list[AlertItem] = []
+
+    # --- 1. Account-metric shifts ---
+    recent = insights_repo.find_daily_metric_samples(
+        client, user_id, ig_user_id, _ALERT_METRICS, since, now,
+    )
+    baseline = insights_repo.find_daily_metric_samples(
+        client, user_id, ig_user_id, _ALERT_METRICS, baseline_since, since,
+    )
+    for metric in _ALERT_METRICS:
+        cur, base = recent[metric], baseline[metric]
+        if len(cur) < 3 or len(base) < 3:
+            continue
+        cur_mean = sum(cur) / len(cur)
+        base_mean = sum(base) / len(base)
+        delta = pct_delta(cur_mean, base_mean)
+        if delta is None or abs(delta) < _ALERT_DELTA_THRESHOLD_PCT:
+            continue
+        if sample_significance(cur, base) is not True:
+            continue
+        surge = delta > 0
+        label = _ALERT_METRIC_LABELS[metric]
+        alerts.append(AlertItem(
+            id=f"metric:{metric}",
+            kind="metric_surge" if surge else "metric_drop",
+            severity="positive" if surge else "warning",
+            title=f"{label} {'up' if surge else 'down'} {abs(delta):.0f}% vs your baseline",
+            detail=(
+                f"Daily {label.lower()} averaged {cur_mean:,.0f} over the last "
+                f"{days} days vs {base_mean:,.0f} over the prior {baseline_days} days."
+            ),
+            metric=metric,
+            delta_pct=round(delta, 1),
+        ))
+
+    # --- 2. Overperforming posts ---
+    trailing = insights_repo.find_baseline_post_engagement(
+        client, user_id, ig_user_id, before=since,
+    )
+    if len(trailing) >= _POST_BASELINE_MIN:
+        med = _median(trailing)
+        if med > 0:
+            for ig_media_id, permalink, caption, _ts, engagement in (
+                insights_repo.find_recent_post_engagement(client, user_id, ig_user_id, since)
+            ):
+                engagement = int(engagement or 0)
+                if engagement < _POST_OVERPERFORM_MULTIPLE * med:
+                    continue
+                ratio = engagement / med
+                alerts.append(AlertItem(
+                    id=f"post:{ig_media_id}",
+                    kind="post_overperform",
+                    severity="positive",
+                    title=f"Post outperforming {ratio:.1f}× your median",
+                    detail=(
+                        f"{engagement:,} likes + comments vs a median of "
+                        f"{med:,.0f} across your previous {len(trailing)} posts."
+                    ),
+                    ig_media_id=ig_media_id,
+                    permalink=permalink or None,
+                    caption=(caption[:100] if caption else None),
+                ))
+
+    # Warnings first, then biggest movers.
+    alerts.sort(key=lambda a: (a.severity != "warning", -abs(a.delta_pct or 0)))
+    return AlertsResponse(period_days=days, baseline_days=baseline_days, alerts=alerts)
 
 
 @router.get("/insights/demographics", response_model=DemographicResponse)

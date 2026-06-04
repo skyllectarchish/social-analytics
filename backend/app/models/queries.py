@@ -48,6 +48,12 @@ ORDER BY updated_at DESC
 LIMIT 1
 """
 
+# Every connected account — drives the daily account_sync job.
+GET_ALL_INSTAGRAM_TOKENS = """
+SELECT user_id, ig_user_id, access_token, token_expires_at
+FROM instagram_profiles FINAL
+"""
+
 # --- Instagram Media ---
 
 COUNT_INSTAGRAM_MEDIA = """
@@ -193,6 +199,118 @@ WHERE mi.user_id = {user_id:UUID}
   AND m.timestamp <= {until:DateTime}
 GROUP BY mi.ig_media_id, m.media_type, m.permalink, m.thumbnail_url, m.media_url, m.caption
 ORDER BY interactions DESC
+LIMIT {limit:UInt32}
+"""
+
+# --- Comment inbox ---
+
+# Filters are parameterized as "off" sentinels ('' / 0) so one centralized
+# query serves every filter combination without dynamic SQL. Spam (per the
+# sentiment batch) is always excluded; the creator's own top-level comments
+# are excluded via self_username. `replied` = the creator has a reply under
+# the comment (their own replies are synced like any other comment).
+_COMMENT_INBOX_FILTERS = """
+WHERE c.user_id = {user_id:UUID}
+  AND c.parent_comment_id = ''
+  AND c.username != {self_username:String}
+  AND coalesce(s.is_spam, 0) = 0
+  AND ({sentiment:String} = '' OR s.sentiment = {sentiment:String})
+  AND ({questions_only:UInt8} = 0 OR s.is_question = 1)
+  AND ({unanswered_only:UInt8} = 0 OR coalesce(r.my_replies, 0) = 0)
+"""
+
+_COMMENT_INBOX_JOINS = """
+FROM instagram_comments c FINAL
+LEFT JOIN comment_sentiment s FINAL
+    ON s.user_id = c.user_id AND s.ig_comment_id = c.ig_comment_id
+LEFT JOIN (
+    SELECT parent_comment_id,
+           countIf(username = {self_username:String}) AS my_replies
+    FROM instagram_comments FINAL
+    WHERE user_id = {user_id:UUID} AND parent_comment_id != ''
+    GROUP BY parent_comment_id
+) r ON r.parent_comment_id = c.ig_comment_id
+LEFT JOIN instagram_media m FINAL
+    ON m.user_id = c.user_id AND m.ig_media_id = c.ig_media_id
+"""
+
+GET_COMMENT_INBOX = f"""
+SELECT
+    c.ig_comment_id,
+    c.ig_media_id,
+    c.username,
+    c.text,
+    c.like_count,
+    c.timestamp,
+    coalesce(s.sentiment, '') AS sentiment,
+    coalesce(s.is_question, 0) AS is_question,
+    coalesce(r.my_replies, 0) > 0 AS replied,
+    coalesce(m.permalink, '') AS permalink
+{_COMMENT_INBOX_JOINS}
+{_COMMENT_INBOX_FILTERS}
+ORDER BY c.timestamp DESC
+LIMIT {{limit:UInt32}} OFFSET {{offset:UInt32}}
+"""
+
+COUNT_COMMENT_INBOX = f"""
+SELECT count()
+{_COMMENT_INBOX_JOINS}
+{_COMMENT_INBOX_FILTERS}
+"""
+
+# One comment + its post context — reply validation and the AI suggester.
+GET_COMMENT_WITH_CONTEXT = """
+SELECT c.ig_comment_id, c.ig_media_id, c.username, c.text,
+       coalesce(s.sentiment, '') AS sentiment,
+       coalesce(s.is_question, 0) AS is_question,
+       coalesce(m.caption, '') AS media_caption
+FROM instagram_comments c FINAL
+LEFT JOIN comment_sentiment s FINAL
+    ON s.user_id = c.user_id AND s.ig_comment_id = c.ig_comment_id
+LEFT JOIN instagram_media m FINAL
+    ON m.user_id = c.user_id AND m.ig_media_id = c.ig_media_id
+WHERE c.user_id = {user_id:UUID}
+  AND c.ig_comment_id = {ig_comment_id:String}
+LIMIT 1
+"""
+
+# The creator's most recent replies — voice samples for the AI suggester.
+GET_RECENT_SELF_REPLIES = """
+SELECT text
+FROM instagram_comments FINAL
+WHERE user_id = {user_id:UUID}
+  AND parent_comment_id != ''
+  AND username = {self_username:String}
+ORDER BY timestamp DESC
+LIMIT {limit:UInt32}
+"""
+
+# --- Anomaly alerts ---
+
+# Recent posts with their organic engagement (likes + comments straight off
+# instagram_media — populated even when per-media insights are blocked, e.g.
+# posts that predate the Business-account conversion). Stories excluded:
+# they expire in 24h and have no like counts.
+GET_POST_ENGAGEMENT_WINDOW = """
+SELECT ig_media_id, permalink, caption, timestamp,
+       like_count + comments_count AS engagement
+FROM instagram_media FINAL
+WHERE user_id = {user_id:UUID}
+  AND ig_user_id = {ig_user_id:String}
+  AND media_product_type != 'STORY'
+  AND timestamp >= {since:DateTime}
+ORDER BY timestamp DESC
+"""
+
+# Trailing-post engagement baseline for the overperformance median.
+GET_POST_ENGAGEMENT_BASELINE = """
+SELECT like_count + comments_count AS engagement
+FROM instagram_media FINAL
+WHERE user_id = {user_id:UUID}
+  AND ig_user_id = {ig_user_id:String}
+  AND media_product_type != 'STORY'
+  AND timestamp < {before:DateTime}
+ORDER BY timestamp DESC
 LIMIT {limit:UInt32}
 """
 

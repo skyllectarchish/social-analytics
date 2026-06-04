@@ -83,6 +83,54 @@ export interface DashboardSummary {
   comparisons?: Record<string, ComparisonValue> | null;
 }
 
+export interface InboxComment {
+  ig_comment_id: string;
+  ig_media_id: string;
+  username: string;
+  text: string;
+  like_count: number;
+  timestamp: string;
+  sentiment: "positive" | "neutral" | "negative" | "";
+  is_question: boolean;
+  replied: boolean;
+  permalink: string;
+}
+
+export interface CommentInboxResponse {
+  total: number;
+  comments: InboxComment[];
+}
+
+export interface CommentReplySuggestion {
+  id: string;
+  tone: "friendly" | "playful" | "professional";
+  reply: string;
+}
+
+export interface CommentReplySuggestResponse {
+  ig_comment_id: string;
+  suggestions: CommentReplySuggestion[];
+}
+
+export interface AlertItem {
+  id: string;
+  kind: "metric_drop" | "metric_surge" | "post_overperform";
+  severity: "positive" | "warning";
+  title: string;
+  detail: string;
+  metric: string | null;
+  delta_pct: number | null;
+  ig_media_id: string | null;
+  permalink: string | null;
+  caption: string | null;
+}
+
+export interface AlertsResponse {
+  period_days: number;
+  baseline_days: number;
+  alerts: AlertItem[];
+}
+
 export interface InsightDataPoint {
   end_time: string;
   value: number;

@@ -150,6 +150,36 @@ async def get_long_lived_token(short_token: str) -> tuple[str, int]:
             raise OAuthError("Invalid response from Instagram token endpoint")
 
 
+async def refresh_long_lived_token(token: str) -> tuple[str, int]:
+    """Refresh an unexpired long-lived token for another ~60 days.
+
+    Uses the IG Login `ig_refresh_token` grant on `graph.instagram.com`.
+    Meta requires the token to be at least 24 hours old and still valid —
+    an already-expired token cannot be refreshed (the user must re-OAuth).
+
+    Returns:
+        Tuple of (refreshed_token, expires_in_seconds).
+
+    Raises:
+        OAuthError: If the refresh fails.
+    """
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+        try:
+            resp = await client.get(
+                f"{GRAPH_BASE_URL}/refresh_access_token",
+                params={"grant_type": "ig_refresh_token", "access_token": token},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["access_token"], data.get("expires_in", 5184000)
+        except httpx.HTTPStatusError as exc:
+            logger.error("Token refresh failed: %s", exc.response.text)
+            raise OAuthError("Failed to refresh long-lived token")
+        except (KeyError, httpx.HTTPError) as exc:
+            logger.error("Token refresh error: %s", exc)
+            raise OAuthError("Invalid response from Instagram token endpoint")
+
+
 # Meta error codes that the platform documents as transient. Worth retrying.
 # 1 = UNKNOWN, 2 = SERVICE temporarily unavailable, 4 = APPLICATION_USER rate
 # limit, 17 = USER rate limit, 32 = PAGE rate limit. See:
@@ -913,6 +943,35 @@ async def fetch_comments_for_media(
             params["after"] = after
 
     return comments
+
+
+async def post_comment_reply(comment_id: str, message: str, token: str) -> str:
+    """Post a reply under a comment via POST /{comment-id}/replies.
+
+    This is the only write the app performs against the Graph API; it's
+    covered by the `instagram_business_manage_comments` scope requested
+    during OAuth.
+
+    Returns:
+        The new reply's IG comment id.
+
+    Raises:
+        InstagramAPIError: If the reply could not be posted.
+    """
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+        try:
+            resp = await client.post(
+                f"{GRAPH_BASE_URL}/{comment_id}/replies",
+                data={"message": message, "access_token": token},
+            )
+            resp.raise_for_status()
+            return str(resp.json().get("id", ""))
+        except httpx.HTTPStatusError as exc:
+            logger.error("Comment reply failed for %s: %s", comment_id, exc.response.text)
+            raise InstagramAPIError("Failed to post the reply to Instagram")
+        except httpx.HTTPError as exc:
+            logger.error("Comment reply failed for %s: %s", comment_id, exc)
+            raise InstagramAPIError("Failed to post the reply to Instagram")
 
 
 async def fetch_media_insights(

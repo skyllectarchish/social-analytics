@@ -141,6 +141,23 @@ class CaptionSuggestResponse(BaseModel):
     notes_md: str = ""
 
 
+# --- Comment Reply Suggester ----------------------------------------------
+
+class CommentReplySuggestRequest(BaseModel):
+    ig_comment_id: str = Field(min_length=1, max_length=256)
+
+
+class CommentReplySuggestion(BaseModel):
+    id: str
+    tone: Literal["friendly", "playful", "professional"]
+    reply: str
+
+
+class CommentReplySuggestResponse(BaseModel):
+    ig_comment_id: str
+    suggestions: list[CommentReplySuggestion] = Field(default_factory=list)
+
+
 # --- Quota ---------------------------------------------------------------
 
 class QuotaResponse(BaseModel):
@@ -152,7 +169,7 @@ class QuotaResponse(BaseModel):
 # --- Feedback ------------------------------------------------------------
 
 class FeedbackRequest(BaseModel):
-    feature: Literal["digest", "ideas", "diagnostic", "caption"]
+    feature: Literal["digest", "ideas", "diagnostic", "caption", "comment_reply"]
     ref_id: str = Field(min_length=1, max_length=256)
     rating: Literal["up", "down"]
     note: str | None = Field(default=None, max_length=2000)

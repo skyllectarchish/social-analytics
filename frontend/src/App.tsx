@@ -22,6 +22,9 @@ import ReelsStudioPage from "./pages/ReelsStudioPage";
 import AudienceDNAPage from "./pages/AudienceDNAPage";
 import CompetitorsPage from "./pages/CompetitorsPage";
 import CopilotPage from "./pages/CopilotPage";
+import MediaKitPage from "./pages/MediaKitPage";
+import InboxPage from "./pages/InboxPage";
+import PostsPage from "./pages/PostsPage";
 
 function Splash() {
   return (
@@ -79,11 +82,14 @@ function AppRoutes() {
       <Route path="/connect" element={<ProtectedRoute><ConnectInstagramPage /></ProtectedRoute>} />
       <Route path="/auth/instagram/callback" element={<ProtectedRoute><CallbackPage /></ProtectedRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+      <Route path="/dashboard/posts" element={<ProtectedRoute><PostsPage /></ProtectedRoute>} />
       <Route path="/dashboard/content" element={<ProtectedRoute><ContentLabPage /></ProtectedRoute>} />
       <Route path="/dashboard/reels" element={<ProtectedRoute><ReelsStudioPage /></ProtectedRoute>} />
       <Route path="/dashboard/audience" element={<ProtectedRoute><AudienceDNAPage /></ProtectedRoute>} />
       <Route path="/dashboard/competitors" element={<ProtectedRoute><CompetitorsPage /></ProtectedRoute>} />
       <Route path="/dashboard/copilot" element={<ProtectedRoute><CopilotPage /></ProtectedRoute>} />
+      <Route path="/dashboard/media-kit" element={<ProtectedRoute><MediaKitPage /></ProtectedRoute>} />
+      <Route path="/dashboard/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

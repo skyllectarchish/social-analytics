@@ -9,7 +9,13 @@ from typing import Any
 
 from clickhouse_connect.driver.client import Client
 
-from ..models.queries import GET_COMMENTS_PENDING_SENTIMENT
+from ..models.queries import (
+    COUNT_COMMENT_INBOX,
+    GET_COMMENT_INBOX,
+    GET_COMMENT_WITH_CONTEXT,
+    GET_COMMENTS_PENDING_SENTIMENT,
+    GET_RECENT_SELF_REPLIES,
+)
 from .safe_query import is_schema_missing, log_schema_missing
 
 logger = logging.getLogger(__name__)
@@ -67,6 +73,102 @@ def bulk_insert_comments(
         ],
     )
     return len(rows)
+
+
+# --- Comment inbox ---
+
+def _inbox_params(
+    user_id: str,
+    self_username: str,
+    sentiment: str,
+    questions_only: bool,
+    unanswered_only: bool,
+) -> dict[str, Any]:
+    return {
+        "user_id": user_id,
+        "self_username": self_username,
+        "sentiment": sentiment,
+        "questions_only": 1 if questions_only else 0,
+        "unanswered_only": 1 if unanswered_only else 0,
+    }
+
+
+def find_inbox_page(
+    client: Client,
+    user_id: str,
+    self_username: str,
+    *,
+    sentiment: str = "",
+    questions_only: bool = False,
+    unanswered_only: bool = False,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[tuple]:
+    """One page of the comment inbox, newest first. Spam always excluded."""
+    params = _inbox_params(user_id, self_username, sentiment, questions_only, unanswered_only)
+    return client.query(
+        GET_COMMENT_INBOX,
+        parameters={**params, "limit": limit, "offset": offset},
+    ).result_rows
+
+
+def count_inbox(
+    client: Client,
+    user_id: str,
+    self_username: str,
+    *,
+    sentiment: str = "",
+    questions_only: bool = False,
+    unanswered_only: bool = False,
+) -> int:
+    """Total inbox rows for the same filter set (pagination)."""
+    rows = client.query(
+        COUNT_COMMENT_INBOX,
+        parameters=_inbox_params(user_id, self_username, sentiment, questions_only, unanswered_only),
+    ).result_rows
+    return int(rows[0][0]) if rows else 0
+
+
+def find_comment_with_context(
+    client: Client,
+    user_id: str,
+    ig_comment_id: str,
+) -> dict[str, Any] | None:
+    """One comment + its post caption, scoped to the user. None when not found.
+
+    The user scoping doubles as the ownership check for the reply endpoint —
+    a comment id belonging to someone else's account simply won't resolve.
+    """
+    rows = client.query(
+        GET_COMMENT_WITH_CONTEXT,
+        parameters={"user_id": user_id, "ig_comment_id": ig_comment_id},
+    ).result_rows
+    if not rows:
+        return None
+    r = rows[0]
+    return {
+        "ig_comment_id": r[0],
+        "ig_media_id": r[1],
+        "username": r[2],
+        "text": r[3],
+        "sentiment": r[4],
+        "is_question": bool(r[5]),
+        "media_caption": r[6],
+    }
+
+
+def find_recent_self_replies(
+    client: Client,
+    user_id: str,
+    self_username: str,
+    limit: int = 5,
+) -> list[str]:
+    """The creator's most recent reply texts — AI voice samples."""
+    rows = client.query(
+        GET_RECENT_SELF_REPLIES,
+        parameters={"user_id": user_id, "self_username": self_username, "limit": limit},
+    ).result_rows
+    return [r[0] for r in rows if r[0]]
 
 
 def find_comments_pending_sentiment(

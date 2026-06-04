@@ -64,15 +64,18 @@ MODEL_FOR_DIGEST: str = ""      # set on first use
 MODEL_FOR_DIAGNOSTIC: str = ""
 MODEL_FOR_IDEAS: str = ""
 MODEL_FOR_CAPTION: str = ""
+MODEL_FOR_COMMENT_REPLY: str = ""
 
 
 def _refresh_model_aliases() -> None:
-    global MODEL_FOR_DIGEST, MODEL_FOR_DIAGNOSTIC, MODEL_FOR_IDEAS, MODEL_FOR_CAPTION
+    global MODEL_FOR_DIGEST, MODEL_FOR_DIAGNOSTIC, MODEL_FOR_IDEAS, \
+        MODEL_FOR_CAPTION, MODEL_FOR_COMMENT_REPLY
     m = _model_for_feature()
     MODEL_FOR_DIGEST = m
     MODEL_FOR_DIAGNOSTIC = m
     MODEL_FOR_IDEAS = m
     MODEL_FOR_CAPTION = m
+    MODEL_FOR_COMMENT_REPLY = m
 
 
 _refresh_model_aliases()

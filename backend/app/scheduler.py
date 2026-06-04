@@ -3,6 +3,8 @@
 The API process owns a single AsyncIOScheduler that drives the three Tier 2
 background jobs on the cadence documented in the implementation plan:
 
+* `account_sync` — daily at `SCHEDULER_ACCOUNT_SYNC_HOUR` UTC (own profile/
+  media/insights refresh + long-lived token renewal).
 * `competitor_sync` — daily at `SCHEDULER_COMPETITOR_SYNC_HOUR` UTC.
 * `sentiment_batch` — every `SCHEDULER_SENTIMENT_BATCH_MINUTES` minutes.
 * `topic_clustering` — weekly on `SCHEDULER_TOPIC_CLUSTERING_DAY` /
@@ -31,6 +33,15 @@ logger = logging.getLogger(__name__)
 # require apscheduler to be installed at import time. The lifespan hook is
 # the only caller of `start_scheduler()` / `shutdown_scheduler()`.
 _scheduler: Any | None = None
+
+
+async def _run_account_sync() -> None:
+    # Async wrapper — see _run_competitor_sync for the coroutine rationale.
+    from .jobs import account_sync
+    try:
+        await account_sync._run()
+    except Exception:
+        logger.exception("Scheduled account_sync failed")
 
 
 async def _run_competitor_sync() -> None:
@@ -120,6 +131,15 @@ def start_scheduler() -> None:
         job_defaults={"coalesce": True, "max_instances": 1, "misfire_grace_time": 600},
     )
 
+    # Own-account sync runs an hour before competitor_sync so the latter's
+    # daily self-snapshot reads freshly synced profile/media data.
+    sch.add_job(
+        _run_account_sync,
+        CronTrigger(hour=settings.scheduler_account_sync_hour, minute=0),
+        id="account_sync",
+        name="Daily own-account sync + token refresh",
+        replace_existing=True,
+    )
     sch.add_job(
         _run_competitor_sync,
         CronTrigger(hour=settings.scheduler_competitor_sync_hour, minute=0),
@@ -180,10 +200,12 @@ def start_scheduler() -> None:
     sch.start()
     _scheduler = sch
     logger.info(
-        "Scheduler started: competitor_sync @ %02d:00 UTC daily, "
+        "Scheduler started: account_sync @ %02d:00 UTC daily, "
+        "competitor_sync @ %02d:00 UTC daily, "
         "sentiment_batch every %d min, "
         "topic_clustering weekday=%d @ %02d:00 UTC, "
         "weekly_digest weekday=%d @ %02d:00 UTC",
+        settings.scheduler_account_sync_hour,
         settings.scheduler_competitor_sync_hour,
         settings.scheduler_sentiment_batch_minutes,
         settings.scheduler_topic_clustering_day,

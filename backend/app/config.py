@@ -76,6 +76,9 @@ class Settings(BaseSettings):
     # Set ENABLE_SCHEDULER=false to disable (e.g., when running cron externally
     # or in a multi-worker deploy where only one worker should schedule jobs).
     enable_scheduler: bool = True
+    scheduler_account_sync_hour: int = 2      # UTC hour for the daily own-account sync
+    account_sync_lookback_days: int = 7       # insights window topped up by the daily sync
+    token_refresh_threshold_days: int = 10    # refresh long-lived tokens expiring within N days
     scheduler_competitor_sync_hour: int = 3   # UTC hour for the daily competitor snapshot
     scheduler_sentiment_batch_minutes: int = 60  # interval in minutes for sentiment batches
     scheduler_topic_clustering_day: int = 0   # weekday for topic clustering (0=Mon)
