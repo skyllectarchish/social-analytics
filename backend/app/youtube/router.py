@@ -291,6 +291,7 @@ async def list_competitors(current_user: User = Depends(get_current_user)):
 @router.post("/competitors", response_model=YoutubeCompetitor, status_code=201)
 async def add_competitor(
     body: AddCompetitorRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
 ):
     user_id = str(current_user.id)
@@ -322,7 +323,29 @@ async def add_competitor(
 
     youtube_repo.upsert_competitor(client, user_id, token["yt_channel_id"], competitor)
     competitor["added_at"] = str(datetime.now(timezone.utc))
+
+    # Kick off an immediate video fetch so the baseline exists right away
+    background_tasks.add_task(
+        _fetch_competitor_videos_now, user_id, competitor["competitor_channel_id"], access_token
+    )
+
     return YoutubeCompetitor(**competitor)
+
+
+async def _fetch_competitor_videos_now(user_id: str, competitor_channel_id: str, access_token: str) -> None:
+    """Fetch the first batch of competitor videos immediately after adding."""
+    try:
+        client = get_client()
+        videos = await service.fetch_latest_videos(competitor_channel_id, access_token, max_results=30)
+        for v in videos:
+            v["competitor_channel_id"] = competitor_channel_id
+        youtube_repo.bulk_insert_competitor_videos(client, user_id, videos)
+        for v in videos:
+            youtube_repo.record_title_if_changed(
+                client, user_id, competitor_channel_id, v["video_id"], v.get("title", "")
+            )
+    except Exception:
+        logger.exception("Initial competitor video fetch failed for %s", competitor_channel_id)
 
 
 @router.delete("/competitors/{competitor_channel_id}", status_code=204)
@@ -335,6 +358,27 @@ async def remove_competitor(
     if settings.webhook_base_url:
         await service.unsubscribe_from_channel(competitor_channel_id, settings.webhook_base_url)
     youtube_repo.delete_competitor(client, user_id, competitor_channel_id)
+
+
+@router.post("/competitors/sync", status_code=202)
+async def sync_competitors(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+):
+    """Manually trigger a competitor video fetch for all tracked channels."""
+    user_id = str(current_user.id)
+    client = get_client()
+    token = youtube_repo.find_token(client, user_id)
+    if not token:
+        raise _channel_not_connected()
+    refresh = decrypt_token(token["refresh_token"], settings.jwt_secret_key)
+    access_token = await service.refresh_access_token(refresh)
+    competitors = youtube_repo.list_competitors(client, user_id)
+    for c in competitors:
+        background_tasks.add_task(
+            _fetch_competitor_videos_now, user_id, c["competitor_channel_id"], access_token
+        )
+    return {"status": "queued", "channels": len(competitors)}
 
 
 # ── Insights: Outliers ───────────────────────────────────────────────────────

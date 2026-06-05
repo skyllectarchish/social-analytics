@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Trash2, TrendingUp } from "lucide-react";
+import { Plus, Trash2, TrendingUp, RefreshCw } from "lucide-react";
 import apiClient from "../api/client";
 import type {
   YoutubeCompetitor, CompetitorOutlier, TitleHistoryEntry,
@@ -25,6 +25,7 @@ export default function YoutubeCompetitorsPage() {
   const [addError, setAddError] = useState("");
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [fetchingVideos, setFetchingVideos] = useState(false);
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
   const [titleHistory, setTitleHistory] = useState<TitleHistoryEntry[]>([]);
 
@@ -32,6 +33,17 @@ export default function YoutubeCompetitorsPage() {
     setSyncing(true);
     try { await apiClient.post("/youtube/insights/sync"); } finally { setSyncing(false); }
   }
+
+  const fetchVideos = async () => {
+    setFetchingVideos(true);
+    try {
+      await apiClient.post("/youtube/competitors/sync");
+      await new Promise(r => setTimeout(r, 2000));
+      await load();
+    } finally {
+      setFetchingVideos(false);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -128,7 +140,20 @@ export default function YoutubeCompetitorsPage() {
           </div>
 
           <div className="lg:col-span-2 space-y-4">
-            <p className="text-xs font-semibold text-ink/50 uppercase tracking-wider">Outlier Videos</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-ink/50 uppercase tracking-wider">Outlier Videos</p>
+              {competitors.length > 0 && (
+                <button
+                  onClick={fetchVideos}
+                  disabled={fetchingVideos}
+                  className="flex items-center gap-1 text-xs text-ink/50 hover:text-red-600 transition-colors disabled:opacity-40"
+                  title="Fetch latest competitor videos now"
+                >
+                  <RefreshCw size={11} className={fetchingVideos ? "animate-spin" : ""} />
+                  {fetchingVideos ? "Fetching…" : "Fetch Now"}
+                </button>
+              )}
+            </div>
             {outliers.length === 0 && !loading && (
               <div className="card-hairline glass rounded-2xl p-8 text-center text-ink/40 text-sm">
                 No outliers detected yet. Add competitors and check back after the next sync.
