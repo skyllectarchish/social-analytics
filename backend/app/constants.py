@@ -94,9 +94,11 @@ YOUTUBE_REQUIRED_SCOPES: list[str] = [
 
 YOUTUBE_DEFAULT_VIDEO_FETCH_LIMIT: int = 50
 YOUTUBE_ANALYTICS_OVERVIEW_METRICS: str = (
-    "views,estimatedMinutesWatched,subscribersGained,subscribersLost,"
-    "impressions,impressionsCTR,averageViewDuration"
+    "views,estimatedMinutesWatched,subscribersGained,subscribersLost"
 )
+# impressions/impressionsCTR are "reach" report metrics — they cannot be
+# combined with subscribersGained/subscribersLost in the same API call.
+# Fetch them separately when CTR-based features are needed.
 
 YOUTUBE_PUBSUBHUBBUB_HUB_URL: str = "https://pubsubhubbub.appspot.com/subscribe"
 YOUTUBE_WEBSUB_LEASE_SECONDS: int = 864000  # 10 days
