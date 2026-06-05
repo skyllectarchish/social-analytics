@@ -16,18 +16,30 @@ from ..oauth_state import create_signed_oauth_state, verify_oauth_state
 from ..repositories import youtube_repo
 from . import service
 from .schemas import (
+    AddCompetitorRequest,
+    ArchiveMinerStatus,
+    CompetitorOutlier,
+    CrossPlatformDay,
+    CrossPlatformResponse,
+    InstagramReelMarker,
     RetentionAnnotation,
     RetentionCurvePoint,
     RetentionResponse,
+    TitleHistoryEntry,
+    YoutubeAlert,
+    YoutubeArchiveSuggestion,
     YoutubeCallbackResponse,
     YoutubeChannel,
+    YoutubeCompetitor,
     YoutubeConnectResponse,
     YoutubeOverviewResponse,
     YoutubeMetricPoint,
     YoutubeMetricSeries,
+    YoutubePrediction,
     YoutubeSyncResponse,
     YoutubeVideo,
     YoutubeVideoListResponse,
+    VelocityPoint,
 )
 
 logger = logging.getLogger(__name__)
@@ -265,4 +277,188 @@ async def get_retention(
         ) for p in curve],
         annotations=[RetentionAnnotation(**a) for a in annotations_raw],
         annotations_pending=annotations_pending,
+    )
+
+
+# ── Competitors ──────────────────────────────────────────────────────────────
+
+@router.get("/competitors", response_model=list[YoutubeCompetitor])
+async def list_competitors(current_user: User = Depends(get_current_user)):
+    client = get_client()
+    return youtube_repo.list_competitors(client, str(current_user.id))
+
+
+@router.post("/competitors", response_model=YoutubeCompetitor, status_code=201)
+async def add_competitor(
+    body: AddCompetitorRequest,
+    current_user: User = Depends(get_current_user),
+):
+    user_id = str(current_user.id)
+    client = get_client()
+
+    count = youtube_repo.count_competitors(client, user_id)
+    if count >= settings.competitor_limit_standard:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Competitor limit reached ({settings.competitor_limit_standard})",
+        )
+
+    token = youtube_repo.find_token(client, user_id)
+    if not token:
+        raise _channel_not_connected()
+
+    refresh = decrypt_token(token["refresh_token"], settings.jwt_secret_key)
+    access_token = await service.refresh_access_token(refresh)
+
+    competitor = await service.fetch_channel_by_handle(body.handle, access_token)
+    if not competitor:
+        raise HTTPException(status_code=404, detail="YouTube channel not found for that handle")
+
+    if settings.webhook_base_url:
+        ok = await service.subscribe_to_channel(competitor["competitor_channel_id"], settings.webhook_base_url)
+        competitor["webhook_active"] = ok
+    else:
+        competitor["webhook_active"] = False
+
+    youtube_repo.upsert_competitor(client, user_id, token["yt_channel_id"], competitor)
+    competitor["added_at"] = str(datetime.now(timezone.utc))
+    return YoutubeCompetitor(**competitor)
+
+
+@router.delete("/competitors/{competitor_channel_id}", status_code=204)
+async def remove_competitor(
+    competitor_channel_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    user_id = str(current_user.id)
+    client = get_client()
+    if settings.webhook_base_url:
+        await service.unsubscribe_from_channel(competitor_channel_id, settings.webhook_base_url)
+    youtube_repo.delete_competitor(client, user_id, competitor_channel_id)
+
+
+# ── Insights: Outliers ───────────────────────────────────────────────────────
+
+@router.get("/insights/outliers", response_model=list[CompetitorOutlier])
+def get_outliers(current_user: User = Depends(get_current_user)):
+    client = get_client()
+    return youtube_repo.get_competitor_outliers(client, str(current_user.id))
+
+
+@router.get("/insights/title-history/{video_id}", response_model=list[TitleHistoryEntry])
+def get_title_history(video_id: str, current_user: User = Depends(get_current_user)):
+    client = get_client()
+    return youtube_repo.get_title_history(client, str(current_user.id), video_id)
+
+
+# ── Insights: Velocity + Predictions ────────────────────────────────────────
+
+@router.get("/insights/velocity/{video_id}", response_model=list[VelocityPoint])
+def get_velocity(video_id: str, current_user: User = Depends(get_current_user)):
+    client = get_client()
+    return youtube_repo.get_velocity(client, str(current_user.id), video_id)
+
+
+@router.get("/insights/predictions/{video_id}", response_model=YoutubePrediction | None)
+def get_prediction(video_id: str, current_user: User = Depends(get_current_user)):
+    client = get_client()
+    user_id = str(current_user.id)
+    pred = youtube_repo.get_prediction(client, user_id, video_id)
+    if pred is None:
+        return None
+    model = youtube_repo.get_model_state(client, user_id)
+    return YoutubePrediction(**pred, model_r2=model["r2_score"] if model else None)
+
+
+# ── Insights: Archive Miner ──────────────────────────────────────────────────
+
+@router.get("/insights/archive", response_model=ArchiveMinerStatus)
+def get_archive(current_user: User = Depends(get_current_user)):
+    client = get_client()
+    user_id = str(current_user.id)
+    suggestions = youtube_repo.get_archive_suggestions(client, user_id)
+    last_scan = youtube_repo.get_last_archive_scan(client, user_id)
+    return ArchiveMinerStatus(
+        last_scan=str(last_scan) if last_scan else None,
+        suggestions=suggestions,
+    )
+
+
+@router.post("/insights/archive/refresh", status_code=202)
+async def refresh_archive(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+):
+    user_id = str(current_user.id)
+    client = get_client()
+    last_scan = youtube_repo.get_last_archive_scan(client, user_id)
+    if last_scan:
+        from datetime import timedelta
+        elapsed = (datetime.now(timezone.utc).replace(tzinfo=None) - last_scan).total_seconds()
+        if elapsed < 86400:
+            raise HTTPException(status_code=429, detail="Archive scan already ran today")
+    background_tasks.add_task(_run_archive_miner_for_user, user_id)
+    return {"status": "queued"}
+
+
+async def _run_archive_miner_for_user(user_id: str) -> None:
+    from ..jobs.yt_archive_miner import run_for_user
+    try:
+        await run_for_user(user_id)
+    except Exception:
+        logger.exception("Archive miner failed for user %s", user_id)
+
+
+# ── Insights: Alerts ─────────────────────────────────────────────────────────
+
+@router.get("/insights/alerts", response_model=list[YoutubeAlert])
+def get_alerts(current_user: User = Depends(get_current_user)):
+    client = get_client()
+    return youtube_repo.get_alerts(client, str(current_user.id))
+
+
+# ── Insights: Cross-Platform ─────────────────────────────────────────────────
+
+@router.get("/insights/cross-platform", response_model=CrossPlatformResponse)
+def get_cross_platform(
+    days: int = Query(default=90, ge=7, le=365),
+    current_user: User = Depends(get_current_user),
+):
+    from datetime import timedelta
+    import numpy as np
+
+    client = get_client()
+    user_id = str(current_user.id)
+    start_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+
+    yt_rows = youtube_repo.get_daily_subscriber_net(client, user_id, start_date)
+    ig_rows = youtube_repo.get_instagram_reel_posts(client, user_id, start_date)
+
+    ig_dates = {r["post_date"] for r in ig_rows}
+
+    result_days = [
+        CrossPlatformDay(
+            day=r["day"],
+            subscribers_gained=r["gained"],
+            subscribers_lost=r["lost"],
+            net_subscribers=r["gained"] - r["lost"],
+            has_instagram_reel=r["day"] in ig_dates,
+        )
+        for r in yt_rows
+    ]
+
+    correlation = None
+    if len(result_days) >= 10:
+        try:
+            ig_flag = np.array([1 if d.has_instagram_reel else 0 for d in result_days])
+            gains = np.array([d.subscribers_gained for d in result_days])
+            if gains.std() > 0 and ig_flag.std() > 0:
+                correlation = float(np.corrcoef(ig_flag, gains)[0, 1])
+        except Exception:
+            pass
+
+    return CrossPlatformResponse(
+        days=result_days,
+        reel_posts=[InstagramReelMarker(**r) for r in ig_rows],
+        correlation=round(correlation, 3) if correlation is not None else None,
     )
