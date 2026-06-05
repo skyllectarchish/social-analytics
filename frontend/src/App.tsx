@@ -26,6 +26,10 @@ import YoutubeConnectPage from "./pages/YoutubeConnectPage";
 import YoutubeCallbackPage from "./pages/YoutubeCallbackPage";
 import YoutubeDashboardPage from "./pages/YoutubeDashboardPage";
 import YoutubeRetentionPage from "./pages/YoutubeRetentionPage";
+import YoutubeCompetitorsPage from "./pages/YoutubeCompetitorsPage";
+import YoutubePredictivePage from "./pages/YoutubePredictivePage";
+import YoutubeArchivePage from "./pages/YoutubeArchivePage";
+import YoutubeFunnelPage from "./pages/YoutubeFunnelPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsOfServicePage from "./pages/TermsOfServicePage";
 
@@ -96,6 +100,10 @@ function AppRoutes() {
       <Route path="/auth/youtube/callback" element={<ProtectedRoute><YoutubeCallbackPage /></ProtectedRoute>} />
       <Route path="/youtube" element={<ProtectedRoute><YoutubeDashboardPage /></ProtectedRoute>} />
       <Route path="/youtube/retention" element={<ProtectedRoute><YoutubeRetentionPage /></ProtectedRoute>} />
+      <Route path="/youtube/competitors" element={<ProtectedRoute><YoutubeCompetitorsPage /></ProtectedRoute>} />
+      <Route path="/youtube/predict" element={<ProtectedRoute><YoutubePredictivePage /></ProtectedRoute>} />
+      <Route path="/youtube/archive" element={<ProtectedRoute><YoutubeArchivePage /></ProtectedRoute>} />
+      <Route path="/youtube/funnel" element={<ProtectedRoute><YoutubeFunnelPage /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
