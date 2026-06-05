@@ -20,6 +20,7 @@ function formatDate(iso: string) {
 export default function YoutubeCompetitorsPage() {
   const [competitors, setCompetitors] = useState<YoutubeCompetitor[]>([]);
   const [outliers, setOutliers] = useState<CompetitorOutlier[]>([]);
+  const [recentVideos, setRecentVideos] = useState<CompetitorOutlier[]>([]);
   const [handle, setHandle] = useState("");
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState("");
@@ -47,12 +48,14 @@ export default function YoutubeCompetitorsPage() {
 
   const load = async () => {
     setLoading(true);
-    const [compRes, outlierRes] = await Promise.all([
+    const [compRes, outlierRes, recentRes] = await Promise.all([
       apiClient.get<YoutubeCompetitor[]>("/youtube/competitors").catch(() => null),
       apiClient.get<CompetitorOutlier[]>("/youtube/insights/outliers").catch(() => null),
+      apiClient.get<CompetitorOutlier[]>("/youtube/insights/recent-videos").catch(() => null),
     ]);
     setCompetitors(compRes?.data ?? []);
     setOutliers(outlierRes?.data ?? []);
+    setRecentVideos(recentRes?.data ?? []);
     setLoading(false);
   };
 
@@ -89,9 +92,9 @@ export default function YoutubeCompetitorsPage() {
   };
 
   return (
-    <YoutubeDashboardLayout active="Outlier Radar" onSync={sync} syncing={syncing}>
+    <YoutubeDashboardLayout active="Competitors" onSync={sync} syncing={syncing}>
       <div className="p-6 max-w-7xl mx-auto">
-        <h1 className="text-2xl font-display font-bold text-ink mb-1">Outlier Radar</h1>
+        <h1 className="text-2xl font-display font-bold text-ink mb-1">Competitors</h1>
         <p className="text-sm text-ink/50 mb-6">Track competitors. Get AI analysis when their videos go viral.</p>
 
         <div className="card-hairline glass rounded-2xl p-4 mb-6">
@@ -141,7 +144,9 @@ export default function YoutubeCompetitorsPage() {
 
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-ink/50 uppercase tracking-wider">Outlier Videos</p>
+              <p className="text-xs font-semibold text-ink/50 uppercase tracking-wider">
+                {outliers.length > 0 ? "Outlier Videos" : "Recent Competitor Videos"}
+              </p>
               {competitors.length > 0 && (
                 <button
                   onClick={fetchVideos}
@@ -154,12 +159,12 @@ export default function YoutubeCompetitorsPage() {
                 </button>
               )}
             </div>
-            {outliers.length === 0 && !loading && (
+            {outliers.length === 0 && recentVideos.length === 0 && !loading && (
               <div className="card-hairline glass rounded-2xl p-8 text-center text-ink/40 text-sm">
-                No outliers detected yet. Add competitors and check back after the next sync.
+                No videos fetched yet. Click "Fetch Now" to load competitor videos.
               </div>
-            )}
-            {outliers.map(o => (
+            )}            
+            {(outliers.length > 0 ? outliers : recentVideos).map(o => (
               <motion.div key={o.video_id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="card-hairline glass rounded-2xl p-4">
                 <div className="flex gap-3">
                   {o.thumbnail_url && (

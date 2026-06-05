@@ -36,7 +36,19 @@ async def _extract_topic(title: str, description: str) -> dict:
         messages=[{"role": "user", "content": prompt}],
         max_tokens=80,
     )
-    data = json.loads(result.text)
+    text = result.text.strip() if result.text else ""
+    # Strip markdown code fences if present
+    if text.startswith("```"):
+        text = text.split("```")[1]
+        if text.startswith("json"):
+            text = text[4:]
+        text = text.strip()
+    if not text:
+        return {"keyword": title[:40], "wikipedia_article": title[:40]}
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return {"keyword": title[:40], "wikipedia_article": title[:40]}
     return {"keyword": data.get("keyword", title[:40]), "wikipedia_article": data.get("wikipedia_article", title[:40])}
 
 
@@ -103,7 +115,16 @@ async def _generate_recommendation(title: str, keyword: str, spike_pct: float, s
         messages=[{"role": "user", "content": prompt}],
         max_tokens=150,
     )
-    data = json.loads(result.text)
+    text = result.text.strip() if result.text else ""
+    if text.startswith("```"):
+        text = text.split("```")[1]
+        if text.startswith("json"):
+            text = text[4:]
+        text = text.strip()
+    try:
+        data = json.loads(text) if text else {}
+    except json.JSONDecodeError:
+        data = {}
     return {
         "suggestion_type": data.get("suggestion_type", "UPDATE"),
         "llm_recommendation": data.get("llm_recommendation", "Consider updating this video."),

@@ -61,7 +61,16 @@ export default function YoutubeArchivePage() {
     } catch (e: any) {
       if (e?.response?.status !== 429) console.error(e);
     }
-    await load();
+    // Poll until last_scan timestamp changes (job is async)
+    const prevScan = status?.last_scan ?? null;
+    for (let i = 0; i < 24; i++) {
+      await new Promise(r => setTimeout(r, 5000));
+      const res = await apiClient.get<ArchiveMinerStatus>("/youtube/insights/archive").catch(() => null);
+      const data = res?.data ?? null;
+      setStatus(data);
+      setLoading(false);
+      if (data?.last_scan && data.last_scan !== prevScan) break;
+    }
     setScanning(false);
   };
 

@@ -1635,6 +1635,15 @@ ORDER BY v.published_at DESC
 LIMIT 50
 """
 
+GET_YT_RECENT_COMPETITOR_VIDEOS = """
+SELECT v.competitor_channel_id, v.video_id, v.title, v.thumbnail_url,
+       v.view_count, v.published_at, v.llm_analysis
+FROM youtube_competitor_videos v FINAL
+WHERE v.user_id = {user_id:UUID}
+ORDER BY v.view_count DESC, v.published_at DESC
+LIMIT 50
+"""
+
 # --- Velocity ---
 
 GET_YT_VELOCITY = """

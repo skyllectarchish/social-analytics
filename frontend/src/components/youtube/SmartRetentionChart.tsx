@@ -34,8 +34,11 @@ export default function SmartRetentionChart({
 }) {
   if (!curve.length) {
     return (
-      <div className="flex h-64 items-center justify-center text-sm text-foreground/50">
-        No retention data available for this video.
+      <div className="flex h-64 flex-col items-center justify-center gap-2 text-center text-sm text-foreground/50">
+        <p>No retention data available for this video.</p>
+        <p className="text-xs text-foreground/35 max-w-xs">
+          YouTube Analytics only provides retention curves once a video reaches a minimum view threshold. Try a higher-view video.
+        </p>
       </div>
     );
   }

@@ -389,6 +389,12 @@ def get_outliers(current_user: User = Depends(get_current_user)):
     return youtube_repo.get_competitor_outliers(client, str(current_user.id))
 
 
+@router.get("/insights/recent-videos", response_model=list[CompetitorOutlier])
+def get_recent_competitor_videos(current_user: User = Depends(get_current_user)):
+    client = get_client()
+    return youtube_repo.get_recent_competitor_videos(client, str(current_user.id))
+
+
 @router.get("/insights/title-history/{video_id}", response_model=list[TitleHistoryEntry])
 def get_title_history(video_id: str, current_user: User = Depends(get_current_user)):
     client = get_client()

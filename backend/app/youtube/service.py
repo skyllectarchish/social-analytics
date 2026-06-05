@@ -230,8 +230,14 @@ async def fetch_retention_curve(channel_id: str, video_id: str, access_token: st
             },
             headers={"Authorization": f"Bearer {access_token}"},
         )
-        resp.raise_for_status()
+        if resp.status_code != 200:
+            logger.warning("Retention API %s for video %s: %s", resp.status_code, video_id, resp.text[:300])
+            return []
         data = resp.json()
+        rows = data.get("rows") or []
+        if not rows:
+            logger.info("Retention API no rows for video %s channel %s — response: %s",
+                        video_id, channel_id, str(data)[:300])
         col_names = [c["name"] for c in data.get("columnHeaders", [])]
         return [
             {
@@ -239,7 +245,7 @@ async def fetch_retention_curve(channel_id: str, video_id: str, access_token: st
                 "audience_watch_ratio": float(dict(zip(col_names, row)).get("audienceWatchRatio", 0)),
                 "relative_retention_performance": float(dict(zip(col_names, row)).get("relativeRetentionPerformance", 0)),
             }
-            for row in data.get("rows", [])
+            for row in rows
         ]
 
 

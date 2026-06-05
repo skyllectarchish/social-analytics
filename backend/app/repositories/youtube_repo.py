@@ -20,6 +20,7 @@ from ..models.queries import (
     GET_YT_ARCHIVE_SUGGESTIONS,
     GET_YT_ALERTS,
     GET_YT_COMPETITOR_OUTLIERS,
+    GET_YT_RECENT_COMPETITOR_VIDEOS,
     GET_YT_COMPETITOR_VIDEOS_FOR_BASELINE,
     GET_YT_COMPETITORS,
     GET_YT_DAILY_SUBSCRIBER_NET,
@@ -352,6 +353,16 @@ def mark_video_outlier(client: Client, user_id: str, video_id: str, llm_analysis
 
 def get_competitor_outliers(client: Client, user_id: str) -> list[dict]:
     rows = client.query(GET_YT_COMPETITOR_OUTLIERS, parameters={"user_id": user_id}).result_rows
+    return [
+        {"competitor_channel_id": r[0], "video_id": r[1], "title": r[2],
+         "thumbnail_url": r[3], "view_count": int(r[4]),
+         "published_at": str(r[5]), "llm_analysis": r[6]}
+        for r in rows
+    ]
+
+
+def get_recent_competitor_videos(client: Client, user_id: str) -> list[dict]:
+    rows = client.query(GET_YT_RECENT_COMPETITOR_VIDEOS, parameters={"user_id": user_id}).result_rows
     return [
         {"competitor_channel_id": r[0], "video_id": r[1], "title": r[2],
          "thumbnail_url": r[3], "view_count": int(r[4]),
