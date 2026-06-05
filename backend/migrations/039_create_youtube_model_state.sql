@@ -1,3 +1,4 @@
+-- One model state per user. ORDER BY (user_id) means ReplacingMergeTree keeps only the latest trained model.
 CREATE TABLE IF NOT EXISTS youtube_model_state (
     id UUID DEFAULT generateUUIDv4(),
     user_id UUID,

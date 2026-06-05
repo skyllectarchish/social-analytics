@@ -1,3 +1,5 @@
+-- ReplacingMergeTree contract: Every insert must carry the current values of llm_analysis and is_outlier
+-- (defaulting to NULL and false respectively) to prevent background merges from clobbering them with older inserts.
 CREATE TABLE IF NOT EXISTS youtube_competitor_videos (
     id UUID DEFAULT generateUUIDv4(),
     user_id UUID,
