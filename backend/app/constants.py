@@ -94,5 +94,9 @@ YOUTUBE_REQUIRED_SCOPES: list[str] = [
 
 YOUTUBE_DEFAULT_VIDEO_FETCH_LIMIT: int = 50
 YOUTUBE_ANALYTICS_OVERVIEW_METRICS: str = (
-    "views,estimatedMinutesWatched,subscribersGained,subscribersLost"
+    "views,estimatedMinutesWatched,subscribersGained,subscribersLost,"
+    "impressions,impressionsCTR,averageViewDuration"
 )
+
+YOUTUBE_PUBSUBHUBBUB_HUB_URL: str = "https://pubsubhubbub.appspot.com/subscribe"
+YOUTUBE_WEBSUB_LEASE_SECONDS: int = 864000  # 10 days
