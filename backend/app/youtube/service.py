@@ -264,3 +264,88 @@ async def fetch_captions(video_id: str, access_token: str) -> str | None:
             headers={"Authorization": f"Bearer {access_token}"},
         )
         return dl_resp.text if dl_resp.status_code == 200 else None
+
+
+async def fetch_channel_by_handle(handle: str, access_token: str) -> dict | None:
+    """Resolve a YouTube @handle or channel URL to channel metadata."""
+    # Strip URL prefix and @ sign
+    handle = handle.strip()
+    for prefix in ("https://www.youtube.com/@", "https://youtube.com/@", "@"):
+        if handle.startswith(prefix):
+            handle = handle[len(prefix):]
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+        resp = await client.get(
+            f"{YOUTUBE_DATA_API_BASE}/channels",
+            params={"part": "snippet,statistics", "forHandle": handle},
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if resp.status_code != 200:
+            return None
+        items = resp.json().get("items", [])
+        if not items:
+            return None
+        item = items[0]
+        stats = item.get("statistics", {})
+        snippet = item.get("snippet", {})
+        return {
+            "competitor_channel_id": item["id"],
+            "competitor_title": snippet.get("title", ""),
+            "competitor_thumbnail_url": snippet.get("thumbnails", {}).get("default", {}).get("url", ""),
+            "subscriber_count": int(stats.get("subscriberCount", 0)),
+        }
+
+
+async def fetch_video_stats(video_id: str, access_token: str) -> dict | None:
+    """Lightweight fetch: statistics + snippet for a single video (1 quota unit)."""
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+        resp = await client.get(
+            f"{YOUTUBE_DATA_API_BASE}/videos",
+            params={"part": "snippet,statistics", "id": video_id},
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if resp.status_code != 200:
+            return None
+        items = resp.json().get("items", [])
+        if not items:
+            return None
+        item = items[0]
+        stats = item.get("statistics", {})
+        snippet = item.get("snippet", {})
+        return {
+            "video_id": video_id,
+            "title": snippet.get("title", ""),
+            "view_count": int(stats.get("viewCount", 0)),
+            "thumbnail_url": snippet.get("thumbnails", {}).get("medium", {}).get("url", ""),
+        }
+
+
+async def subscribe_to_channel(channel_id: str, webhook_base_url: str) -> bool:
+    """Subscribe to PubSubHubbub for a YouTube channel. Returns True on success."""
+    from ..constants import YOUTUBE_PUBSUBHUBBUB_HUB_URL, YOUTUBE_WEBSUB_LEASE_SECONDS
+    topic_url = f"https://www.youtube.com/xml/feeds/videos.xml?channel_id={channel_id}"
+    callback_url = f"{webhook_base_url.rstrip('/')}/api/youtube/webhook/receive"
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(
+            YOUTUBE_PUBSUBHUBBUB_HUB_URL,
+            data={
+                "hub.callback": callback_url,
+                "hub.mode": "subscribe",
+                "hub.topic": topic_url,
+                "hub.verify": "async",
+                "hub.lease_seconds": str(YOUTUBE_WEBSUB_LEASE_SECONDS),
+            },
+        )
+        return resp.status_code in (200, 202, 204)
+
+
+async def unsubscribe_from_channel(channel_id: str, webhook_base_url: str) -> None:
+    """Unsubscribe from PubSubHubbub for a YouTube channel."""
+    from ..constants import YOUTUBE_PUBSUBHUBBUB_HUB_URL
+    topic_url = f"https://www.youtube.com/xml/feeds/videos.xml?channel_id={channel_id}"
+    callback_url = f"{webhook_base_url.rstrip('/')}/api/youtube/webhook/receive"
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        await client.post(
+            YOUTUBE_PUBSUBHUBBUB_HUB_URL,
+            data={"hub.callback": callback_url, "hub.mode": "unsubscribe",
+                  "hub.topic": topic_url, "hub.verify": "async"},
+        )
