@@ -49,6 +49,9 @@ def verify(
     hub_mode: str = Query(default="", alias="hub.mode"),
 ):
     """PubSubHubbub subscription verification — echo the challenge."""
+    if hub_mode == "unsubscribe":
+        logger.warning("WebSub unsubscribe verification denied")
+        return Response(status_code=404)
     logger.info("WebSub verify: mode=%s", hub_mode)
     return Response(content=hub_challenge, media_type="text/plain")
 
@@ -61,35 +64,39 @@ async def receive(request: Request, background_tasks: BackgroundTasks):
     if not notifications:
         return Response(status_code=204)
 
-    client = get_client()
+    try:
+        client = get_client()
 
-    for notif in notifications:
-        channel_id = notif["channel_id"]
-        video_id = notif["video_id"]
-        title = notif["title"]
+        for notif in notifications:
+            channel_id = notif["channel_id"]
+            video_id = notif["video_id"]
+            title = notif["title"]
 
-        # Own channel: find user by yt_channel_id in youtube_tokens
-        own_rows = client.query(
-            "SELECT user_id FROM youtube_tokens FINAL WHERE yt_channel_id = {cid:String} LIMIT 1",
-            parameters={"cid": channel_id},
-        ).result_rows
-        if own_rows:
-            user_id = str(own_rows[0][0])
-            background_tasks.add_task(
-                _handle_own_channel_notification, user_id, channel_id, video_id, title
-            )
+            # Own channel: find user by yt_channel_id in youtube_tokens
+            own_rows = client.query(
+                "SELECT user_id FROM youtube_tokens FINAL WHERE yt_channel_id = {cid:String} LIMIT 1",
+                parameters={"cid": channel_id},
+            ).result_rows
+            if own_rows:
+                user_id = str(own_rows[0][0])
+                background_tasks.add_task(
+                    _handle_own_channel_notification, user_id, channel_id, video_id, title
+                )
 
-        # Competitor channel: find all users tracking this channel
-        comp_rows = client.query(
-            "SELECT DISTINCT user_id FROM youtube_competitors FINAL "
-            "WHERE competitor_channel_id = {cid:String} AND is_deleted = false",
-            parameters={"cid": channel_id},
-        ).result_rows
-        for row in comp_rows:
-            user_id = str(row[0])
-            background_tasks.add_task(
-                _handle_competitor_notification, user_id, channel_id, video_id, title
-            )
+            # Competitor channel: find all users tracking this channel
+            comp_rows = client.query(
+                "SELECT DISTINCT user_id FROM youtube_competitors FINAL "
+                "WHERE competitor_channel_id = {cid:String} AND is_deleted = false",
+                parameters={"cid": channel_id},
+            ).result_rows
+            for row in comp_rows:
+                user_id = str(row[0])
+                background_tasks.add_task(
+                    _handle_competitor_notification, user_id, channel_id, video_id, title
+                )
+    except Exception:
+        logger.exception("Webhook receive DB error — YouTube hub will retry")
+        return Response(status_code=500)
 
     return Response(status_code=204)
 

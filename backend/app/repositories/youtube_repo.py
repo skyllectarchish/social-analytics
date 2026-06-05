@@ -388,6 +388,8 @@ def get_own_velocity_samples(client: Client, user_id: str) -> list[dict]:
 # --- Title History ---
 
 def record_title_if_changed(client: Client, user_id: str, channel_id: str, video_id: str, current_title: str) -> None:
+    if not current_title:
+        return
     rows = client.query(GET_YT_LAST_OBSERVED_TITLE,
                         parameters={"user_id": user_id, "video_id": video_id}).result_rows
     last_title = rows[0][0] if rows else None
