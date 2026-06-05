@@ -1645,6 +1645,9 @@ WHERE user_id = {user_id:UUID}
 ORDER BY hours_since_publish ASC
 """
 
+# Own-channel videos are also stored in youtube_competitor_velocity with the
+# user's own yt_channel_id as channel_id. This JOIN retrieves 4h velocity
+# data for own videos to train the predictive model.
 GET_YT_OWN_VELOCITY_SAMPLES = """
 SELECT v.video_id, vel.view_count AS four_hour_views,
        vel.avg_watch_s AS four_hour_avg_watch_s, vel.ctr_pct,
@@ -1747,7 +1750,7 @@ GET_INSTAGRAM_REEL_POSTS = """
 SELECT toDate(timestamp) AS post_date, ig_media_id, thumbnail_url, caption
 FROM instagram_media FINAL
 WHERE user_id = {user_id:UUID}
-  AND media_type IN ('VIDEO', 'REEL')
+  AND media_product_type = 'REELS'
   AND timestamp >= {start_date:DateTime}
 ORDER BY post_date ASC
 """
