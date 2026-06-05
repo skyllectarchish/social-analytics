@@ -1,12 +1,16 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
+  AlertTriangle,
+  Archive,
   Bell,
   ChartNoAxesColumn,
   LayoutDashboard,
+  Link2,
   Menu,
   RefreshCw,
   Sparkles,
+  TrendingUp,
   Unplug,
   X,
   type LucideIcon,
@@ -21,6 +25,10 @@ import { avatar } from "../../data/mock";
 const YT_NAV: { label: string; icon: LucideIcon; to: string }[] = [
   { label: "Overview", icon: LayoutDashboard, to: "/youtube" },
   { label: "Retention Studio", icon: ChartNoAxesColumn, to: "/youtube/retention" },
+  { label: "Outlier Radar", icon: AlertTriangle, to: "/youtube/competitors" },
+  { label: "Predictive Studio", icon: TrendingUp, to: "/youtube/predict" },
+  { label: "Archive Miner", icon: Archive, to: "/youtube/archive" },
+  { label: "Cross-Platform", icon: Link2, to: "/youtube/funnel" },
 ];
 
 function YTIcon({ className }: { className?: string }) {
