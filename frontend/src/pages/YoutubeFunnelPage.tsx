@@ -24,6 +24,12 @@ export default function YoutubeFunnelPage() {
   const [days, setDays] = useState<typeof DAYS_OPTIONS[number]>(90);
   const [data, setData] = useState<CrossPlatformResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+
+  async function sync() {
+    setSyncing(true);
+    try { await apiClient.post("/youtube/insights/sync"); } finally { setSyncing(false); }
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -36,7 +42,7 @@ export default function YoutubeFunnelPage() {
   const chartData = data?.days.map(d => ({ ...d, label: d.day.slice(5) })) ?? [];
 
   return (
-    <YoutubeDashboardLayout active="Cross-Platform">
+    <YoutubeDashboardLayout active="Cross-Platform" onSync={sync} syncing={syncing}>
       <div className="p-6 max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>

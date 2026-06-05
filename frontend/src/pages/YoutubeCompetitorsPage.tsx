@@ -24,8 +24,14 @@ export default function YoutubeCompetitorsPage() {
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
   const [titleHistory, setTitleHistory] = useState<TitleHistoryEntry[]>([]);
+
+  async function sync() {
+    setSyncing(true);
+    try { await apiClient.post("/youtube/insights/sync"); } finally { setSyncing(false); }
+  }
 
   const load = async () => {
     setLoading(true);
@@ -71,7 +77,7 @@ export default function YoutubeCompetitorsPage() {
   };
 
   return (
-    <YoutubeDashboardLayout active="Outlier Radar">
+    <YoutubeDashboardLayout active="Outlier Radar" onSync={sync} syncing={syncing}>
       <div className="p-6 max-w-7xl mx-auto">
         <h1 className="text-2xl font-display font-bold text-ink mb-1">Outlier Radar</h1>
         <p className="text-sm text-ink/50 mb-6">Track competitors. Get AI analysis when their videos go viral.</p>

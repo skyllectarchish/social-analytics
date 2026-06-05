@@ -39,6 +39,12 @@ export default function YoutubeArchivePage() {
   const [status, setStatus] = useState<ArchiveMinerStatus | null>(null);
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+
+  async function sync() {
+    setSyncing(true);
+    try { await apiClient.post("/youtube/insights/sync"); } finally { setSyncing(false); }
+  }
 
   const load = async () => {
     const res = await apiClient.get<ArchiveMinerStatus>("/youtube/insights/archive").catch(() => null);
@@ -64,7 +70,7 @@ export default function YoutubeArchivePage() {
     : "Never scanned";
 
   return (
-    <YoutubeDashboardLayout active="Archive Miner">
+    <YoutubeDashboardLayout active="Archive Miner" onSync={sync} syncing={syncing}>
       <div className="p-6 max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>

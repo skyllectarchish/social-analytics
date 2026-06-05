@@ -16,6 +16,12 @@ export default function YoutubePredictivePage() {
   const [velocity, setVelocity] = useState<VelocityPoint[]>([]);
   const [prediction, setPrediction] = useState<YoutubePrediction | null>(null);
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  async function sync() {
+    setSyncing(true);
+    try { await apiClient.post("/youtube/insights/sync"); } finally { setSyncing(false); }
+  }
 
   useEffect(() => {
     apiClient.get<YoutubeVideoListResponse>("/youtube/videos?page=1&page_size=30")
@@ -36,7 +42,7 @@ export default function YoutubePredictivePage() {
   };
 
   return (
-    <YoutubeDashboardLayout active="Predictive Studio">
+    <YoutubeDashboardLayout active="Predictive Studio" onSync={sync} syncing={syncing}>
       <div className="p-6 max-w-7xl mx-auto">
         <h1 className="text-2xl font-display font-bold text-ink mb-1">Predictive Studio</h1>
         <p className="text-sm text-ink/50 mb-6">4-hour velocity → 30-day view projection.</p>
