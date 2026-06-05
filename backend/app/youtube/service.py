@@ -15,6 +15,7 @@ from ..constants import (
     YOUTUBE_OAUTH_DIALOG_URL,
     YOUTUBE_TOKEN_EXCHANGE_URL,
     YOUTUBE_REQUIRED_SCOPES,
+    YOUTUBE_ANALYTICS_OVERVIEW_METRICS,
 )
 from ..exceptions import OAuthError
 
@@ -189,7 +190,7 @@ async def fetch_analytics_overview(
                 "ids": f"channel=={channel_id}",
                 "startDate": start_date,
                 "endDate": end_date,
-                "metrics": "views,estimatedMinutesWatched,subscribersGained,subscribersLost",
+                "metrics": YOUTUBE_ANALYTICS_OVERVIEW_METRICS,
                 "dimensions": "day",
                 "sort": "day",
             },
@@ -205,7 +206,7 @@ async def fetch_analytics_overview(
                 end_time = datetime.strptime(row_dict["day"], "%Y-%m-%d").replace(hour=12)
             except (KeyError, ValueError):
                 continue
-            for metric in ["views", "estimatedMinutesWatched", "subscribersGained", "subscribersLost"]:
+            for metric in YOUTUBE_ANALYTICS_OVERVIEW_METRICS.split(","):
                 if metric in row_dict:
                     rows.append({
                         "metric_name": metric,
