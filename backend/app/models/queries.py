@@ -2015,12 +2015,14 @@ WHERE user_id = {user_id:UUID}
   AND media_product_type = 'REELS'
   AND timestamp >= {start_date:DateTime}
 ORDER BY post_date ASC
+"""
 # --- Story analytics retention ---
 
 # Snapshotted stories joined with their insights (stored in media_insights,
 # same as every other media). LEFT JOIN: a story snapshotted moments before
 # expiry may have no insights row yet — show it with zeroed metrics rather
 # than dropping it.
+
 GET_STORY_HISTORY = """
 SELECT
     s.ig_media_id,
