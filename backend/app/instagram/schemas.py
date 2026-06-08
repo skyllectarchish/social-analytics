@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
@@ -173,6 +173,22 @@ class SyncResponse(BaseModel):
     media_insights_synced: int
     demographics_synced: bool
     message: str = ""
+    job_id: str = ""             # poll GET /insights/sync/status with this
+
+
+class SyncStatusResponse(BaseModel):
+    """Response for GET /api/instagram/insights/sync/status.
+
+    status is 'idle' when the user has never synced (or migration 036 isn't
+    applied yet); otherwise the state of their most recent run.
+    """
+
+    job_id: str = ""
+    status: str = "idle"         # 'idle' | 'running' | 'completed' | 'failed'
+    lookback_days: int = 0
+    error: str = ""
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
 
 
 class PurgeResponse(BaseModel):

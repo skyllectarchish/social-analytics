@@ -159,9 +159,12 @@ async def _run_user(
                     continue
 
                 status, error = "sent", ""
+                # Count every send attempt toward the per-run cap, not just
+                # successes: a failed attempt still consumed a messaging-API
+                # call, and the cap exists to stay within Meta's rate limits.
+                sends += 1
                 try:
                     await service.send_private_reply(comment_id, funnel["dm_message"], token)
-                    sends += 1
                     if funnel["public_reply"]:
                         try:
                             await service.post_comment_reply(

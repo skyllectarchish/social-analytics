@@ -2134,3 +2134,15 @@ WHERE user_id = {user_id:UUID}
 ORDER BY timestamp DESC
 LIMIT {limit:UInt32}
 """
+
+# --- Insights sync job tracking ---
+
+# Most recent sync run for a user. FINAL collapses the running→finished inserts
+# (same job_id) to the freshest state; ORDER BY started_at picks the latest run.
+GET_LATEST_SYNC_JOB = """
+SELECT job_id, status, lookback_days, error, started_at, finished_at
+FROM instagram_sync_jobs FINAL
+WHERE user_id = {user_id:UUID}
+ORDER BY started_at DESC
+LIMIT 1
+"""

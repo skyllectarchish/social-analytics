@@ -1,4 +1,5 @@
 import axios, { AxiosError } from "axios";
+import type { SyncStatus } from "./types";
 
 const TOKEN_KEY = "access_token";
 
@@ -75,6 +76,23 @@ export async function safeGet<T>(
     return data;
   } catch {
     return null;
+  }
+}
+
+// Poll the sync-status endpoint until the latest insights sync is no longer
+// "running" (completed/failed — or "idle"/unreachable, meaning tracking isn't
+// available and we shouldn't keep waiting), or until the timeout elapses. Lets
+// pages refresh exactly when the background sync finishes instead of guessing a
+// fixed delay. Resolves regardless of outcome — the caller just reloads after.
+export async function waitForSync(
+  timeoutMs = 90_000,
+  intervalMs = 1_500,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, intervalMs));
+    const s = await safeGet<SyncStatus>("/instagram/insights/sync/status");
+    if (!s || s.status !== "running") return;
   }
 }
 

@@ -12,7 +12,7 @@ import {
   Share2,
   Users,
 } from "lucide-react";
-import api, { errorMessage } from "../api/client";
+import api, { errorMessage, waitForSync } from "../api/client";
 import type { StoryHistoryResponse, StoryHistoryItem } from "../api/types";
 import DashboardLayout from "../components/dashboard/DashboardLayout";
 import { CardEmpty } from "../components/dashboard/States";
@@ -83,6 +83,9 @@ export default function StoriesPage() {
     try {
       // The insights sync snapshots any currently-live stories too.
       await api.post("/instagram/insights/sync", null, { params: { lookback_days: days } });
+      // The sync runs as a background task; poll its status so we reload the
+      // moment it finishes rather than guessing with a fixed delay.
+      await waitForSync();
       await load();
     } catch (err) {
       setError(errorMessage(err, "Sync failed"));

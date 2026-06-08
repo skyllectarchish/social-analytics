@@ -13,7 +13,7 @@ import {
   Sparkles,
   Star,
 } from "lucide-react";
-import api, { errorMessage, safeGet } from "../api/client";
+import api, { errorMessage, safeGet, waitForSync } from "../api/client";
 import type {
   CommentInboxResponse,
   CommentReplySuggestion,
@@ -265,6 +265,9 @@ export default function InboxPage() {
     try {
       // Comments piggyback on the insights sync (same cadence as media insights).
       await api.post("/instagram/insights/sync", null, { params: { lookback_days: days } });
+      // The sync runs as a background task; poll its status so we reload the
+      // moment it finishes rather than guessing with a fixed delay.
+      await waitForSync();
       await load(0);
     } catch (err) {
       setError(errorMessage(err, "Sync failed"));
@@ -274,8 +277,15 @@ export default function InboxPage() {
   }
 
   function markReplied(id: string) {
-    setComments((prev) => prev.map((c) => (c.ig_comment_id === id ? { ...c, replied: true } : c)));
     setExpanded(null);
+    if (filter === "unanswered") {
+      // The comment no longer matches the active filter, so drop it from the
+      // list rather than leaving a "replied" row that contradicts "Unanswered".
+      setComments((prev) => prev.filter((c) => c.ig_comment_id !== id));
+      setTotal((t) => Math.max(0, t - 1));
+      return;
+    }
+    setComments((prev) => prev.map((c) => (c.ig_comment_id === id ? { ...c, replied: true } : c)));
   }
 
   if (loading && comments.length === 0) {

@@ -1,6 +1,7 @@
 """Instagram routes — OAuth flow, profile, media, refresh, insights, stories."""
 
 import logging
+import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 
@@ -48,6 +49,7 @@ from ..repositories import (
     instagram_repo,
     insights_repo,
     story_repo,
+    sync_job_repo,
 )
 from ..repositories.comparison import (
     COMPARE_TO_PATTERN,
@@ -155,6 +157,7 @@ from .schemas import (
     SuperfanItem,
     SuperfansResponse,
     SyncResponse,
+    SyncStatusResponse,
     TopicItem,
     TopicsResponse,
     TopPost,
@@ -1303,6 +1306,42 @@ async def _run_insights_sync(
         logger.exception("Background sync: story snapshot failed for user %s", user_id)
 
 
+async def _run_insights_sync_tracked(
+    user_id: str,
+    ig_user_id: str,
+    token: str,
+    lookback_days: int,
+    purge: bool,
+    job_id: str,
+    started_at: datetime,
+) -> None:
+    """Wrap _run_insights_sync with sync-job bookkeeping.
+
+    The 'running' row is written synchronously in the request handler so the
+    status endpoint reflects it the instant POST returns; this wrapper only
+    writes the terminal row. It always records completion (even on an
+    unexpected error) so a run never gets stuck reporting 'running' forever.
+    """
+    client = get_client()
+    status, error = "completed", ""
+    try:
+        await _run_insights_sync(user_id, ig_user_id, token, lookback_days, purge)
+    except Exception as exc:
+        status, error = "failed", str(exc)
+        logger.exception("Background sync: unexpected failure for user %s", user_id)
+    finally:
+        try:
+            sync_job_repo.finish_sync_job(
+                client, user_id, job_id,
+                lookback_days=lookback_days, started_at=started_at,
+                status=status, error=error,
+            )
+        except Exception:
+            logger.exception(
+                "Background sync: could not record completion for user %s", user_id,
+            )
+
+
 @router.post("/insights/sync", response_model=SyncResponse)
 async def sync_insights(
     background_tasks: BackgroundTasks,
@@ -1334,19 +1373,45 @@ async def sync_insights(
         raise InstagramNotConnectedError()
 
     token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
-    background_tasks.add_task(
-        _run_insights_sync,
-        user_id, token_data.ig_user_id, token, lookback_days, purge,
+
+    # Register the run as 'running' before scheduling the task so a status poll
+    # immediately after this POST returns the new run, not a stale prior one.
+    job_id = uuid.uuid4().hex
+    started_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    sync_job_repo.start_sync_job(
+        client, user_id, job_id, lookback_days=lookback_days, started_at=started_at,
     )
 
-    logger.info("Insights sync queued for user %s", user_id)
+    background_tasks.add_task(
+        _run_insights_sync_tracked,
+        user_id, token_data.ig_user_id, token, lookback_days, purge, job_id, started_at,
+    )
+
+    logger.info("Insights sync queued for user %s (job %s)", user_id, job_id)
     return SyncResponse(
         success=True,
         account_metrics_synced=0,
         media_insights_synced=0,
         demographics_synced=False,
         message="Sync started in background",
+        job_id=job_id,
     )
+
+
+@router.get("/insights/sync/status", response_model=SyncStatusResponse)
+async def get_sync_status(current_user: User = Depends(get_current_user)):
+    """Most recent insights-sync run for the current user.
+
+    The frontend polls this after POST /insights/sync to refresh exactly when
+    the background task finishes, rather than guessing with a fixed delay.
+    Returns status='idle' when the user has never synced (or migration 036
+    hasn't been applied yet).
+    """
+    client = get_client()
+    job = sync_job_repo.get_latest_sync_job(client, str(current_user.id))
+    if job is None:
+        return SyncStatusResponse()
+    return SyncStatusResponse(**job)
 
 
 def _build_dashboard_summary(

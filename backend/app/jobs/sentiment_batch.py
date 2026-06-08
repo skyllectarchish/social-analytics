@@ -79,8 +79,13 @@ def _parse_response(text: str) -> dict[str, Any]:
             return {}
 
 
-def analyze_one(text: str) -> dict[str, Any]:
-    """Score a single comment via Haiku. Returns a partial dict on failure."""
+def analyze_one(text: str) -> dict[str, Any] | None:
+    """Score a single comment via Haiku.
+
+    Returns ``None`` on an API failure so the caller can leave the comment
+    pending for a later retry, rather than stamping it with a misleading
+    neutral score it would never be re-scored out of.
+    """
     try:
         msg = _anthropic().messages.create(
             model=MODEL_ID,
@@ -90,10 +95,7 @@ def analyze_one(text: str) -> dict[str, Any]:
         )
     except Exception as exc:
         logger.warning("Haiku sentiment call failed: %s", exc)
-        return {
-            "sentiment": "neutral", "score": 0.0,
-            "is_question": False, "is_spam": False, "is_collab": False,
-        }
+        return None
 
     content = msg.content[0].text if msg.content else ""
     parsed = _parse_response(content)
@@ -118,8 +120,14 @@ def main(limit: int = 5000) -> int:
         return 0
 
     scored: list[dict[str, Any]] = []
+    failed = 0
     for user_id, ig_comment_id, ig_media_id, text in pending:
         analysis = analyze_one(text)
+        if analysis is None:
+            # Transient API failure — leave the comment pending so a later run
+            # retries it instead of writing a permanent neutral fallback.
+            failed += 1
+            continue
         scored.append({
             "user_id": user_id,
             "ig_comment_id": ig_comment_id,
@@ -128,8 +136,12 @@ def main(limit: int = 5000) -> int:
             **analysis,
         })
 
-    bulk_insert_sentiment(client, scored)
-    logger.info("sentiment_batch: scored %d comments", len(scored))
+    if scored:
+        bulk_insert_sentiment(client, scored)
+    logger.info(
+        "sentiment_batch: scored %d comments (%d left pending after API failure)",
+        len(scored), failed,
+    )
     return len(scored)
 
 

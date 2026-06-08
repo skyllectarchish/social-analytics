@@ -321,6 +321,16 @@ export interface StoryHistoryResponse {
   stories: StoryHistoryItem[];
 }
 
+// Status of the most recent background insights sync (GET /instagram/insights/sync/status).
+export interface SyncStatus {
+  job_id: string;
+  status: "idle" | "running" | "completed" | "failed";
+  lookback_days: number;
+  error: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
 export interface DemographicBreakdown {
   dimension_value: string;
   value: number;

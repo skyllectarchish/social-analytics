@@ -8,6 +8,7 @@ from . import (
     instagram_repo,
     insights_repo,
     story_repo,
+    sync_job_repo,
     user_repo,
 )
 
@@ -20,4 +21,5 @@ __all__ = [
     "branded_hashtag_repo",
     "dm_funnel_repo",
     "story_repo",
+    "sync_job_repo",
 ]

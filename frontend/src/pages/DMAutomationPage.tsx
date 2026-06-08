@@ -64,6 +64,7 @@ function CreateAutomationForm({
       onCreated(data);
     } catch (err) {
       setError(errorMessage(err, "Could not create the automation"));
+    } finally {
       setSaving(false);
     }
   }
