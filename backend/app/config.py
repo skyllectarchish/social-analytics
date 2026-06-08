@@ -45,6 +45,28 @@ class Settings(BaseSettings):
     meta_system_token: str = ""
     meta_system_ig_user_id: str = ""
 
+    # Google / YouTube
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = ""   # must match /auth/youtube/callback registered in Google Cloud Console
+
+    # YouTube Phase 2 — Webhook Intelligence
+    # Set to your public base URL (e.g. https://abc123.ngrok.io) to enable
+    # PubSubHubbub subscriptions. Leave blank to use polling fallback.
+    webhook_base_url: str = ""
+
+    # Archive Miner
+    archive_miner_max_videos_per_run: int = 20
+    scheduler_archive_miner_day: int = 6   # 6 = Sunday
+    scheduler_archive_miner_hour: int = 3  # UTC
+
+    # Predictive projections
+    default_rpm_usd: float = 3.0
+
+    # Competitor limits
+    competitor_limit_standard: int = 5
+    competitor_limit_premium: int = 25
+
     # OAuth state CSRF token (signed JWT, scoped to the IG connect flow)
     oauth_state_ttl_seconds: int = 600
 

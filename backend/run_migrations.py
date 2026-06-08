@@ -1,27 +1,23 @@
-"""Run SQL migrations against ClickHouse using clickhouse-migrations.
+"""Run SQL migrations against ClickHouse.
 
-The clickhouse-migrations library automatically tracks which migration files
-have been applied in a `db_migrations` table inside your ClickHouse database.
-Re-running this script is always safe — already-applied migrations are skipped.
+Tracks applied migrations in a `db_migrations` table.
+Re-running is always safe — already-applied migrations are skipped.
+
+Uses clickhouse-connect (HTTPS port 8443), same as the app itself.
+No separate native TCP port needed.
 
 Usage:
     python run_migrations.py
-
-Note on ports:
-    - clickhouse-connect (used by the app)  uses HTTPS port 8443
-    - clickhouse-migrations (used here)     uses native TCP port 9440 (secure)
-    Both values are read from .env. CLICKHOUSE_PORT (8443) is for the app;
-    CLICKHOUSE_NATIVE_PORT (9440) is for migrations.
 """
 
 import os
+import re
 import sys
 from pathlib import Path
 
-from clickhouse_migrations.clickhouse_cluster import ClickhouseCluster
+import clickhouse_connect
 from dotenv import load_dotenv
 
-# Load .env from the same directory as this script
 load_dotenv(Path(__file__).parent / ".env")
 
 _required = ["CLICKHOUSE_HOST", "CLICKHOUSE_USER", "CLICKHOUSE_PASSWORD"]
@@ -31,34 +27,76 @@ if _missing:
     print("Copy .env.example to .env and fill in your credentials.", file=sys.stderr)
     sys.exit(1)
 
-# ClickHouse Cloud uses port 9440 for secure native TCP (used by clickhouse-migrations).
-# This is different from port 8443 (HTTPS) used by clickhouse-connect in the app.
-# `secure=True` is forwarded as **kwargs to clickhouse-driver.Client() for TLS.
-cluster = ClickhouseCluster(
-    db_host=os.environ["CLICKHOUSE_HOST"],
-    db_port=int(os.environ.get("CLICKHOUSE_NATIVE_PORT", 9440)),
-    db_user=os.environ["CLICKHOUSE_USER"],
-    db_password=os.environ["CLICKHOUSE_PASSWORD"],
+host = os.environ["CLICKHOUSE_HOST"]
+db = os.environ.get("CLICKHOUSE_DATABASE", "social_analytics")
+port = int(os.environ.get("CLICKHOUSE_PORT", 8443))
+
+print(f"Connecting to {host}...")
+
+client = clickhouse_connect.get_client(
+    host=host,
+    port=port,
+    username=os.environ["CLICKHOUSE_USER"],
+    password=os.environ["CLICKHOUSE_PASSWORD"],
     secure=True,
 )
 
-migrations_dir = str(Path(__file__).parent / "migrations")
+# Ensure database exists
+client.command(f"CREATE DATABASE IF NOT EXISTS `{db}`")
+client = clickhouse_connect.get_client(
+    host=host,
+    port=port,
+    username=os.environ["CLICKHOUSE_USER"],
+    password=os.environ["CLICKHOUSE_PASSWORD"],
+    database=db,
+    secure=True,
+)
 
-print(f"Connecting to {os.environ['CLICKHOUSE_HOST']}...")
+# Tracking table
+client.command("""
+    CREATE TABLE IF NOT EXISTS db_migrations (
+        version String,
+        applied_at DateTime DEFAULT now()
+    ) ENGINE = ReplacingMergeTree(applied_at)
+    ORDER BY version
+""")
+
+# Already-applied versions
+applied = {row[0] for row in client.query("SELECT version FROM db_migrations").result_rows}
+
+migrations_dir = Path(__file__).parent / "migrations"
+sql_files = sorted(migrations_dir.glob("*.sql"))
+
 print(f"Running migrations from: {migrations_dir}")
 
-try:
-    cluster.migrate(
-        db_name=os.environ.get("CLICKHOUSE_DATABASE", "social_analytics"),
-        migration_path=migrations_dir,
-        cluster_name=None,          # None = single-node / ClickHouse Cloud
-        create_db_if_no_exists=True,
-        multi_statement=True,       # Allow multiple statements per .sql file
-        dryrun=False,
-        fake=False,
-    )
-    print("All migrations applied successfully.")
-except Exception as exc:
-    print(f"Migration failed: {exc}", file=sys.stderr)
-    sys.exit(1)
+applied_count = 0
+skipped_count = 0
 
+for path in sql_files:
+    version = path.name
+    if version in applied:
+        skipped_count += 1
+        continue
+
+    print(f"  Applying {version}...")
+    sql = path.read_text(encoding="utf-8")
+
+    # Strip single-line comments before splitting so semicolons inside
+    # comments don't produce spurious empty statements.
+    sql = re.sub(r"--[^\n]*", "", sql)
+    statements = [s.strip() for s in sql.split(";")]
+    statements = [s for s in statements if s]  # drop empty
+
+    try:
+        for stmt in statements:
+            client.command(stmt)
+        client.command(
+            "INSERT INTO db_migrations (version) VALUES ({version:String})",
+            parameters={"version": version},
+        )
+        applied_count += 1
+    except Exception as exc:
+        print(f"Migration failed on {version}: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+print(f"Done. Applied: {applied_count}, Skipped (already applied): {skipped_count}.")

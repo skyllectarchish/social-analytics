@@ -83,3 +83,27 @@ INSIGHTS_INITIAL_FETCH_DAYS: int = 90
 
 # Stories
 STORY_FIELDS: str = "id,media_type,media_url,thumbnail_url,permalink,timestamp"
+
+# --- YouTube API ---
+
+YOUTUBE_DATA_API_BASE: str = "https://www.googleapis.com/youtube/v3"
+YOUTUBE_ANALYTICS_API_BASE: str = "https://youtubeanalytics.googleapis.com/v2"
+YOUTUBE_OAUTH_DIALOG_URL: str = "https://accounts.google.com/o/oauth2/v2/auth"
+YOUTUBE_TOKEN_EXCHANGE_URL: str = "https://oauth2.googleapis.com/token"
+
+YOUTUBE_REQUIRED_SCOPES: list[str] = [
+    "https://www.googleapis.com/auth/youtube.readonly",
+    "https://www.googleapis.com/auth/yt-analytics.readonly",
+    "https://www.googleapis.com/auth/youtube.force-ssl",  # caption download
+]
+
+YOUTUBE_DEFAULT_VIDEO_FETCH_LIMIT: int = 50
+YOUTUBE_ANALYTICS_OVERVIEW_METRICS: str = (
+    "views,estimatedMinutesWatched,subscribersGained,subscribersLost"
+)
+# impressions/impressionsCTR are "reach" report metrics — they cannot be
+# combined with subscribersGained/subscribersLost in the same API call.
+# Fetch them separately when CTR-based features are needed.
+
+YOUTUBE_PUBSUBHUBBUB_HUB_URL: str = "https://pubsubhubbub.appspot.com/subscribe"
+YOUTUBE_WEBSUB_LEASE_SECONDS: int = 864000  # 10 days

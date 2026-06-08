@@ -22,6 +22,14 @@ import ReelsStudioPage from "./pages/ReelsStudioPage";
 import AudienceDNAPage from "./pages/AudienceDNAPage";
 import CompetitorsPage from "./pages/CompetitorsPage";
 import CopilotPage from "./pages/CopilotPage";
+import YoutubeConnectPage from "./pages/YoutubeConnectPage";
+import YoutubeCallbackPage from "./pages/YoutubeCallbackPage";
+import YoutubeDashboardPage from "./pages/YoutubeDashboardPage";
+import YoutubeRetentionPage from "./pages/YoutubeRetentionPage";
+import YoutubeCompetitorsPage from "./pages/YoutubeCompetitorsPage";
+import YoutubePredictivePage from "./pages/YoutubePredictivePage";
+import YoutubeArchivePage from "./pages/YoutubeArchivePage";
+import YoutubeFunnelPage from "./pages/YoutubeFunnelPage";
 import MediaKitPage from "./pages/MediaKitPage";
 import InboxPage from "./pages/InboxPage";
 import StoriesPage from "./pages/StoriesPage";
@@ -96,6 +104,14 @@ function AppRoutes() {
       <Route path="/dashboard/audience" element={<ProtectedRoute><AudienceDNAPage /></ProtectedRoute>} />
       <Route path="/dashboard/competitors" element={<ProtectedRoute><CompetitorsPage /></ProtectedRoute>} />
       <Route path="/dashboard/copilot" element={<ProtectedRoute><CopilotPage /></ProtectedRoute>} />
+      <Route path="/youtube/connect" element={<ProtectedRoute><YoutubeConnectPage /></ProtectedRoute>} />
+      <Route path="/auth/youtube/callback" element={<ProtectedRoute><YoutubeCallbackPage /></ProtectedRoute>} />
+      <Route path="/youtube" element={<ProtectedRoute><YoutubeDashboardPage /></ProtectedRoute>} />
+      <Route path="/youtube/retention" element={<ProtectedRoute><YoutubeRetentionPage /></ProtectedRoute>} />
+      <Route path="/youtube/competitors" element={<ProtectedRoute><YoutubeCompetitorsPage /></ProtectedRoute>} />
+      <Route path="/youtube/predict" element={<ProtectedRoute><YoutubePredictivePage /></ProtectedRoute>} />
+      <Route path="/youtube/archive" element={<ProtectedRoute><YoutubeArchivePage /></ProtectedRoute>} />
+      <Route path="/youtube/funnel" element={<ProtectedRoute><YoutubeFunnelPage /></ProtectedRoute>} />
       <Route path="/dashboard/media-kit" element={<ProtectedRoute><MediaKitPage /></ProtectedRoute>} />
       <Route path="/dashboard/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
       <Route path="/dashboard/stories" element={<ProtectedRoute><StoriesPage /></ProtectedRoute>} />

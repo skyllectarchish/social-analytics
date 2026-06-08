@@ -1760,6 +1760,261 @@ FROM comment_topics FINAL
 WHERE user_id = {user_id:UUID}
 """
 
+# --- YouTube Tokens ---
+
+GET_YOUTUBE_TOKEN = """
+SELECT yt_channel_id, refresh_token
+FROM youtube_tokens FINAL
+WHERE user_id = {user_id:UUID}
+ORDER BY updated_at DESC
+LIMIT 1
+"""
+
+# --- YouTube Channels ---
+
+GET_YOUTUBE_CHANNEL = """
+SELECT yt_channel_id, title, description, thumbnail_url,
+       subscriber_count, video_count, view_count, hidden_subscriber_count, fetched_at
+FROM youtube_channels FINAL
+WHERE user_id = {user_id:UUID}
+ORDER BY fetched_at DESC
+LIMIT 1
+"""
+
+# --- YouTube Videos ---
+
+COUNT_YOUTUBE_VIDEOS = """
+SELECT count()
+FROM youtube_videos FINAL
+WHERE user_id = {user_id:UUID}
+  AND yt_channel_id = {yt_channel_id:String}
+"""
+
+GET_YOUTUBE_VIDEOS_PAGE = """
+SELECT video_id, title, thumbnail_url, published_at,
+       duration_seconds, video_format, view_count, like_count, comment_count
+FROM youtube_videos FINAL
+WHERE user_id = {user_id:UUID}
+  AND yt_channel_id = {yt_channel_id:String}
+ORDER BY published_at DESC
+LIMIT {limit:UInt32}
+OFFSET {offset:UInt32}
+"""
+
+# --- YouTube Daily Metrics ---
+
+GET_YOUTUBE_DAILY_METRICS = """
+SELECT metric_name, metric_value, end_time
+FROM youtube_daily_metrics FINAL
+WHERE user_id = {user_id:UUID}
+  AND yt_channel_id = {yt_channel_id:String}
+  AND metric_name IN {metrics:Array(String)}
+  AND end_time >= {since:DateTime}
+ORDER BY metric_name, end_time ASC
+"""
+
+# --- YouTube Retention ---
+
+GET_YOUTUBE_RETENTION_CURVE = """
+SELECT elapsed_video_time_ratio, audience_watch_ratio,
+       relative_retention_performance, fetched_at
+FROM youtube_retention_curves FINAL
+WHERE user_id = {user_id:UUID}
+  AND video_id = {video_id:String}
+ORDER BY elapsed_video_time_ratio ASC
+"""
+
+GET_YOUTUBE_RETENTION_ANNOTATIONS = """
+SELECT timestamp_seconds, annotation_text, drop_pct, model, generated_at
+FROM youtube_retention_annotations FINAL
+WHERE user_id = {user_id:UUID}
+  AND video_id = {video_id:String}
+ORDER BY timestamp_seconds ASC
+"""
+
+GET_YOUTUBE_LATEST_RETENTION_FETCH = """
+SELECT max(fetched_at)
+FROM youtube_retention_curves FINAL
+WHERE user_id = {user_id:UUID}
+  AND video_id = {video_id:String}
+"""
+
+GET_YOUTUBE_LATEST_ANNOTATION_GENERATED = """
+SELECT max(generated_at)
+FROM youtube_retention_annotations FINAL
+WHERE user_id = {user_id:UUID}
+  AND video_id = {video_id:String}
+"""
+
+# ── YouTube Phase 2 ──────────────────────────────────────────────────────────
+
+# --- Competitors ---
+
+GET_YT_COMPETITORS = """
+SELECT competitor_channel_id, competitor_title, competitor_thumbnail_url,
+       webhook_active, added_at
+FROM youtube_competitors FINAL
+WHERE user_id = {user_id:UUID}
+  AND is_deleted = false
+ORDER BY added_at DESC
+"""
+
+COUNT_YT_COMPETITORS = """
+SELECT count()
+FROM youtube_competitors FINAL
+WHERE user_id = {user_id:UUID}
+  AND is_deleted = false
+"""
+
+# --- Competitor Videos ---
+
+GET_YT_COMPETITOR_VIDEOS_FOR_BASELINE = """
+SELECT video_id, view_count, published_at, title, thumbnail_url,
+       llm_analysis, is_outlier
+FROM youtube_competitor_videos FINAL
+WHERE user_id = {user_id:UUID}
+  AND competitor_channel_id = {competitor_channel_id:String}
+ORDER BY published_at DESC
+LIMIT 30
+"""
+
+GET_YT_COMPETITOR_OUTLIERS = """
+SELECT v.competitor_channel_id, v.video_id, v.title, v.thumbnail_url,
+       v.view_count, v.published_at, v.llm_analysis
+FROM youtube_competitor_videos v FINAL
+WHERE v.user_id = {user_id:UUID}
+  AND v.is_outlier = true
+ORDER BY v.published_at DESC
+LIMIT 50
+"""
+
+GET_YT_RECENT_COMPETITOR_VIDEOS = """
+SELECT v.competitor_channel_id, v.video_id, v.title, v.thumbnail_url,
+       v.view_count, v.published_at, v.llm_analysis
+FROM youtube_competitor_videos v FINAL
+WHERE v.user_id = {user_id:UUID}
+ORDER BY v.view_count DESC, v.published_at DESC
+LIMIT 50
+"""
+
+# --- Velocity ---
+
+GET_YT_VELOCITY = """
+SELECT hours_since_publish, view_count, avg_watch_s, ctr_pct, checked_at
+FROM youtube_competitor_velocity FINAL
+WHERE user_id = {user_id:UUID}
+  AND video_id = {video_id:String}
+ORDER BY hours_since_publish ASC
+"""
+
+# Own-channel videos are also stored in youtube_competitor_velocity with the
+# user's own yt_channel_id as channel_id. This JOIN retrieves 4h velocity
+# data for own videos to train the predictive model.
+GET_YT_OWN_VELOCITY_SAMPLES = """
+SELECT v.video_id, vel.view_count AS four_hour_views,
+       vel.avg_watch_s AS four_hour_avg_watch_s, vel.ctr_pct,
+       toUInt64(v.view_count) AS final_views
+FROM youtube_videos v FINAL
+JOIN youtube_competitor_velocity vel FINAL
+  ON vel.video_id = v.video_id
+     AND vel.user_id = v.user_id
+     AND vel.hours_since_publish = 4
+WHERE v.user_id = {user_id:UUID}
+  AND v.view_count > 0
+  AND toDate(v.published_at) <= today() - 30
+ORDER BY v.published_at DESC
+LIMIT 100
+"""
+
+# --- Title History ---
+
+GET_YT_TITLE_HISTORY = """
+SELECT title_text, observed_at
+FROM youtube_title_history
+WHERE user_id = {user_id:UUID}
+  AND video_id = {video_id:String}
+ORDER BY observed_at ASC
+"""
+
+GET_YT_LAST_OBSERVED_TITLE = """
+SELECT title_text
+FROM youtube_title_history
+WHERE user_id = {user_id:UUID}
+  AND video_id = {video_id:String}
+ORDER BY observed_at DESC
+LIMIT 1
+"""
+
+# --- Archive Suggestions ---
+
+GET_YT_ARCHIVE_SUGGESTIONS = """
+SELECT video_id, original_title, trending_topic, wikipedia_spike_pct,
+       autocomplete_matches, suggestion_type, llm_recommendation, generated_at
+FROM youtube_archive_suggestions FINAL
+WHERE user_id = {user_id:UUID}
+ORDER BY generated_at DESC
+"""
+
+GET_YT_LAST_ARCHIVE_SCAN = """
+SELECT max(generated_at) AS last_scan
+FROM youtube_archive_suggestions FINAL
+WHERE user_id = {user_id:UUID}
+"""
+
+# --- Predictions ---
+
+GET_YT_PREDICTION = """
+SELECT video_id, four_hour_views, four_hour_avg_watch_s, ctr_pct,
+       predicted_30d_views, predicted_low, predicted_high,
+       revenue_low_usd, revenue_high_usd, predicted_at
+FROM youtube_predictions FINAL
+WHERE user_id = {user_id:UUID}
+  AND video_id = {video_id:String}
+ORDER BY predicted_at DESC
+LIMIT 1
+"""
+
+# --- Alerts ---
+
+GET_YT_ALERTS = """
+SELECT id, video_id, alert_type, alert_body, is_read, created_at
+FROM youtube_alerts
+WHERE user_id = {user_id:UUID}
+ORDER BY created_at DESC
+LIMIT 20
+"""
+
+# --- Model State ---
+
+GET_YT_MODEL_STATE = """
+SELECT coefficients_json, intercept, r2_score, training_sample_size, trained_at
+FROM youtube_model_state FINAL
+WHERE user_id = {user_id:UUID}
+ORDER BY trained_at DESC
+LIMIT 1
+"""
+
+# --- Cross-Platform ---
+
+GET_YT_DAILY_SUBSCRIBER_NET = """
+SELECT
+    toDate(end_time) AS day,
+    sumIf(metric_value, metric_name = 'subscribersGained') AS gained,
+    sumIf(metric_value, metric_name = 'subscribersLost') AS lost
+FROM youtube_daily_metrics FINAL
+WHERE user_id = {user_id:UUID}
+  AND end_time >= {start_date:DateTime}
+GROUP BY day
+ORDER BY day ASC
+"""
+
+GET_INSTAGRAM_REEL_POSTS = """
+SELECT toDate(timestamp) AS post_date, ig_media_id, thumbnail_url, caption
+FROM instagram_media FINAL
+WHERE user_id = {user_id:UUID}
+  AND media_product_type = 'REELS'
+  AND timestamp >= {start_date:DateTime}
+ORDER BY post_date ASC
 # --- Story analytics retention ---
 
 # Snapshotted stories joined with their insights (stored in media_insights,

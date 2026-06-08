@@ -118,6 +118,74 @@ async def _run_weekly_digest() -> None:
         logger.exception("Scheduled weekly_digest failed")
 
 
+async def _run_yt_outlier_detection() -> None:
+    """Daily competitor outlier scan — only runs when WEBHOOK_BASE_URL is not set (polling fallback)."""
+    from .config import settings
+    if settings.webhook_base_url:
+        # Webhook mode active — skip polling fallback
+        return
+    from .jobs import yt_competitor_poll
+    try:
+        await yt_competitor_poll._run()
+    except Exception:
+        logger.exception("Scheduled yt_outlier_detection failed")
+
+
+async def _run_yt_archive_miner() -> None:
+    """Weekly archive miner — requires OLLAMA_API_KEY."""
+    from .config import settings
+    if not settings.ollama_api_key:
+        logger.info("Scheduled yt_archive_miner skipped — OLLAMA_API_KEY not set")
+        return
+    from .jobs import yt_archive_miner
+    try:
+        await yt_archive_miner._run()
+    except Exception:
+        logger.exception("Scheduled yt_archive_miner failed")
+
+
+def schedule_golden_hour(user_id: str, channel_id: str, video_id: str) -> None:
+    """Schedule a golden hour check 60 minutes from now."""
+    global _scheduler
+    if _scheduler is None:
+        return
+    from datetime import datetime, timedelta, timezone
+    from apscheduler.triggers.date import DateTrigger
+    from .jobs.yt_golden_hour import run_golden_hour
+    run_at = datetime.now(timezone.utc) + timedelta(minutes=60)
+    job_id = f"golden_hour_{user_id}_{video_id}"
+    _scheduler.add_job(
+        run_golden_hour,
+        DateTrigger(run_date=run_at),
+        id=job_id,
+        args=[user_id, channel_id, video_id],
+        replace_existing=True,
+        misfire_grace_time=600,
+    )
+
+
+def schedule_velocity_checks(user_id: str, channel_id: str, video_id: str) -> None:
+    """Schedule velocity checks at +4h, +12h, +24h for a competitor video."""
+    global _scheduler
+    if _scheduler is None:
+        return
+    from datetime import datetime, timedelta, timezone
+    from apscheduler.triggers.date import DateTrigger
+    from .jobs.yt_outlier_detection import check_video_after_delay
+    now = datetime.now(timezone.utc)
+    for hours in (4, 12, 24):
+        run_at = now + timedelta(hours=hours)
+        job_id = f"velocity_{user_id}_{video_id}_{hours}h"
+        _scheduler.add_job(
+            check_video_after_delay,
+            DateTrigger(run_date=run_at),
+            id=job_id,
+            args=[user_id, channel_id, video_id, hours],
+            replace_existing=True,
+            misfire_grace_time=1800,
+        )
+
+
 def start_scheduler() -> None:
     """Start the in-process scheduler if `ENABLE_SCHEDULER` is true.
 
@@ -236,6 +304,26 @@ def start_scheduler() -> None:
         ),
         id="weekly_digest",
         name="Weekly AI digest synthesis",
+        replace_existing=True,
+    )
+
+    sch.add_job(
+        _run_yt_outlier_detection,
+        CronTrigger(hour=2, minute=0),
+        id="yt_outlier_detection",
+        name="Daily YouTube competitor outlier scan (polling fallback)",
+        replace_existing=True,
+    )
+
+    sch.add_job(
+        _run_yt_archive_miner,
+        CronTrigger(
+            day_of_week=settings.scheduler_archive_miner_day,
+            hour=settings.scheduler_archive_miner_hour,
+            minute=30,
+        ),
+        id="yt_archive_miner",
+        name="Weekly YouTube archive miner",
         replace_existing=True,
     )
 

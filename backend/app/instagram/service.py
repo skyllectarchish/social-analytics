@@ -6,13 +6,11 @@ This module is responsible only for Instagram API communication.
 
 import asyncio
 import logging
-import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlencode
 
 import httpx
-from jose import JWTError, jwt
 
 from ..config import settings
 from ..constants import (
@@ -33,37 +31,18 @@ from ..constants import (
     TOKEN_EXCHANGE_URL,
 )
 from ..exceptions import InstagramAPIError, OAuthError
+from ..oauth_state import create_signed_oauth_state as _create_state
+from ..oauth_state import verify_oauth_state as _verify_state
 
 logger = logging.getLogger(__name__)
 
 
 def create_signed_oauth_state(user_id: str) -> str:
-    """Mint a signed, short-lived state token bound to the logged-in user.
-
-    The state is a JWT signed with the app's JWT secret. It carries the user id,
-    a nonce, an expiry, and a purpose tag — verified on `/callback` to prevent
-    CSRF and cross-user code injection.
-    """
-    payload = {
-        "uid": user_id,
-        "nonce": secrets.token_urlsafe(16),
-        "exp": datetime.now(tz=timezone.utc)
-        + timedelta(seconds=settings.oauth_state_ttl_seconds),
-        "purpose": "ig_oauth_state",
-    }
-    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return _create_state(user_id, purpose="ig_oauth_state")
 
 
 def verify_oauth_state(state: str, expected_user_id: str) -> None:
-    """Verify a state token on /callback. Raises OAuthError on any failure."""
-    try:
-        payload = jwt.decode(
-            state, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
-        )
-    except JWTError:
-        raise OAuthError("Invalid or expired OAuth state token")
-    if payload.get("purpose") != "ig_oauth_state" or payload.get("uid") != expected_user_id:
-        raise OAuthError("OAuth state user mismatch")
+    _verify_state(state, expected_user_id, purpose="ig_oauth_state")
 
 
 def get_oauth_url(state: str) -> str:

@@ -216,6 +216,10 @@
       "Bash(Select-Object -ExpandProperty FullName)",
       "PowerShell(Set-Location \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\frontend\"; npx tsc -b 2>&1 | Select-Object -First 30; \"exit: $LASTEXITCODE\")",
       "PowerShell(Set-Location \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\frontend\"; npx tsc -b; \"exit: $LASTEXITCODE\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git checkout *)",
+      "Bash(git commit *)"
       "PowerShell(npx tsc -b)",
       "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe -c \"from app.database import get_client; from app.models.queries import GET_ALL_INSTAGRAM_TOKENS; rows = get_client\\(\\).query\\(GET_ALL_INSTAGRAM_TOKENS\\).result_rows; print\\(len\\(rows\\), 'connected account\\(s\\)'\\); [print\\(str\\(r[0]\\)[:8], r[1], 'expires', r[3]\\) for r in rows]\")",
       "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe -m app.jobs.account_sync)",
