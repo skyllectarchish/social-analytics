@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
   ArrowUpRight,
+  Briefcase,
   Check,
   CornerDownRight,
   Heart,
@@ -10,13 +11,16 @@ import {
   Loader2,
   Send,
   Sparkles,
+  Star,
 } from "lucide-react";
-import api, { errorMessage } from "../api/client";
+import api, { errorMessage, safeGet } from "../api/client";
 import type {
   CommentInboxResponse,
   CommentReplySuggestion,
   CommentReplySuggestResponse,
   InboxComment,
+  SuperfanItem,
+  SuperfansResponse,
 } from "../api/types";
 import DashboardLayout from "../components/dashboard/DashboardLayout";
 import { CardEmpty } from "../components/dashboard/States";
@@ -24,12 +28,13 @@ import { useAuthedImage } from "../hooks/useAuthedImage";
 
 const PAGE_SIZE = 20;
 
-type Filter = "all" | "unanswered" | "questions" | "positive" | "negative";
+type Filter = "all" | "unanswered" | "questions" | "collabs" | "positive" | "negative";
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "unanswered", label: "Unanswered" },
   { key: "questions", label: "Questions" },
+  { key: "collabs", label: "Collabs" },
   { key: "positive", label: "Positive" },
   { key: "negative", label: "Negative" },
 ];
@@ -38,6 +43,7 @@ function filterParams(filter: Filter): Record<string, unknown> {
   switch (filter) {
     case "unanswered": return { unanswered_only: true };
     case "questions": return { questions_only: true };
+    case "collabs": return { collab_only: true };
     case "positive": return { sentiment: "positive" };
     case "negative": return { sentiment: "negative" };
     default: return {};
@@ -178,6 +184,32 @@ function ReplyComposer({
   );
 }
 
+function SuperfansCard({ fans }: { fans: SuperfanItem[] }) {
+  if (fans.length === 0) return null;
+  return (
+    <div className="card-hairline p-4">
+      <div className="flex items-center gap-2 text-xs font-semibold text-violet-deep">
+        <Star className="h-3.5 w-3.5" /> Superfans
+        <span className="font-normal text-foreground/45">
+          — repeat engagers in the last 90 days. Reply to them first.
+        </span>
+      </div>
+      <ul className="mt-3 flex flex-wrap gap-2">
+        {fans.slice(0, 8).map((f) => (
+          <li
+            key={f.username}
+            className="flex items-center gap-1.5 rounded-full bg-lavender/60 px-3 py-1 text-xs"
+            title={`${f.comment_count} comments across ${f.posts_touched} posts`}
+          >
+            <span className="font-semibold">@{f.username}</span>
+            <span className="num text-foreground/55">{f.comment_count}×</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function InboxPage() {
   const navigate = useNavigate();
   const [days, setDays] = useState(30);
@@ -189,6 +221,7 @@ export default function InboxPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [superfans, setSuperfans] = useState<SuperfanItem[]>([]);
 
   const load = useCallback(async (offset = 0) => {
     if (offset === 0) setLoading(true); else setLoadingMore(true);
@@ -220,6 +253,12 @@ export default function InboxPage() {
   useEffect(() => {
     load(0);
   }, [load]);
+
+  useEffect(() => {
+    safeGet<SuperfansResponse>("/instagram/comments/superfans").then((r) => {
+      if (r) setSuperfans(r.superfans);
+    });
+  }, []);
 
   async function sync() {
     setSyncing(true);
@@ -265,6 +304,8 @@ export default function InboxPage() {
             <span className="num">{total}</span> comments · reply directly or let AI draft one in your voice
           </p>
         </div>
+
+        <SuperfansCard fans={superfans} />
 
         {/* filters */}
         <div className="flex flex-wrap gap-1.5">
@@ -317,6 +358,16 @@ export default function InboxPage() {
                         {c.is_question && (
                           <span className="flex items-center gap-0.5 rounded-full bg-violet/10 px-2 py-0.5 text-[10px] font-medium text-violet-deep">
                             <HelpCircle className="h-3 w-3" /> question
+                          </span>
+                        )}
+                        {c.is_collab && (
+                          <span className="flex items-center gap-0.5 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600">
+                            <Briefcase className="h-3 w-3" /> collab
+                          </span>
+                        )}
+                        {c.is_superfan && (
+                          <span className="flex items-center gap-0.5 rounded-full bg-violet/10 px-2 py-0.5 text-[10px] font-medium text-violet-deep" title="Repeat engager — commented on several of your posts recently">
+                            <Star className="h-3 w-3" /> superfan
                           </span>
                         )}
                         {c.replied && (

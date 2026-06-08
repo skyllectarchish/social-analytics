@@ -184,11 +184,59 @@ export interface InboxComment {
   is_question: boolean;
   replied: boolean;
   permalink: string;
+  is_collab: boolean;
+  is_superfan: boolean;
 }
 
 export interface CommentInboxResponse {
   total: number;
   comments: InboxComment[];
+}
+
+export interface SuperfanItem {
+  username: string;
+  comment_count: number;
+  posts_touched: number;
+  total_likes: number;
+  last_comment_at: string;
+  avg_sentiment_score: number;
+}
+
+export interface SuperfansResponse {
+  superfans: SuperfanItem[];
+}
+
+/* ---------- Comment-to-DM funnels ---------- */
+export interface DMFunnel {
+  funnel_id: string;
+  keyword: string;
+  dm_message: string;
+  public_reply: string;
+  ig_media_id: string;
+  created_at: string;
+  sent_count: number;
+  failed_count: number;
+  last_sent_at: string | null;
+}
+
+export interface DMFunnelListResponse {
+  funnels: DMFunnel[];
+}
+
+export interface DMFunnelSend {
+  funnel_id: string;
+  keyword: string;
+  ig_comment_id: string;
+  ig_media_id: string;
+  commenter_username: string;
+  comment_text: string;
+  status: "sent" | "failed";
+  error: string;
+  sent_at: string;
+}
+
+export interface DMFunnelSendsResponse {
+  sends: DMFunnelSend[];
 }
 
 export interface CommentReplySuggestion {
@@ -252,6 +300,25 @@ export interface StoryWithInsights {
 }
 export interface StoriesResponse {
   stories: StoryWithInsights[];
+}
+
+export interface StoryHistoryItem {
+  ig_media_id: string;
+  media_type: string;
+  permalink: string;
+  timestamp: string;
+  reach: number;
+  views: number;
+  replies: number;
+  shares: number;
+  interactions: number;
+  navigation: number;
+}
+
+export interface StoryHistoryResponse {
+  total: number;
+  period_days: number;
+  stories: StoryHistoryItem[];
 }
 
 export interface DemographicBreakdown {

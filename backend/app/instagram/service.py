@@ -1020,6 +1020,48 @@ async def post_comment_reply(comment_id: str, message: str, token: str) -> str:
             raise InstagramAPIError("Failed to post the reply to Instagram")
 
 
+async def send_private_reply(comment_id: str, message: str, token: str) -> str:
+    """Send a private DM reply to a commenter via POST /me/messages.
+
+    This is Meta's "private reply" — the only way an app can *initiate* a DM,
+    and it's only allowed within 7 days of the comment being posted. Covered
+    by the `instagram_business_manage_messages` scope requested during OAuth.
+    Used by the comment-to-DM funnel runner.
+
+    Returns:
+        The sent message id ('' if Meta omits it).
+
+    Raises:
+        InstagramAPIError: If the message could not be sent (expired window,
+            user has DMs closed, messaging permission not approved, etc.).
+    """
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+        try:
+            resp = await client.post(
+                f"{GRAPH_BASE_URL}/me/messages",
+                params={"access_token": token},
+                json={
+                    "recipient": {"comment_id": comment_id},
+                    "message": {"text": message},
+                },
+            )
+            resp.raise_for_status()
+            return str(resp.json().get("message_id", ""))
+        except httpx.HTTPStatusError as exc:
+            # Bubble Meta's error message up — the funnel runner logs it on the
+            # send row so the user can see WHY a DM failed (e.g. 7-day window).
+            detail = ""
+            try:
+                detail = exc.response.json().get("error", {}).get("message", "")
+            except (ValueError, AttributeError):
+                pass
+            logger.error("Private reply failed for %s: %s", comment_id, exc.response.text)
+            raise InstagramAPIError(detail or "Failed to send the private reply")
+        except httpx.HTTPError as exc:
+            logger.error("Private reply failed for %s: %s", comment_id, exc)
+            raise InstagramAPIError("Failed to send the private reply")
+
+
 async def fetch_media_insights(
     media_id: str,
     token: str,

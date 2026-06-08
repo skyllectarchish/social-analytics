@@ -258,6 +258,8 @@ class InboxComment(BaseModel):
     is_question: bool
     replied: bool                # creator has a reply under this comment
     permalink: str               # post permalink ('' if media row missing)
+    is_collab: bool = False      # brand-collab inquiry (LLM flag or keyword heuristic)
+    is_superfan: bool = False    # commenter is a repeat engager (see /comments/superfans)
 
 
 class CommentInboxResponse(BaseModel):
@@ -265,6 +267,23 @@ class CommentInboxResponse(BaseModel):
 
     total: int
     comments: list[InboxComment]
+
+
+class SuperfanItem(BaseModel):
+    """One repeat engager — ranked by comment volume across posts."""
+
+    username: str
+    comment_count: int
+    posts_touched: int
+    total_likes: int
+    last_comment_at: str         # ISO-8601
+    avg_sentiment_score: float   # -1..1 across their scored comments
+
+
+class SuperfansResponse(BaseModel):
+    """Response for GET /api/instagram/comments/superfans."""
+
+    superfans: list[SuperfanItem]
 
 
 class CommentReplyRequest(BaseModel):
@@ -355,6 +374,80 @@ class StoriesResponse(BaseModel):
     """Response for GET /api/instagram/stories."""
 
     stories: list[StoryWithInsights]
+
+
+class StoryHistoryItem(BaseModel):
+    """A snapshotted story with its retained insights (survives the 24h expiry)."""
+
+    ig_media_id: str
+    media_type: str
+    permalink: str
+    timestamp: str               # ISO-8601 (when the story was posted)
+    reach: int
+    views: int
+    replies: int
+    shares: int
+    interactions: int
+    navigation: int              # taps forward/back/exit, summed
+
+
+class StoryHistoryResponse(BaseModel):
+    """Response for GET /api/instagram/stories/history."""
+
+    total: int
+    period_days: int
+    stories: list[StoryHistoryItem]
+
+
+# --- Comment-to-DM keyword funnels ---
+
+class CreateDMFunnelRequest(BaseModel):
+    """Body for POST /api/instagram/dm-funnels."""
+
+    keyword: str = Field(min_length=2, max_length=40)
+    dm_message: str = Field(min_length=1, max_length=1000)
+    public_reply: str = Field(default="", max_length=2200)
+    ig_media_id: str = Field(default="", max_length=64)  # '' = all posts
+
+
+class DMFunnelItem(BaseModel):
+    """One funnel + its lifetime send stats."""
+
+    funnel_id: str
+    keyword: str
+    dm_message: str
+    public_reply: str
+    ig_media_id: str             # '' = all posts
+    created_at: str              # ISO-8601
+    sent_count: int = 0
+    failed_count: int = 0
+    last_sent_at: str | None = None
+
+
+class DMFunnelListResponse(BaseModel):
+    """Response for GET /api/instagram/dm-funnels."""
+
+    funnels: list[DMFunnelItem]
+
+
+class DMFunnelSendItem(BaseModel):
+    """One funnel send-log entry (the activity feed)."""
+
+    funnel_id: str
+    keyword: str
+    ig_comment_id: str
+    ig_media_id: str
+    commenter_username: str
+    comment_text: str
+    status: str                  # 'sent' | 'failed'
+    error: str
+    sent_at: str                 # ISO-8601
+
+
+class DMFunnelSendsResponse(BaseModel):
+    """Response for GET /api/instagram/dm-funnels/sends."""
+
+    sends: list[DMFunnelSendItem]
 
 
 # --- Feature 1: Content-Format Performance Breakdown ---

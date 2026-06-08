@@ -44,8 +44,10 @@ from ..repositories import (
     branded_hashtag_repo,
     comment_repo,
     competitor_repo,
+    dm_funnel_repo,
     instagram_repo,
     insights_repo,
+    story_repo,
 )
 from ..repositories.comparison import (
     COMPARE_TO_PATTERN,
@@ -91,7 +93,12 @@ from .schemas import (
     ContentMixAccount,
     ContentMixDistribution,
     ContentMixResponse,
+    CreateDMFunnelRequest,
     DashboardSummary,
+    DMFunnelItem,
+    DMFunnelListResponse,
+    DMFunnelSendItem,
+    DMFunnelSendsResponse,
     DemographicBreakdown,
     DemographicResponse,
     FollowerQualityCohort,
@@ -142,7 +149,11 @@ from .schemas import (
     SentimentSummaryResponse,
     SentimentTrendPoint,
     StoriesResponse,
+    StoryHistoryItem,
+    StoryHistoryResponse,
     StoryWithInsights,
+    SuperfanItem,
+    SuperfansResponse,
     SyncResponse,
     TopicItem,
     TopicsResponse,
@@ -749,17 +760,27 @@ def get_format_fatigue(
 
 # --- Comment inbox ---
 
+#: Superfan thresholds — a commenter must clear BOTH to earn the badge.
+#: 3 comments across 2+ posts = repeat engagement, not one comment storm.
+_SUPERFAN_MIN_COMMENTS = 3
+_SUPERFAN_MIN_POSTS = 2
+_SUPERFAN_WINDOW_DAYS = 90
+
+
 @router.get("/comments/inbox", response_model=CommentInboxResponse)
 def get_comment_inbox(
     sentiment: Literal["", "positive", "neutral", "negative"] = Query(""),
     questions_only: bool = Query(False),
     unanswered_only: bool = Query(False),
+    collab_only: bool = Query(False),
     limit: int = Query(20, ge=1, le=50),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_user),
 ):
     """Unified comment inbox: top-level comments across all posts, newest
-    first, joined with sentiment + replied status. Spam is always excluded."""
+    first, joined with sentiment + replied status. Spam is always excluded.
+    Comments are tagged is_collab (brand inquiries) and is_superfan (the
+    commenter is a repeat engager over the trailing 90 days)."""
     client = get_client()
     user_id = str(current_user.id)
 
@@ -771,11 +792,30 @@ def get_comment_inbox(
         "sentiment": sentiment,
         "questions_only": questions_only,
         "unanswered_only": unanswered_only,
+        "collab_only": collab_only,
     }
     rows = comment_repo.find_inbox_page(
         client, user_id, ig_profile.username, **filters, limit=limit, offset=offset,
     )
     total = comment_repo.count_inbox(client, user_id, ig_profile.username, **filters)
+
+    # Superfan tagging — one aggregate query, then mark rows in Python rather
+    # than bolting another join onto the already-shared inbox SQL.
+    superfan_names: set[str] = set()
+    try:
+        superfan_names = {
+            f["username"]
+            for f in comment_repo.find_superfans(
+                client, user_id, ig_profile.username,
+                since=datetime.now(timezone.utc).replace(tzinfo=None)
+                - timedelta(days=_SUPERFAN_WINDOW_DAYS),
+                min_comments=_SUPERFAN_MIN_COMMENTS,
+                min_posts=_SUPERFAN_MIN_POSTS,
+                limit=200,
+            )
+        }
+    except Exception:
+        logger.warning("Superfan tagging skipped for user %s", user_id)
 
     return CommentInboxResponse(
         total=total,
@@ -791,8 +831,53 @@ def get_comment_inbox(
                 is_question=bool(r[7]),
                 replied=bool(r[8]),
                 permalink=r[9],
+                is_collab=bool(r[10]),
+                is_superfan=r[2] in superfan_names,
             )
             for r in rows
+        ],
+    )
+
+
+@router.get("/comments/superfans", response_model=SuperfansResponse)
+def get_superfans(
+    days: int = Query(_SUPERFAN_WINDOW_DAYS, ge=7, le=365),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+):
+    """Repeat engagers: commenters with ≥3 comments across ≥2 posts in the
+    window, ranked by volume. These are the people most likely to share,
+    defend, and convert — the inbox surfaces them so the creator can
+    prioritize replying."""
+    client = get_client()
+    user_id = str(current_user.id)
+
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+
+    fans = comment_repo.find_superfans(
+        client, user_id, ig_profile.username,
+        since=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days),
+        min_comments=_SUPERFAN_MIN_COMMENTS,
+        min_posts=_SUPERFAN_MIN_POSTS,
+        limit=limit,
+    )
+    return SuperfansResponse(
+        superfans=[
+            SuperfanItem(
+                username=f["username"],
+                comment_count=f["comment_count"],
+                posts_touched=f["posts_touched"],
+                total_likes=f["total_likes"],
+                last_comment_at=(
+                    f["last_comment_at"].isoformat()
+                    if hasattr(f["last_comment_at"], "isoformat")
+                    else str(f["last_comment_at"])
+                ),
+                avg_sentiment_score=round(f["avg_sentiment_score"], 3),
+            )
+            for f in fans
         ],
     )
 
@@ -1206,6 +1291,16 @@ async def _run_insights_sync(
             )
     except Exception:
         logger.exception("Background sync: comment sync failed for user %s", user_id)
+
+    # Story analytics retention — snapshot whatever stories are live right now
+    # so they survive Meta's 24h expiry. The scheduled story_snapshot job does
+    # the same every few hours; doing it here too means a manual "Sync" never
+    # misses a story that would expire before the next scheduled run.
+    try:
+        from ..jobs.story_snapshot import snapshot_user_stories
+        await snapshot_user_stories(client, user_id, ig_user_id, token)
+    except Exception:
+        logger.exception("Background sync: story snapshot failed for user %s", user_id)
 
 
 @router.post("/insights/sync", response_model=SyncResponse)
@@ -1708,6 +1803,57 @@ async def get_stories(current_user: User = Depends(get_current_user)):
         )
 
     return StoriesResponse(stories=stories_out)
+
+
+@router.get("/stories/history", response_model=StoryHistoryResponse)
+def get_story_history(
+    days: int = Query(90, ge=1, le=INSIGHTS_MAX_LOOKBACK_DAYS),
+    limit: int = Query(200, ge=1, le=500),
+    current_user: User = Depends(get_current_user),
+):
+    """Retained story history — snapshots taken before Meta's 24h expiry.
+
+    Unlike GET /stories (live only), this reads from ClickHouse: every story
+    the snapshot job captured, with its insights, going back as far as the
+    user has been connected. Instagram itself never offers this view."""
+    client = get_client()
+    user_id = str(current_user.id)
+
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+    items = story_repo.find_story_history(
+        client, user_id, ig_profile.ig_user_id, since=since, limit=limit,
+    )
+    total = story_repo.count_story_history(
+        client, user_id, ig_profile.ig_user_id, since=since,
+    )
+
+    return StoryHistoryResponse(
+        total=total,
+        period_days=days,
+        stories=[
+            StoryHistoryItem(
+                ig_media_id=s["ig_media_id"],
+                media_type=s["media_type"],
+                permalink=s["permalink"],
+                timestamp=(
+                    s["timestamp"].isoformat()
+                    if hasattr(s["timestamp"], "isoformat")
+                    else str(s["timestamp"])
+                ),
+                reach=s["reach"],
+                views=s["views"],
+                replies=s["replies"],
+                shares=s["shares"],
+                interactions=s["interactions"],
+                navigation=s["navigation"],
+            )
+            for s in items
+        ],
+    )
 
 
 # --- Feature 4: Reels Retention ---
@@ -2919,4 +3065,120 @@ def get_branded_hashtag_mentions(
         hashtag=hashtag.lower(),
         period_days=days,
         mentions=[BrandedHashtagMention(**r) for r in rows],
+    )
+
+
+# --- Comment-to-DM keyword funnels ---
+
+def _funnel_item(f: dict, counts: dict[str, dict]) -> DMFunnelItem:
+    c = counts.get(f["funnel_id"], {})
+    last = c.get("last_sent_at")
+    return DMFunnelItem(
+        funnel_id=f["funnel_id"],
+        keyword=f["keyword"],
+        dm_message=f["dm_message"],
+        public_reply=f["public_reply"],
+        ig_media_id=f["ig_media_id"],
+        created_at=(
+            f["created_at"].isoformat()
+            if hasattr(f["created_at"], "isoformat")
+            else str(f["created_at"])
+        ),
+        sent_count=c.get("sent_count", 0),
+        failed_count=c.get("failed_count", 0),
+        last_sent_at=last.isoformat() if hasattr(last, "isoformat") else None,
+    )
+
+
+@router.get("/dm-funnels", response_model=DMFunnelListResponse)
+def list_dm_funnels(current_user: User = Depends(get_current_user)):
+    """The user's active funnels with lifetime send stats."""
+    client = get_client()
+    user_id = str(current_user.id)
+    funnels = dm_funnel_repo.list_funnels(client, user_id)
+    counts = dm_funnel_repo.send_counts(client, user_id)
+    return DMFunnelListResponse(funnels=[_funnel_item(f, counts) for f in funnels])
+
+
+@router.post("/dm-funnels", response_model=DMFunnelItem)
+def create_dm_funnel(
+    payload: CreateDMFunnelRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Create a keyword → DM funnel.
+
+    From the moment it exists, the funnel runner DMs anyone whose NEW comment
+    contains the keyword (word-boundary match). Comments posted before
+    creation never trigger it. Requires Advanced Access on
+    `instagram_business_manage_messages` for real sends."""
+    client = get_client()
+    user_id = str(current_user.id)
+
+    if instagram_repo.find_profile(client, user_id) is None:
+        raise InstagramNotConnectedError()
+
+    funnels = dm_funnel_repo.list_funnels(client, user_id)
+    if len(funnels) >= dm_funnel_repo.MAX_ACTIVE_FUNNELS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot have more than {dm_funnel_repo.MAX_ACTIVE_FUNNELS} active funnels.",
+        )
+    keyword = payload.keyword.lower().strip()
+    if any(f["keyword"] == keyword and f["ig_media_id"] == payload.ig_media_id for f in funnels):
+        raise HTTPException(
+            status_code=400,
+            detail="A funnel with this keyword already exists for that scope.",
+        )
+
+    created = dm_funnel_repo.create_funnel(
+        client, user_id,
+        keyword=keyword,
+        dm_message=payload.dm_message.strip(),
+        public_reply=payload.public_reply.strip(),
+        ig_media_id=payload.ig_media_id.strip(),
+    )
+    logger.info("DM funnel created for user %s (keyword=%r)", user_id, keyword)
+    return _funnel_item(created, {})
+
+
+@router.delete("/dm-funnels/{funnel_id}", status_code=204)
+def delete_dm_funnel(
+    funnel_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Soft-delete (active=0). Send history is preserved."""
+    client = get_client()
+    user_id = str(current_user.id)
+    if not dm_funnel_repo.soft_delete_funnel(client, user_id, funnel_id):
+        raise EntityNotFoundError("Funnel")
+
+
+@router.get("/dm-funnels/sends", response_model=DMFunnelSendsResponse)
+def get_dm_funnel_sends(
+    limit: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
+):
+    """Recent funnel activity — every DM attempt, newest first."""
+    client = get_client()
+    user_id = str(current_user.id)
+    sends = dm_funnel_repo.recent_sends(client, user_id, limit=limit)
+    return DMFunnelSendsResponse(
+        sends=[
+            DMFunnelSendItem(
+                funnel_id=s["funnel_id"],
+                keyword=s["keyword"],
+                ig_comment_id=s["ig_comment_id"],
+                ig_media_id=s["ig_media_id"],
+                commenter_username=s["commenter_username"],
+                comment_text=s["comment_text"],
+                status=s["status"],
+                error=s["error"],
+                sent_at=(
+                    s["sent_at"].isoformat()
+                    if hasattr(s["sent_at"], "isoformat")
+                    else str(s["sent_at"])
+                ),
+            )
+            for s in sends
+        ],
     )

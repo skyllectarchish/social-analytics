@@ -84,6 +84,24 @@ async def _run_branded_hashtag_sync() -> None:
         logger.exception("Scheduled branded_hashtag_sync failed")
 
 
+async def _run_story_snapshot() -> None:
+    # Async — same reasoning as _run_competitor_sync.
+    from .jobs import story_snapshot
+    try:
+        await story_snapshot._run()
+    except Exception:
+        logger.exception("Scheduled story_snapshot failed")
+
+
+async def _run_dm_funnel_runner() -> None:
+    # Async — same reasoning as _run_competitor_sync.
+    from .jobs import dm_funnel_runner
+    try:
+        await dm_funnel_runner._run()
+    except Exception:
+        logger.exception("Scheduled dm_funnel_runner failed")
+
+
 async def _run_weekly_digest() -> None:
     # Tier 4 / Phase F — async because digest synthesis is async (Anthropic
     # SDK is awaited). Per-user errors are isolated inside the job; this
@@ -183,6 +201,30 @@ def start_scheduler() -> None:
         replace_existing=True,
     )
 
+    # Story analytics retention — capture live stories (and their insights)
+    # before the 24h expiry. Interval-based so each story gets several
+    # snapshots over its lifetime; ReplacingMergeTree keeps the freshest.
+    sch.add_job(
+        _run_story_snapshot,
+        IntervalTrigger(hours=settings.scheduler_story_snapshot_hours),
+        id="story_snapshot",
+        name="Snapshot live stories + insights",
+        replace_existing=True,
+        next_run_time=None,
+    )
+
+    # Comment-to-DM funnels — frequent because funnel latency is the feature
+    # ("comment LINK" should be answered in minutes). The job no-ops quickly
+    # when nobody has active funnels.
+    sch.add_job(
+        _run_dm_funnel_runner,
+        IntervalTrigger(minutes=settings.scheduler_dm_funnel_minutes),
+        id="dm_funnel_runner",
+        name="Comment-to-DM funnel runner",
+        replace_existing=True,
+        next_run_time=None,
+    )
+
     # Tier 4 / Phase F — Weekly AI digest synthesis. Charges under
     # feature='digest_auto' so it doesn't burn the user's monthly cap.
     sch.add_job(
@@ -204,7 +246,9 @@ def start_scheduler() -> None:
         "competitor_sync @ %02d:00 UTC daily, "
         "sentiment_batch every %d min, "
         "topic_clustering weekday=%d @ %02d:00 UTC, "
-        "weekly_digest weekday=%d @ %02d:00 UTC",
+        "weekly_digest weekday=%d @ %02d:00 UTC, "
+        "story_snapshot every %dh, "
+        "dm_funnel_runner every %d min",
         settings.scheduler_account_sync_hour,
         settings.scheduler_competitor_sync_hour,
         settings.scheduler_sentiment_batch_minutes,
@@ -212,6 +256,8 @@ def start_scheduler() -> None:
         settings.scheduler_topic_clustering_hour,
         settings.scheduler_weekly_digest_day,
         settings.scheduler_weekly_digest_hour,
+        settings.scheduler_story_snapshot_hours,
+        settings.scheduler_dm_funnel_minutes,
     )
 
 

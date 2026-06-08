@@ -4,8 +4,10 @@ from . import (
     branded_hashtag_repo,
     comment_repo,
     competitor_repo,
+    dm_funnel_repo,
     instagram_repo,
     insights_repo,
+    story_repo,
     user_repo,
 )
 
@@ -16,4 +18,6 @@ __all__ = [
     "comment_repo",
     "competitor_repo",
     "branded_hashtag_repo",
+    "dm_funnel_repo",
+    "story_repo",
 ]

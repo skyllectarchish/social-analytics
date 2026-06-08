@@ -24,6 +24,8 @@ import CompetitorsPage from "./pages/CompetitorsPage";
 import CopilotPage from "./pages/CopilotPage";
 import MediaKitPage from "./pages/MediaKitPage";
 import InboxPage from "./pages/InboxPage";
+import StoriesPage from "./pages/StoriesPage";
+import DMAutomationPage from "./pages/DMAutomationPage";
 import PostsPage from "./pages/PostsPage";
 import ImportPage from "./pages/ImportPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
@@ -96,6 +98,10 @@ function AppRoutes() {
       <Route path="/dashboard/copilot" element={<ProtectedRoute><CopilotPage /></ProtectedRoute>} />
       <Route path="/dashboard/media-kit" element={<ProtectedRoute><MediaKitPage /></ProtectedRoute>} />
       <Route path="/dashboard/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
+      <Route path="/dashboard/stories" element={<ProtectedRoute><StoriesPage /></ProtectedRoute>} />
+      <Route path="/dashboard/automation" element={<ProtectedRoute><DMAutomationPage /></ProtectedRoute>} />
+      {/* legacy path from the initial release of this feature */}
+      <Route path="/dashboard/funnels" element={<Navigate to="/dashboard/automation" replace />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
