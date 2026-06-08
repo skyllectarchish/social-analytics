@@ -48,6 +48,12 @@ ORDER BY updated_at DESC
 LIMIT 1
 """
 
+# Every connected account — drives the daily account_sync job.
+GET_ALL_INSTAGRAM_TOKENS = """
+SELECT user_id, ig_user_id, access_token, token_expires_at
+FROM instagram_profiles FINAL
+"""
+
 # --- Instagram Media ---
 
 COUNT_INSTAGRAM_MEDIA = """
@@ -193,6 +199,253 @@ WHERE mi.user_id = {user_id:UUID}
   AND m.timestamp <= {until:DateTime}
 GROUP BY mi.ig_media_id, m.media_type, m.permalink, m.thumbnail_url, m.media_url, m.caption
 ORDER BY interactions DESC
+LIMIT {limit:UInt32}
+"""
+
+# --- AI content factory ---
+
+# Question comments for the audience-demand miner. Excludes spam; synthetic
+# demo rows are excluded unless include_demo=1 (used to demo the feature
+# before Meta App Review unlocks real comment data).
+GET_QUESTION_COMMENTS = """
+SELECT c.text, c.ig_media_id, coalesce(m.caption, '') AS media_caption
+FROM instagram_comments c FINAL
+INNER JOIN comment_sentiment s FINAL
+    ON s.user_id = c.user_id AND s.ig_comment_id = c.ig_comment_id
+LEFT JOIN instagram_media m FINAL
+    ON m.user_id = c.user_id AND m.ig_media_id = c.ig_media_id
+WHERE c.user_id = {user_id:UUID}
+  AND s.is_question = 1
+  AND s.is_spam = 0
+  AND ({include_demo:UInt8} = 1 OR c.ig_comment_id NOT LIKE 'synth_%')
+  AND c.timestamp >= {since:DateTime}
+ORDER BY c.timestamp DESC
+LIMIT {limit:UInt32}
+"""
+
+# Weekly average engagement (likes + comments per post) per format — feeds
+# the deterministic format-fatigue detector. Uses instagram_media counts so
+# it works even where per-media insights are blocked by Meta.
+GET_WEEKLY_FORMAT_ENGAGEMENT = """
+SELECT
+    toStartOfWeek(timestamp) AS week,
+    multiIf(
+        media_product_type = 'REELS', 'REELS',
+        media_type = 'CAROUSEL_ALBUM', 'CAROUSEL',
+        'IMAGE'
+    ) AS format,
+    count() AS posts,
+    avg(like_count + comments_count) AS avg_engagement
+FROM instagram_media FINAL
+WHERE user_id = {user_id:UUID}
+  AND ig_user_id = {ig_user_id:String}
+  AND media_product_type != 'STORY'
+  AND timestamp >= {since:DateTime}
+GROUP BY week, format
+ORDER BY format, week
+"""
+
+# --- Data-export archive import ---
+
+GET_ARCHIVE_SUMMARY = """
+SELECT
+    (SELECT count() FROM archive_posts FINAL WHERE user_id = {user_id:UUID}) AS posts,
+    (SELECT min(taken_at) FROM archive_posts FINAL WHERE user_id = {user_id:UUID}) AS posts_from,
+    (SELECT count() FROM archive_stories FINAL WHERE user_id = {user_id:UUID}) AS stories,
+    (SELECT min(taken_at) FROM archive_stories FINAL WHERE user_id = {user_id:UUID}) AS stories_from,
+    (SELECT count() FROM follower_events FINAL WHERE user_id = {user_id:UUID}) AS followers,
+    (SELECT min(followed_at) FROM follower_events FINAL WHERE user_id = {user_id:UUID}) AS followers_from
+"""
+
+# Cumulative follower curve by month — the real historical growth line the
+# Graph API can never provide (it has no per-follower timestamps at all).
+GET_ARCHIVE_FOLLOWER_GROWTH = """
+SELECT month, joins, sum(joins) OVER (ORDER BY month) AS cumulative
+FROM (
+    SELECT toStartOfMonth(followed_at) AS month, count() AS joins
+    FROM follower_events FINAL
+    WHERE user_id = {user_id:UUID}
+    GROUP BY month
+)
+ORDER BY month
+"""
+
+GET_ARCHIVE_CONTENT_BY_MONTH = """
+SELECT month, sumIf(n, kind = 'post') AS posts, sumIf(n, kind = 'story') AS stories
+FROM (
+    SELECT toStartOfMonth(taken_at) AS month, 'post' AS kind, count() AS n
+    FROM archive_posts FINAL WHERE user_id = {user_id:UUID} GROUP BY month
+    UNION ALL
+    SELECT toStartOfMonth(taken_at) AS month, 'story' AS kind, count() AS n
+    FROM archive_stories FINAL WHERE user_id = {user_id:UUID} GROUP BY month
+)
+GROUP BY month
+ORDER BY month
+"""
+
+# --- Comment inbox ---
+
+# Brand-collab inquiry heuristic — supplements the LLM-scored `is_collab`
+# flag so comments scored before migration 035 (or not yet batch-scored)
+# still surface under the Collabs filter. Substring match, case-insensitive.
+_COLLAB_KEYWORDS_SQL = (
+    "['collab', 'partnership', 'sponsor', 'brand deal', 'work with you', "
+    "'work together', 'ambassador', 'business inquiry', 'paid promotion', "
+    "'promote our']"
+)
+
+# A comment counts as a collab inquiry when the LLM flagged it OR the
+# heuristic matches. Shared between the SELECT column and the filter.
+_COMMENT_IS_COLLAB_EXPR = (
+    "(coalesce(s.is_collab, 0) = 1 "
+    f"OR multiSearchAnyCaseInsensitive(c.text, {_COLLAB_KEYWORDS_SQL}) > 0)"
+)
+
+# Filters are parameterized as "off" sentinels ('' / 0) so one centralized
+# query serves every filter combination without dynamic SQL. Spam (per the
+# sentiment batch) is always excluded; the creator's own top-level comments
+# are excluded via self_username. `replied` = the creator has a reply under
+# the comment (their own replies are synced like any other comment).
+# Synthetic demo rows (seed_demo_sentiment, ig_comment_id 'synth_*') are
+# excluded — the inbox is an action surface and replying to them would 400
+# at Meta; they remain visible in the Audience Voice demo sections.
+_COMMENT_INBOX_FILTERS = f"""
+WHERE c.user_id = {{user_id:UUID}}
+  AND c.parent_comment_id = ''
+  AND c.username != {{self_username:String}}
+  AND c.ig_comment_id NOT LIKE 'synth_%'
+  AND coalesce(s.is_spam, 0) = 0
+  AND ({{sentiment:String}} = '' OR s.sentiment = {{sentiment:String}})
+  AND ({{questions_only:UInt8}} = 0 OR s.is_question = 1)
+  AND ({{unanswered_only:UInt8}} = 0 OR coalesce(r.my_replies, 0) = 0)
+  AND ({{collab_only:UInt8}} = 0 OR {_COMMENT_IS_COLLAB_EXPR})
+"""
+
+_COMMENT_INBOX_JOINS = """
+FROM instagram_comments c FINAL
+LEFT JOIN comment_sentiment s FINAL
+    ON s.user_id = c.user_id AND s.ig_comment_id = c.ig_comment_id
+LEFT JOIN (
+    SELECT parent_comment_id,
+           countIf(username = {self_username:String}) AS my_replies
+    FROM instagram_comments FINAL
+    WHERE user_id = {user_id:UUID} AND parent_comment_id != ''
+    GROUP BY parent_comment_id
+) r ON r.parent_comment_id = c.ig_comment_id
+LEFT JOIN instagram_media m FINAL
+    ON m.user_id = c.user_id AND m.ig_media_id = c.ig_media_id
+"""
+
+GET_COMMENT_INBOX = f"""
+SELECT
+    c.ig_comment_id,
+    c.ig_media_id,
+    c.username,
+    c.text,
+    c.like_count,
+    c.timestamp,
+    coalesce(s.sentiment, '') AS sentiment,
+    coalesce(s.is_question, 0) AS is_question,
+    coalesce(r.my_replies, 0) > 0 AS replied,
+    coalesce(m.permalink, '') AS permalink,
+    {_COMMENT_IS_COLLAB_EXPR} AS is_collab
+{_COMMENT_INBOX_JOINS}
+{_COMMENT_INBOX_FILTERS}
+ORDER BY c.timestamp DESC
+LIMIT {{limit:UInt32}} OFFSET {{offset:UInt32}}
+"""
+
+COUNT_COMMENT_INBOX = f"""
+SELECT count()
+{_COMMENT_INBOX_JOINS}
+{_COMMENT_INBOX_FILTERS}
+"""
+
+# One comment + its post context — reply validation and the AI suggester.
+GET_COMMENT_WITH_CONTEXT = """
+SELECT c.ig_comment_id, c.ig_media_id, c.username, c.text,
+       coalesce(s.sentiment, '') AS sentiment,
+       coalesce(s.is_question, 0) AS is_question,
+       coalesce(m.caption, '') AS media_caption
+FROM instagram_comments c FINAL
+LEFT JOIN comment_sentiment s FINAL
+    ON s.user_id = c.user_id AND s.ig_comment_id = c.ig_comment_id
+LEFT JOIN instagram_media m FINAL
+    ON m.user_id = c.user_id AND m.ig_media_id = c.ig_media_id
+WHERE c.user_id = {user_id:UUID}
+  AND c.ig_comment_id = {ig_comment_id:String}
+  AND c.ig_comment_id NOT LIKE 'synth_%'
+LIMIT 1
+"""
+
+# The creator's most recent replies — voice samples for the AI suggester.
+GET_RECENT_SELF_REPLIES = """
+SELECT text
+FROM instagram_comments FINAL
+WHERE user_id = {user_id:UUID}
+  AND parent_comment_id != ''
+  AND username = {self_username:String}
+  AND ig_comment_id NOT LIKE 'synth_%'
+ORDER BY timestamp DESC
+LIMIT {limit:UInt32}
+"""
+
+# --- Superfans (repeat engagers) ---
+
+# Top commenters over a window: distinct comments + distinct posts touched.
+# A "superfan" is anyone clearing the min_comments/min_posts thresholds —
+# repeat engagement across multiple posts, not one comment storm under a
+# single viral post. Replies count too (engaging in threads is engagement).
+GET_SUPERFANS = """
+SELECT
+    c.username,
+    count(DISTINCT c.ig_comment_id) AS comment_count,
+    count(DISTINCT c.ig_media_id) AS posts_touched,
+    sum(c.like_count) AS total_likes,
+    max(c.timestamp) AS last_comment_at,
+    avg(coalesce(s.score, 0)) AS avg_sentiment_score
+FROM instagram_comments c FINAL
+LEFT JOIN comment_sentiment s FINAL
+    ON s.user_id = c.user_id AND s.ig_comment_id = c.ig_comment_id
+WHERE c.user_id = {user_id:UUID}
+  AND c.username != {self_username:String}
+  AND c.username != ''
+  AND c.ig_comment_id NOT LIKE 'synth_%'
+  AND coalesce(s.is_spam, 0) = 0
+  AND c.timestamp >= {since:DateTime}
+GROUP BY c.username
+HAVING comment_count >= {min_comments:UInt8}
+   AND posts_touched >= {min_posts:UInt8}
+ORDER BY comment_count DESC, total_likes DESC
+LIMIT {limit:UInt32}
+"""
+
+# --- Anomaly alerts ---
+
+# Recent posts with their organic engagement (likes + comments straight off
+# instagram_media — populated even when per-media insights are blocked, e.g.
+# posts that predate the Business-account conversion). Stories excluded:
+# they expire in 24h and have no like counts.
+GET_POST_ENGAGEMENT_WINDOW = """
+SELECT ig_media_id, permalink, caption, timestamp,
+       like_count + comments_count AS engagement
+FROM instagram_media FINAL
+WHERE user_id = {user_id:UUID}
+  AND ig_user_id = {ig_user_id:String}
+  AND media_product_type != 'STORY'
+  AND timestamp >= {since:DateTime}
+ORDER BY timestamp DESC
+"""
+
+# Trailing-post engagement baseline for the overperformance median.
+GET_POST_ENGAGEMENT_BASELINE = """
+SELECT like_count + comments_count AS engagement
+FROM instagram_media FINAL
+WHERE user_id = {user_id:UUID}
+  AND ig_user_id = {ig_user_id:String}
+  AND media_product_type != 'STORY'
+  AND timestamp < {before:DateTime}
+ORDER BY timestamp DESC
 LIMIT {limit:UInt32}
 """
 
@@ -1762,4 +2015,120 @@ WHERE user_id = {user_id:UUID}
   AND media_product_type = 'REELS'
   AND timestamp >= {start_date:DateTime}
 ORDER BY post_date ASC
+# --- Story analytics retention ---
+
+# Snapshotted stories joined with their insights (stored in media_insights,
+# same as every other media). LEFT JOIN: a story snapshotted moments before
+# expiry may have no insights row yet — show it with zeroed metrics rather
+# than dropping it.
+GET_STORY_HISTORY = """
+SELECT
+    s.ig_media_id,
+    s.media_type,
+    s.permalink,
+    s.timestamp,
+    toInt64(metrics.reach) AS reach,
+    toInt64(metrics.views) AS views,
+    toInt64(metrics.replies) AS replies,
+    toInt64(metrics.shares) AS shares,
+    toInt64(metrics.total_interactions) AS interactions,
+    toInt64(metrics.navigation) AS navigation
+FROM instagram_stories s FINAL
+LEFT JOIN (
+    SELECT
+        ig_media_id, user_id,
+        sumIf(metric_value, metric_name = 'reach') AS reach,
+        sumIf(metric_value, metric_name = 'views') AS views,
+        sumIf(metric_value, metric_name = 'replies') AS replies,
+        sumIf(metric_value, metric_name = 'shares') AS shares,
+        sumIf(metric_value, metric_name = 'total_interactions') AS total_interactions,
+        sumIf(metric_value, metric_name = 'navigation') AS navigation
+    FROM media_insights FINAL
+    WHERE user_id = {user_id:UUID}
+    GROUP BY ig_media_id, user_id
+) metrics ON s.ig_media_id = metrics.ig_media_id AND s.user_id = metrics.user_id
+WHERE s.user_id = {user_id:UUID}
+  AND s.ig_user_id = {ig_user_id:String}
+  AND s.timestamp >= {since:DateTime}
+ORDER BY s.timestamp DESC
+LIMIT {limit:UInt32}
+"""
+
+COUNT_STORY_HISTORY = """
+SELECT count()
+FROM instagram_stories FINAL
+WHERE user_id = {user_id:UUID}
+  AND ig_user_id = {ig_user_id:String}
+  AND timestamp >= {since:DateTime}
+"""
+
+# --- Comment-to-DM keyword funnels ---
+
+GET_DM_FUNNELS = """
+SELECT funnel_id, keyword, dm_message, public_reply, ig_media_id, created_at
+FROM dm_funnels FINAL
+WHERE user_id = {user_id:UUID}
+  AND active = 1
+ORDER BY created_at ASC
+"""
+
+GET_DM_FUNNEL_BY_ID = """
+SELECT funnel_id, keyword, dm_message, public_reply, ig_media_id, created_at
+FROM dm_funnels FINAL
+WHERE user_id = {user_id:UUID}
+  AND funnel_id = {funnel_id:String}
+  AND active = 1
+LIMIT 1
+"""
+
+# Every active funnel across all users — drives the dm_funnel_runner job.
+# created_at matters: the runner only triggers on comments posted AFTER the
+# funnel existed (no retroactive DM blasts).
+GET_ALL_ACTIVE_DM_FUNNELS = """
+SELECT user_id, funnel_id, keyword, dm_message, public_reply, ig_media_id, created_at
+FROM dm_funnels FINAL
+WHERE active = 1
+"""
+
+# Comment ids this user has already been funnel-processed for — dedup guard
+# so one comment never receives two DMs (even failed attempts are final;
+# retry storms against Meta's messaging API are worse than a missed DM).
+GET_DM_FUNNEL_SENT_COMMENT_IDS = """
+SELECT DISTINCT ig_comment_id
+FROM dm_funnel_sends
+WHERE user_id = {user_id:UUID}
+"""
+
+GET_DM_FUNNEL_SEND_COUNTS = """
+SELECT
+    funnel_id,
+    countIf(status = 'sent') AS sent_count,
+    countIf(status = 'failed') AS failed_count,
+    max(sent_at) AS last_sent_at
+FROM dm_funnel_sends FINAL
+WHERE user_id = {user_id:UUID}
+GROUP BY funnel_id
+"""
+
+GET_DM_FUNNEL_RECENT_SENDS = """
+SELECT funnel_id, keyword, ig_comment_id, ig_media_id,
+       commenter_username, comment_text, status, error, sent_at
+FROM dm_funnel_sends FINAL
+WHERE user_id = {user_id:UUID}
+ORDER BY sent_at DESC
+LIMIT {limit:UInt32}
+"""
+
+# Recent comment-eligible media for the funnel runner. Private replies are
+# only allowed within 7 days of the comment, so older posts rarely matter —
+# but commenters do dig into the back catalog, hence a generous window.
+GET_RECENT_MEDIA_FOR_FUNNELS = """
+SELECT ig_media_id
+FROM instagram_media FINAL
+WHERE user_id = {user_id:UUID}
+  AND ig_user_id = {ig_user_id:String}
+  AND media_product_type IN ('FEED', 'REELS')
+  AND timestamp >= {since:DateTime}
+ORDER BY timestamp DESC
+LIMIT {limit:UInt32}
 """

@@ -129,6 +129,36 @@ async def get_long_lived_token(short_token: str) -> tuple[str, int]:
             raise OAuthError("Invalid response from Instagram token endpoint")
 
 
+async def refresh_long_lived_token(token: str) -> tuple[str, int]:
+    """Refresh an unexpired long-lived token for another ~60 days.
+
+    Uses the IG Login `ig_refresh_token` grant on `graph.instagram.com`.
+    Meta requires the token to be at least 24 hours old and still valid —
+    an already-expired token cannot be refreshed (the user must re-OAuth).
+
+    Returns:
+        Tuple of (refreshed_token, expires_in_seconds).
+
+    Raises:
+        OAuthError: If the refresh fails.
+    """
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+        try:
+            resp = await client.get(
+                f"{GRAPH_BASE_URL}/refresh_access_token",
+                params={"grant_type": "ig_refresh_token", "access_token": token},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["access_token"], data.get("expires_in", 5184000)
+        except httpx.HTTPStatusError as exc:
+            logger.error("Token refresh failed: %s", exc.response.text)
+            raise OAuthError("Failed to refresh long-lived token")
+        except (KeyError, httpx.HTTPError) as exc:
+            logger.error("Token refresh error: %s", exc)
+            raise OAuthError("Invalid response from Instagram token endpoint")
+
+
 # Meta error codes that the platform documents as transient. Worth retrying.
 # 1 = UNKNOWN, 2 = SERVICE temporarily unavailable, 4 = APPLICATION_USER rate
 # limit, 17 = USER rate limit, 32 = PAGE rate limit. See:
@@ -263,14 +293,20 @@ async def fetch_media(
     ig_user_id: str,
     token: str,
     limit: int = DEFAULT_MEDIA_FETCH_LIMIT,
+    max_pages: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Fetch all media items for an Instagram user (handles pagination).
+    """Fetch media items for an Instagram user (handles pagination).
 
     Each page is fetched with transient-error retry. If retries on a page are
     exhausted mid-pagination, returns the items already collected rather than
     failing the entire refresh — the user gets partial data and a warning log
     rather than a 502. A non-transient error (auth failure, malformed query)
     still raises `InstagramAPIError`.
+
+    Args:
+        max_pages: cap on pages fetched. None = everything (full sync);
+            the live-mode endpoints pass 1 to grab just the newest posts
+            in a single Graph call.
     """
     media_items: list[dict[str, Any]] = []
     url = f"{GRAPH_BASE_URL}/{ig_user_id}/media"
@@ -283,7 +319,7 @@ async def fetch_media(
     # Hard cap on pagination iterations — defensive against a malformed Meta
     # response that returns both `paging.next` and a stable `after` cursor
     # forever. At MAX_PAGES * limit items, no realistic account is unfetched.
-    MAX_PAGES = 200
+    MAX_PAGES = max_pages if max_pages is not None else 200
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
         page = 0
         seen_cursors: set[str] = set()
@@ -321,10 +357,13 @@ async def fetch_media(
             seen_cursors.add(after_cursor)
             params["after"] = after_cursor
         else:
-            logger.warning(
-                "Media pagination hit MAX_PAGES=%d for %s — returning %d items",
-                MAX_PAGES, ig_user_id, len(media_items),
-            )
+            if max_pages is None:
+                # Only alarming when we *intended* a full fetch — live mode
+                # passes max_pages=1 and stopping early is the whole point.
+                logger.warning(
+                    "Media pagination hit MAX_PAGES=%d for %s — returning %d items",
+                    MAX_PAGES, ig_user_id, len(media_items),
+                )
 
     logger.info("Fetched %d media items for ig_user %s", len(media_items), ig_user_id)
     return media_items
@@ -929,6 +968,77 @@ async def fetch_comments_for_media(
             params["after"] = after
 
     return comments
+
+
+async def post_comment_reply(comment_id: str, message: str, token: str) -> str:
+    """Post a reply under a comment via POST /{comment-id}/replies.
+
+    This is the only write the app performs against the Graph API; it's
+    covered by the `instagram_business_manage_comments` scope requested
+    during OAuth.
+
+    Returns:
+        The new reply's IG comment id.
+
+    Raises:
+        InstagramAPIError: If the reply could not be posted.
+    """
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+        try:
+            resp = await client.post(
+                f"{GRAPH_BASE_URL}/{comment_id}/replies",
+                data={"message": message, "access_token": token},
+            )
+            resp.raise_for_status()
+            return str(resp.json().get("id", ""))
+        except httpx.HTTPStatusError as exc:
+            logger.error("Comment reply failed for %s: %s", comment_id, exc.response.text)
+            raise InstagramAPIError("Failed to post the reply to Instagram")
+        except httpx.HTTPError as exc:
+            logger.error("Comment reply failed for %s: %s", comment_id, exc)
+            raise InstagramAPIError("Failed to post the reply to Instagram")
+
+
+async def send_private_reply(comment_id: str, message: str, token: str) -> str:
+    """Send a private DM reply to a commenter via POST /me/messages.
+
+    This is Meta's "private reply" — the only way an app can *initiate* a DM,
+    and it's only allowed within 7 days of the comment being posted. Covered
+    by the `instagram_business_manage_messages` scope requested during OAuth.
+    Used by the comment-to-DM funnel runner.
+
+    Returns:
+        The sent message id ('' if Meta omits it).
+
+    Raises:
+        InstagramAPIError: If the message could not be sent (expired window,
+            user has DMs closed, messaging permission not approved, etc.).
+    """
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+        try:
+            resp = await client.post(
+                f"{GRAPH_BASE_URL}/me/messages",
+                params={"access_token": token},
+                json={
+                    "recipient": {"comment_id": comment_id},
+                    "message": {"text": message},
+                },
+            )
+            resp.raise_for_status()
+            return str(resp.json().get("message_id", ""))
+        except httpx.HTTPStatusError as exc:
+            # Bubble Meta's error message up — the funnel runner logs it on the
+            # send row so the user can see WHY a DM failed (e.g. 7-day window).
+            detail = ""
+            try:
+                detail = exc.response.json().get("error", {}).get("message", "")
+            except (ValueError, AttributeError):
+                pass
+            logger.error("Private reply failed for %s: %s", comment_id, exc.response.text)
+            raise InstagramAPIError(detail or "Failed to send the private reply")
+        except httpx.HTTPError as exc:
+            logger.error("Private reply failed for %s: %s", comment_id, exc)
+            raise InstagramAPIError("Failed to send the private reply")
 
 
 async def fetch_media_insights(

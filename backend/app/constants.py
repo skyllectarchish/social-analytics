@@ -29,6 +29,11 @@ INSTAGRAM_MEDIA_FIELDS: str = (
 # HTTP
 HTTP_TIMEOUT_SECONDS: int = 30
 
+# Data-export archive import — per-file upload cap. Exports with media can
+# run to GBs; users with oversized ZIPs are told to upload just the JSON
+# files (posts_1.json, stories.json, followers_1.json) instead.
+MAX_ARCHIVE_UPLOAD_BYTES: int = 250 * 1024 * 1024
+
 # Pagination
 DEFAULT_PAGE_SIZE: int = 12
 MAX_PAGE_SIZE: int = 50

@@ -348,6 +348,236 @@ def render_caption_user_block(ctx: dict[str, Any]) -> str:
     return _stable_json(ctx)
 
 
+# --- Reel script writer ----------------------------------------------------
+
+REEL_SCRIPT_SYSTEM = """\
+You write Instagram Reel scripts for one creator. You receive:
+- A content idea (title + summary)
+- Captions of the creator's top-performing reels, with engagement numbers
+
+Your task: turn the idea into a ready-to-shoot reel script.
+
+Rules:
+- Output is a strict JSON object matching the supplied schema. No prose
+  outside the JSON. Use exactly these keys: hook, beats (array of
+  {seconds, action, voiceover, on_screen_text}), cta, duration_s,
+  rationale.
+- `hook`: the first spoken/visual line (≤ 12 words). Must create an open
+  loop or stake — study what the creator's top captions do.
+- `beats`: 3-6 entries covering the whole reel. `seconds` is the beat's
+  start offset. `action` is what's on camera; `voiceover` what is said
+  (may be ""); `on_screen_text` the overlay text (may be "").
+- `cta`: one closing ask (comment/save/follow), phrased the way this
+  creator phrases asks in their top captions.
+- `duration_s`: total target length, 15-60. Shorter is better unless the
+  idea demands more.
+- `rationale`: ≤ 40 words tying script choices to the creator's data.
+- Match the creator's voice from the caption corpus: vocabulary, emoji
+  habits, formality. Never invent facts about the creator's life.
+"""
+
+REEL_SCRIPT_OUTPUT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["hook", "beats", "cta", "duration_s", "rationale"],
+    "properties": {
+        "hook": {"type": "string"},
+        "beats": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 6,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["seconds", "action", "voiceover", "on_screen_text"],
+                "properties": {
+                    "seconds": {"type": "integer", "minimum": 0, "maximum": 90},
+                    "action": {"type": "string"},
+                    "voiceover": {"type": "string"},
+                    "on_screen_text": {"type": "string"},
+                },
+            },
+        },
+        "cta": {"type": "string"},
+        "duration_s": {"type": "integer", "minimum": 10, "maximum": 90},
+        "rationale": {"type": "string"},
+    },
+}
+
+
+def render_reel_script_user_block(ctx: dict[str, Any]) -> str:
+    """Render the reel-script context as deterministic JSON."""
+    return _stable_json(ctx)
+
+
+# --- Content repurposer -----------------------------------------------------
+
+REPURPOSE_SYSTEM = """\
+You repurpose one piece of content into four formats for an Instagram
+creator. You receive the source content (a caption, script, or rough notes)
+and a few of the creator's top captions as voice reference.
+
+Produce all four assets:
+1. `reel_script_md` — a compact reel script: hook line, 3-5 numbered beats
+   with on-screen text in **bold**, closing CTA.
+2. `carousel_md` — a slide-by-slide outline: "Slide 1: …" through
+   "Slide N: …" (5-8 slides), first slide is the hook, last is the CTA.
+3. `story_sequence_md` — 3-5 story frames: each a line "Frame N: …"
+   describing the visual + sticker/poll/question to use.
+4. `tweet_thread_md` — 4-7 numbered tweets, each ≤ 270 chars, first tweet
+   is the hook, last invites follows.
+
+Rules:
+- Output is a strict JSON object matching the supplied schema — exactly the
+  four *_md string keys. Markdown inside the strings, no prose outside.
+- Preserve the substance of the source; adapt structure per format. Never
+  pad with invented facts, stats, or testimonials.
+- Match the creator's voice from the reference captions.
+"""
+
+REPURPOSE_OUTPUT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["reel_script_md", "carousel_md", "story_sequence_md", "tweet_thread_md"],
+    "properties": {
+        "reel_script_md": {"type": "string"},
+        "carousel_md": {"type": "string"},
+        "story_sequence_md": {"type": "string"},
+        "tweet_thread_md": {"type": "string"},
+    },
+}
+
+
+def render_repurpose_user_block(ctx: dict[str, Any]) -> str:
+    """Render the repurposer context as deterministic JSON."""
+    return _stable_json(ctx)
+
+
+# --- Audience-question mining ------------------------------------------------
+
+QUESTION_MINING_SYSTEM = """\
+You mine audience questions for content demand. You receive the distinct
+questions a creator's audience asked in comments, each with a `count` of how
+many times it (or a near-identical phrasing) was asked.
+
+Your task: cluster the questions into demand topics and pitch content.
+
+Rules:
+- Output is a strict JSON object matching the supplied schema: a top-level
+  "topics" array whose items have "topic", "question_count",
+  "sample_questions", "content_pitch", "suggested_format".
+- 3-6 topics, ordered by demand (question_count desc). Merge questions
+  about the same underlying ask into one topic.
+- `topic`: 2-5 word label ("Camera gear", "Editing workflow").
+- `question_count`: the SUM of the `count` values of the questions you
+  assigned to this topic. Plain integer digits (e.g. 14), never words.
+- `sample_questions`: 1-3 verbatim examples from the input.
+- `content_pitch`: one sentence pitching the post that answers the demand.
+- `suggested_format`: exactly one of "REELS", "CAROUSEL", "IMAGE", "STORY".
+- Only cluster what's in the input — never invent questions or counts.
+- Answer directly with the JSON. Do not deliberate at length.
+"""
+
+QUESTION_MINING_OUTPUT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["topics"],
+    "properties": {
+        "topics": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 6,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["topic", "question_count", "sample_questions",
+                             "content_pitch", "suggested_format"],
+                "properties": {
+                    "topic": {"type": "string"},
+                    "question_count": {"type": "integer", "minimum": 1},
+                    "sample_questions": {
+                        "type": "array", "minItems": 1, "maxItems": 3,
+                        "items": {"type": "string"},
+                    },
+                    "content_pitch": {"type": "string"},
+                    "suggested_format": {
+                        "type": "string",
+                        "enum": ["REELS", "CAROUSEL", "IMAGE", "STORY"],
+                    },
+                },
+            },
+        },
+    },
+}
+
+
+def render_question_mining_user_block(ctx: dict[str, Any]) -> str:
+    """Render the question-mining context as deterministic JSON."""
+    return _stable_json(ctx)
+
+
+# --- Comment reply suggester ---------------------------------------------
+
+COMMENT_REPLY_SYSTEM = """\
+You write Instagram comment replies in one creator's voice. You receive:
+- The incoming comment (text, sentiment label, whether it's a question)
+- The caption of the post the comment was left on
+- Up to 5 of the creator's own recent replies (voice samples; may be empty)
+
+Your task: propose 3 ready-to-post replies with distinct tones.
+
+Rules:
+- Output is a strict JSON object matching the supplied schema. No prose
+  outside the JSON.
+- Each reply is 1-2 short sentences, specific to the comment — never a
+  generic "Thanks so much!" unless the comment itself is a bare emoji.
+- Mirror the voice samples when present: their emoji habits, formality,
+  punctuation. With no samples, default to warm and casual.
+- Never invent facts, prices, discounts, links, or commitments. If the
+  comment asks something the caption doesn't answer, acknowledge and
+  promise a follow-up instead of fabricating an answer.
+- For negative comments: de-escalate, stay gracious, never argue.
+- No hashtags. At most one emoji per reply unless the voice samples use more.
+- The three `tone` values MUST be exactly: "friendly", "playful",
+  "professional" — one reply each.
+- Each reply MUST stay under 500 characters.
+- The output object MUST use exactly these keys — a top-level
+  "suggestions" array whose items have "tone" and "reply":
+  {"suggestions":[{"tone":"friendly","reply":"..."},
+  {"tone":"playful","reply":"..."},{"tone":"professional","reply":"..."}]}
+"""
+
+COMMENT_REPLY_OUTPUT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["suggestions"],
+    "properties": {
+        "suggestions": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["tone", "reply"],
+                "properties": {
+                    "tone": {
+                        "type": "string",
+                        "enum": ["friendly", "playful", "professional"],
+                    },
+                    "reply": {"type": "string"},
+                },
+            },
+        },
+    },
+}
+
+
+def render_comment_reply_user_block(ctx: dict[str, Any]) -> str:
+    """Render the comment-reply context as deterministic JSON."""
+    return _stable_json(ctx)
+
+
 # --- Helpers -------------------------------------------------------------
 
 def _stable_json(obj: Any) -> str:

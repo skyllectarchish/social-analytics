@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, Copy, Lightbulb, RefreshCw, Stethoscope } from "lucide-react";
+import { Check, Clapperboard, Copy, Lightbulb, RefreshCw, Stethoscope } from "lucide-react";
 import api, { safeGet } from "../../api/client";
 import type { ContentIdeasResponse, Idea } from "../../api/types";
 import { useAuthedImage } from "../../hooks/useAuthedImage";
@@ -7,6 +7,7 @@ import { Skeleton } from "../dashboard/Skeletons";
 import { CardEmpty } from "../dashboard/States";
 import AIMarkdown from "./AIMarkdown";
 import AIFeedback from "./AIFeedback";
+import ReelScriptDialog from "./ReelScriptDialog";
 import { trackAI } from "../../lib/telemetry";
 
 const DAY_OPTIONS = [30, 90, 180];
@@ -35,7 +36,7 @@ function SourceThumb({ igId, score, onClick }: { igId: string; score: number; on
   );
 }
 
-function IdeaCard({ idea }: { idea: Idea }) {
+function IdeaCard({ idea, onScript, scriptDisabled }: { idea: Idea; onScript: (i: Idea) => void; scriptDisabled: boolean }) {
   const [copied, setCopied] = useState(false);
   async function copy() {
     try {
@@ -57,9 +58,19 @@ function IdeaCard({ idea }: { idea: Idea }) {
       <AIMarkdown text={idea.body_md} className="mt-1 flex-1 !text-xs" />
       <p className="mt-2 text-[11px] italic text-foreground/50">{idea.rationale}</p>
       <div className="mt-2.5 flex items-center justify-between border-t border-black/5 pt-2">
-        <button onClick={copy} className="flex items-center gap-1 text-[11px] font-medium text-violet-deep hover:underline">
-          {copied ? <><Check className="h-3 w-3" /> Copied</> : <><Copy className="h-3 w-3" /> Copy</>}
-        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={copy} className="flex items-center gap-1 text-[11px] font-medium text-violet-deep hover:underline">
+            {copied ? <><Check className="h-3 w-3" /> Copied</> : <><Copy className="h-3 w-3" /> Copy</>}
+          </button>
+          <button
+            onClick={() => onScript(idea)}
+            disabled={scriptDisabled}
+            title={scriptDisabled ? "AI quota exhausted" : "Write a reel script · 1 AI call"}
+            className="flex items-center gap-1 text-[11px] font-medium text-violet-deep hover:underline disabled:opacity-50"
+          >
+            <Clapperboard className="h-3 w-3" /> Script
+          </button>
+        </div>
         <AIFeedback feature="ideas" refId={idea.id} />
       </div>
     </div>
@@ -80,6 +91,7 @@ export default function ContentIdeasPanel({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [adjacentOnly, setAdjacentOnly] = useState(false);
+  const [scriptIdea, setScriptIdea] = useState<Idea | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -182,11 +194,15 @@ export default function ContentIdeasPanel({
             </p>
           ) : (
             <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {ideas.map((idea) => <IdeaCard key={idea.id} idea={idea} />)}
+              {ideas.map((idea) => (
+                <IdeaCard key={idea.id} idea={idea} onScript={setScriptIdea} scriptDisabled={exhausted} />
+              ))}
             </div>
           )}
         </>
       )}
+
+      <ReelScriptDialog idea={scriptIdea} onClose={() => setScriptIdea(null)} onQuotaSpent={onQuotaSpent} />
     </div>
   );
 }

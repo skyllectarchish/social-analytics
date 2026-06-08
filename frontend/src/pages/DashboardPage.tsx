@@ -18,6 +18,7 @@ import axios from "axios";
 import { Eye, Heart, Loader2, Radio, TrendingDown, TrendingUp } from "lucide-react";
 import api, { errorMessage, safeGet } from "../api/client";
 import type {
+  AlertsResponse,
   DashboardSummary,
   DemographicResponse,
   InstagramProfile,
@@ -26,6 +27,7 @@ import type {
   StoriesResponse,
   StoryWithInsights,
 } from "../api/types";
+import AlertsCard from "../components/dashboard/AlertsCard";
 import DashboardLayout from "../components/dashboard/DashboardLayout";
 import { CardEmpty } from "../components/dashboard/States";
 import PostInsightsDrawer, { type DrawerMedia } from "../components/dashboard/PostInsightsDrawer";
@@ -107,6 +109,7 @@ export default function DashboardPage() {
   const [ageDemo, setAgeDemo] = useState<DemographicResponse | null>(null);
   const [genderDemo, setGenderDemo] = useState<DemographicResponse | null>(null);
   const [stories, setStories] = useState<StoryWithInsights[]>([]);
+  const [alerts, setAlerts] = useState<AlertsResponse | null>(null);
   const [drawer, setDrawer] = useState<DrawerMedia>(null);
   const [hideSeries, setHideSeries] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -116,19 +119,24 @@ export default function DashboardPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const { data: prof } = await api.get<InstagramProfile>("/instagram/profile");
+      // live: one Graph call so the greeting/KPIs always show the current
+      // follower count (falls back to the stored snapshot server-side).
+      const { data: prof } = await api.get<InstagramProfile>("/instagram/profile", { params: { live: true } });
       setProfile(prof);
 
       const cmp = compareTo ? { compare_to: compareTo } : {};
-      const [sum, ov, st] = await Promise.all([
+      const [sum, ov, st, al] = await Promise.all([
         api.get<DashboardSummary>("/instagram/insights/dashboard", { params: { days, top_n: 8, ...cmp } }),
         api.get<OverviewResponse>("/instagram/insights/overview", { params: { days, ...cmp } }),
         // Stories are optional — accounts without active stories just hide the strip.
         safeGet<StoriesResponse>("/instagram/stories"),
+        // Alerts are optional too — the endpoint caps its window at 30 days.
+        safeGet<AlertsResponse>("/instagram/insights/alerts", { days: Math.min(30, Math.max(3, days)) }),
       ]);
       setSummary(sum.data);
       setOverview(ov.data);
       setStories(st?.stories ?? []);
+      setAlerts(al);
 
       // Demographics are optional — don't fail the page if they're empty.
       const [age, gender] = await Promise.allSettled([
@@ -311,6 +319,18 @@ export default function DashboardPage() {
             );
           })}
         </div>
+
+        {/* anomaly alerts */}
+        {alerts && (
+          <AlertsCard
+            alerts={alerts.alerts}
+            periodDays={alerts.period_days}
+            onOpenPost={(a) =>
+              a.ig_media_id &&
+              setDrawer({ igId: a.ig_media_id, title: a.caption ?? "", permalink: a.permalink ?? "" })
+            }
+          />
+        )}
 
         {/* live stories */}
         {stories.length > 0 && (

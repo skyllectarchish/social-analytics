@@ -34,6 +34,8 @@ from ..models.queries import (
     GET_MEDIA_NEEDING_SYNC,
     GET_MEDIA_SENTIMENT_DISTRIBUTION,
     GET_MEDIA_SENTIMENT_SAMPLES,
+    GET_POST_ENGAGEMENT_BASELINE,
+    GET_POST_ENGAGEMENT_WINDOW,
     GET_POSTS_FOR_ATTRIBUTION,
     GET_QUESTION_POSTS,
     GET_REELS_RETENTION,
@@ -44,6 +46,7 @@ from ..models.queries import (
     GET_SENTIMENT_TREND,
     GET_TOP_HASHTAGS,
     GET_TOPICS,
+    GET_WEEKLY_FORMAT_ENGAGEMENT,
 )
 
 logger = logging.getLogger(__name__)
@@ -170,6 +173,54 @@ def find_daily_metric_samples(
         if metric_name in out:
             out[metric_name].append(float(daily_value or 0))
     return out
+
+
+def find_weekly_format_engagement(
+    client: Client,
+    user_id: str,
+    ig_user_id: str,
+    since: datetime,
+) -> list[tuple]:
+    """(week, format, posts, avg_engagement) rows — format-fatigue input."""
+    return client.query(
+        GET_WEEKLY_FORMAT_ENGAGEMENT,
+        parameters={"user_id": user_id, "ig_user_id": ig_user_id, "since": since},
+    ).result_rows
+
+
+# --- Anomaly alerts ---
+
+def find_recent_post_engagement(
+    client: Client,
+    user_id: str,
+    ig_user_id: str,
+    since: datetime,
+) -> list[tuple]:
+    """Posts since `since` with (ig_media_id, permalink, caption, timestamp, engagement)."""
+    return client.query(
+        GET_POST_ENGAGEMENT_WINDOW,
+        parameters={"user_id": user_id, "ig_user_id": ig_user_id, "since": since},
+    ).result_rows
+
+
+def find_baseline_post_engagement(
+    client: Client,
+    user_id: str,
+    ig_user_id: str,
+    before: datetime,
+    limit: int = 50,
+) -> list[int]:
+    """Engagement (likes + comments) of the `limit` posts preceding `before`."""
+    rows = client.query(
+        GET_POST_ENGAGEMENT_BASELINE,
+        parameters={
+            "user_id": user_id,
+            "ig_user_id": ig_user_id,
+            "before": before,
+            "limit": limit,
+        },
+    ).result_rows
+    return [int(r[0] or 0) for r in rows]
 
 
 # --- Demographic Insights ---

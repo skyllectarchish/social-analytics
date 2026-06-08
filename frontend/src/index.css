@@ -327,3 +327,19 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* --- Print (media-kit PDF export) ---------------------------------------
+   `window.print()` on the Media Kit page produces the shareable PDF.
+   .no-print hides app chrome (sidebar, header, banners, aurora blobs);
+   .print-flat removes layout padding so the kit fills the page. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-flat {
+    padding: 0 !important;
+  }
+  .aurora-scene {
+    background: white !important;
+  }
+}

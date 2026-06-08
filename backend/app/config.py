@@ -98,10 +98,22 @@ class Settings(BaseSettings):
     # Set ENABLE_SCHEDULER=false to disable (e.g., when running cron externally
     # or in a multi-worker deploy where only one worker should schedule jobs).
     enable_scheduler: bool = True
+    scheduler_account_sync_hour: int = 2      # UTC hour for the daily own-account sync
+    account_sync_lookback_days: int = 7       # insights window topped up by the daily sync
+    token_refresh_threshold_days: int = 10    # refresh long-lived tokens expiring within N days
     scheduler_competitor_sync_hour: int = 3   # UTC hour for the daily competitor snapshot
     scheduler_sentiment_batch_minutes: int = 60  # interval in minutes for sentiment batches
     scheduler_topic_clustering_day: int = 0   # weekday for topic clustering (0=Mon)
     scheduler_topic_clustering_hour: int = 4  # UTC hour for the weekly topic clustering run
+
+    # Story analytics retention — snapshot live stories + insights every N
+    # hours (stories expire after 24h; 6h gives each story ~4 capture points).
+    scheduler_story_snapshot_hours: int = 6
+
+    # Comment-to-DM keyword funnels — runner cadence + guardrails.
+    scheduler_dm_funnel_minutes: int = 15     # how often to scan for trigger comments
+    dm_funnel_media_lookback_days: int = 7    # recent-post window scanned for triggers
+    dm_funnel_max_sends_per_run: int = 25     # per-user DM cap per run (rate-limit safety)
 
     # Tier 4 — weekly digest scheduled job. Synthesizes digests for every
     # user with enough posting history every Monday, recording quota under

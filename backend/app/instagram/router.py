@@ -4,7 +4,7 @@ import logging
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Response, UploadFile
 
 from ..auth.dependencies import get_current_user
 from ..config import settings
@@ -15,6 +15,7 @@ from ..constants import (
     INSIGHTS_INITIAL_FETCH_DAYS,
     INSIGHTS_LOOKBACK_DAYS,
     INSIGHTS_MAX_LOOKBACK_DAYS,
+    MAX_ARCHIVE_UPLOAD_BYTES,
     MAX_PAGE_SIZE,
 )
 from ..crypto import decrypt_token, encrypt_token
@@ -39,11 +40,14 @@ from ..models.queries import (
 from ..models.user import User
 from ..jobs import seed_demo_sentiment
 from ..repositories import (
+    archive_repo,
     branded_hashtag_repo,
     comment_repo,
     competitor_repo,
+    dm_funnel_repo,
     instagram_repo,
     insights_repo,
+    story_repo,
 )
 from ..repositories.comparison import (
     COMPARE_TO_PATTERN,
@@ -51,10 +55,16 @@ from ..repositories.comparison import (
     resolve_current_window,
 )
 from ..stats import pct_delta, rate_significance, sample_significance
-from . import competitors, service
+from . import archive, competitors, service
 from .schemas import (
     AddBrandedHashtagRequest,
     AddCompetitorRequest,
+    AlertItem,
+    AlertsResponse,
+    ArchiveContentPoint,
+    ArchiveGrowthPoint,
+    ArchiveImportResponse,
+    ArchiveSummaryResponse,
     AlgorithmMetricsResponse,
     BrandedHashtagItem,
     BrandedHashtagListResponse,
@@ -68,6 +78,9 @@ from .schemas import (
     BestTimeResponse,
     BestTimeSlot,
     CallbackResponse,
+    CommentInboxResponse,
+    CommentReplyRequest,
+    CommentReplyResponse,
     CompetitorItem,
     CompetitorListResponse,
     CompetitorLookupPreview,
@@ -80,7 +93,12 @@ from .schemas import (
     ContentMixAccount,
     ContentMixDistribution,
     ContentMixResponse,
+    CreateDMFunnelRequest,
     DashboardSummary,
+    DMFunnelItem,
+    DMFunnelListResponse,
+    DMFunnelSendItem,
+    DMFunnelSendsResponse,
     DemographicBreakdown,
     DemographicResponse,
     FollowerQualityCohort,
@@ -92,6 +110,9 @@ from .schemas import (
     FormatBreakdownPost,
     FormatBreakdownPostsResponse,
     FormatBreakdownResponse,
+    FormatFatigueItem,
+    FormatFatigueResponse,
+    FormatWeekPoint,
     GrowthCorrelationPoint,
     GrowthCorrelationResponse,
     GrowthDriverItem,
@@ -102,6 +123,7 @@ from .schemas import (
     HashtagsResponse,
     HashtagTrendPoint,
     HashtagTrendResponse,
+    InboxComment,
     InsightDataPoint,
     InstagramMedia,
     InstagramProfile,
@@ -127,7 +149,11 @@ from .schemas import (
     SentimentSummaryResponse,
     SentimentTrendPoint,
     StoriesResponse,
+    StoryHistoryItem,
+    StoryHistoryResponse,
     StoryWithInsights,
+    SuperfanItem,
+    SuperfansResponse,
     SyncResponse,
     TopicItem,
     TopicsResponse,
@@ -213,22 +239,60 @@ async def callback(
 
 
 @router.get("/profile", response_model=InstagramProfile)
-def get_profile(current_user: User = Depends(get_current_user)):
-    """Return the stored Instagram profile for the current user."""
+async def get_profile(
+    live: bool = Query(
+        False,
+        description="Fetch fresh from the Instagram Graph API (1 call), store the "
+                    "snapshot, and return it. Falls back to stored data on any "
+                    "Graph failure so the page never breaks on a Meta hiccup.",
+    ),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the Instagram profile for the current user (stored or live)."""
     client = get_client()
-    ig_profile = instagram_repo.find_profile(client, str(current_user.id))
+    user_id = str(current_user.id)
+    ig_profile = instagram_repo.find_profile(client, user_id)
     if ig_profile is None:
         raise InstagramNotConnectedError()
+
+    if live:
+        token_data = instagram_repo.find_token(client, user_id)
+        if token_data is not None:
+            try:
+                token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
+                profile_data = await service.fetch_profile(token_data.ig_user_id, token)
+                # Persist the fresh snapshot (token + expiry pass through
+                # unchanged) so analytics see the same numbers the user does.
+                instagram_repo.upsert_profile(
+                    client, user_id, token_data.ig_user_id, profile_data,
+                    token_data.access_token, token_data.token_expires_at,
+                )
+                return InstagramProfile.from_api_data(
+                    user_id, token_data.ig_user_id, profile_data,
+                )
+            except Exception:
+                logger.warning(
+                    "Live profile fetch failed for user %s — serving stored record",
+                    user_id,
+                )
+
     return InstagramProfile.from_model(ig_profile)
 
 
 @router.get("/media", response_model=MediaListResponse)
-def get_media(
+async def get_media(
     page: int = Query(1, ge=1),
     page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+    live: bool = Query(
+        False,
+        description="Pull the newest posts from the Instagram Graph API (1 call) "
+                    "and store them before serving, so brand-new posts and fresh "
+                    "like/comment counts appear without a manual Sync. Only "
+                    "applies to page 1; falls back to stored data on Graph errors.",
+    ),
     current_user: User = Depends(get_current_user),
 ):
-    """Return a paginated list of stored Instagram media for the current user."""
+    """Return a paginated list of Instagram media for the current user."""
     client = get_client()
     user_id = str(current_user.id)
     offset = (page - 1) * page_size
@@ -237,6 +301,20 @@ def get_media(
     if ig_profile is None:
         raise InstagramNotConnectedError()
     ig_user_id = ig_profile.ig_user_id
+
+    if live and page == 1:
+        token_data = instagram_repo.find_token(client, user_id)
+        if token_data is not None:
+            try:
+                token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
+                latest = await service.fetch_media(ig_user_id, token, max_pages=1)
+                if latest:
+                    instagram_repo.bulk_insert_media(client, user_id, ig_user_id, latest)
+            except Exception:
+                logger.warning(
+                    "Live media fetch failed for user %s — serving stored records",
+                    user_id,
+                )
 
     total = instagram_repo.count_media(client, user_id, ig_user_id)
     media_models = instagram_repo.find_media_page(client, user_id, ig_user_id, page_size, offset)
@@ -494,6 +572,479 @@ def get_overview(
     return current
 
 
+# --- Data-export archive import ---
+
+@router.post("/import/archive", response_model=ArchiveImportResponse)
+async def import_archive(
+    files: list[UploadFile] = File(..., description="Instagram data-export ZIP or individual JSON files"),
+    current_user: User = Depends(get_current_user),
+):
+    """Import an Instagram "Download your information" export (JSON format).
+
+    Accepts the whole ZIP (media inside is skipped unread) or individual
+    JSON files. Files are classified by shape, so export-version path
+    differences don't matter. Re-importing the same export is idempotent —
+    the archive tables dedupe on natural keys during background merges.
+    """
+    client = get_client()
+    user_id = str(current_user.id)
+
+    totals = {"posts": 0, "stories": 0, "followers": 0}
+    for f in files:
+        blob = await f.read()
+        if len(blob) > MAX_ARCHIVE_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    f"{f.filename} is larger than "
+                    f"{MAX_ARCHIVE_UPLOAD_BYTES // (1024 * 1024)}MB. Upload just the JSON "
+                    "files from the export (posts_1.json, stories.json, followers_1.json) "
+                    "instead of the full ZIP."
+                ),
+            )
+        try:
+            parsed = archive.extract(f.filename or "", blob)
+        except Exception:
+            logger.exception("Archive import: failed to parse %s", f.filename)
+            raise HTTPException(
+                status_code=422,
+                detail=f"Could not parse {f.filename} — is it an Instagram JSON export?",
+            )
+        totals["posts"] += archive_repo.insert_posts(client, user_id, parsed["posts"])
+        totals["stories"] += archive_repo.insert_stories(client, user_id, parsed["stories"])
+        totals["followers"] += archive_repo.insert_followers(client, user_id, parsed["followers"])
+
+    logger.info(
+        "Archive import for user %s: %d posts, %d stories, %d followers",
+        user_id, totals["posts"], totals["stories"], totals["followers"],
+    )
+    if not any(totals.values()):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "No recognizable data found. Make sure you requested the export in "
+                "JSON format (not HTML) and uploaded the ZIP or its JSON files."
+            ),
+        )
+    return ArchiveImportResponse(
+        posts_imported=totals["posts"],
+        stories_imported=totals["stories"],
+        followers_imported=totals["followers"],
+    )
+
+
+@router.get("/import/summary", response_model=ArchiveSummaryResponse)
+def get_archive_summary(current_user: User = Depends(get_current_user)):
+    """Counts, date ranges, and monthly series for the imported archive."""
+    client = get_client()
+    user_id = str(current_user.id)
+
+    s = archive_repo.summary(client, user_id)
+    growth = [
+        ArchiveGrowthPoint(
+            month=m.isoformat() if hasattr(m, "isoformat") else str(m),
+            joins=int(j or 0),
+            cumulative=int(c or 0),
+        )
+        for m, j, c in archive_repo.follower_growth(client, user_id)
+    ]
+    content = [
+        ArchiveContentPoint(
+            month=m.isoformat() if hasattr(m, "isoformat") else str(m),
+            posts=int(p or 0),
+            stories=int(st or 0),
+        )
+        for m, p, st in archive_repo.content_by_month(client, user_id)
+    ]
+    return ArchiveSummaryResponse(**s, follower_growth=growth, content_by_month=content)
+
+
+# --- Format fatigue ---
+
+_FATIGUE_LABELS = {"REELS": "reels", "CAROUSEL": "carousels", "IMAGE": "image posts"}
+# Minimum weekly data points for a verdict; below this we stay quiet.
+_FATIGUE_MIN_WEEKS = 4
+# |change| ≥ this (recent vs baseline mean) also triggers a verdict.
+_FATIGUE_CHANGE_THRESHOLD_PCT = 25.0
+
+
+@router.get("/insights/format-fatigue", response_model=FormatFatigueResponse)
+def get_format_fatigue(
+    weeks: int = Query(12, ge=4, le=52),
+    current_user: User = Depends(get_current_user),
+):
+    """Deterministic per-format trend verdicts over the last `weeks` weeks.
+
+    A format is *declining* when its weekly average engagement has dropped
+    ≥3 posting-weeks in a row, or its recent two-week mean sits ≥25% under
+    its earlier baseline — *improving* for the mirror conditions. Uses
+    likes + comments from instagram_media so it works even where Meta
+    blocks per-media insights.
+    """
+    client = get_client()
+    user_id = str(current_user.id)
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+
+    since = (datetime.now(timezone.utc) - timedelta(weeks=weeks)).replace(tzinfo=None)
+    rows = insights_repo.find_weekly_format_engagement(
+        client, user_id, ig_profile.ig_user_id, since,
+    )
+
+    by_format: dict[str, list[tuple]] = {}
+    for week, fmt, posts, avg_eng in rows:
+        by_format.setdefault(fmt, []).append((week, int(posts or 0), float(avg_eng or 0)))
+
+    items: list[FormatFatigueItem] = []
+    for fmt, series in by_format.items():
+        series.sort(key=lambda r: r[0])
+        if len(series) < _FATIGUE_MIN_WEEKS:
+            continue
+        values = [v for _, _, v in series]
+
+        # Consecutive movement at the tail (gaps between posting weeks are
+        # fine — we compare consecutive *posting* weeks).
+        down = up = 0
+        for prev, cur in zip(values[:-1], values[1:]):
+            down = down + 1 if cur < prev else 0
+            up = up + 1 if cur > prev else 0
+
+        recent = sum(values[-2:]) / len(values[-2:])
+        baseline_vals = values[:-2] or values
+        baseline = sum(baseline_vals) / len(baseline_vals)
+        change = pct_delta(recent, baseline)
+
+        label = _FATIGUE_LABELS.get(fmt, fmt.lower())
+        if down >= 3 or (change is not None and change <= -_FATIGUE_CHANGE_THRESHOLD_PCT):
+            status = "declining"
+            if down >= 3:
+                message = f"Your {label} have declined {down} posting-weeks in a row."
+            else:
+                message = f"Your {label} are running {abs(change):.0f}% under their usual engagement."
+            consecutive = down
+        elif up >= 3 or (change is not None and change >= _FATIGUE_CHANGE_THRESHOLD_PCT):
+            status = "improving"
+            if up >= 3:
+                message = f"Your {label} have improved {up} posting-weeks in a row."
+            else:
+                message = f"Your {label} are running {change:.0f}% above their usual engagement."
+            consecutive = up
+        else:
+            status = "steady"
+            message = f"Your {label} are holding steady."
+            consecutive = max(down, up)
+
+        items.append(FormatFatigueItem(
+            format=fmt,
+            status=status,
+            weeks_analyzed=len(series),
+            consecutive=consecutive,
+            change_pct=round(change, 1) if change is not None else None,
+            message=message,
+            weekly=[
+                FormatWeekPoint(
+                    week=w.isoformat() if hasattr(w, "isoformat") else str(w),
+                    posts=p,
+                    avg_engagement=round(v, 1),
+                )
+                for w, p, v in series
+            ],
+        ))
+
+    # Declining formats first — they're the actionable ones.
+    order = {"declining": 0, "improving": 1, "steady": 2}
+    items.sort(key=lambda i: order.get(i.status, 3))
+    return FormatFatigueResponse(weeks=weeks, formats=items)
+
+
+# --- Comment inbox ---
+
+#: Superfan thresholds — a commenter must clear BOTH to earn the badge.
+#: 3 comments across 2+ posts = repeat engagement, not one comment storm.
+_SUPERFAN_MIN_COMMENTS = 3
+_SUPERFAN_MIN_POSTS = 2
+_SUPERFAN_WINDOW_DAYS = 90
+
+
+@router.get("/comments/inbox", response_model=CommentInboxResponse)
+def get_comment_inbox(
+    sentiment: Literal["", "positive", "neutral", "negative"] = Query(""),
+    questions_only: bool = Query(False),
+    unanswered_only: bool = Query(False),
+    collab_only: bool = Query(False),
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+):
+    """Unified comment inbox: top-level comments across all posts, newest
+    first, joined with sentiment + replied status. Spam is always excluded.
+    Comments are tagged is_collab (brand inquiries) and is_superfan (the
+    commenter is a repeat engager over the trailing 90 days)."""
+    client = get_client()
+    user_id = str(current_user.id)
+
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+
+    filters = {
+        "sentiment": sentiment,
+        "questions_only": questions_only,
+        "unanswered_only": unanswered_only,
+        "collab_only": collab_only,
+    }
+    rows = comment_repo.find_inbox_page(
+        client, user_id, ig_profile.username, **filters, limit=limit, offset=offset,
+    )
+    total = comment_repo.count_inbox(client, user_id, ig_profile.username, **filters)
+
+    # Superfan tagging — one aggregate query, then mark rows in Python rather
+    # than bolting another join onto the already-shared inbox SQL.
+    superfan_names: set[str] = set()
+    try:
+        superfan_names = {
+            f["username"]
+            for f in comment_repo.find_superfans(
+                client, user_id, ig_profile.username,
+                since=datetime.now(timezone.utc).replace(tzinfo=None)
+                - timedelta(days=_SUPERFAN_WINDOW_DAYS),
+                min_comments=_SUPERFAN_MIN_COMMENTS,
+                min_posts=_SUPERFAN_MIN_POSTS,
+                limit=200,
+            )
+        }
+    except Exception:
+        logger.warning("Superfan tagging skipped for user %s", user_id)
+
+    return CommentInboxResponse(
+        total=total,
+        comments=[
+            InboxComment(
+                ig_comment_id=r[0],
+                ig_media_id=r[1],
+                username=r[2],
+                text=r[3],
+                like_count=int(r[4] or 0),
+                timestamp=r[5].isoformat() if hasattr(r[5], "isoformat") else str(r[5]),
+                sentiment=r[6],
+                is_question=bool(r[7]),
+                replied=bool(r[8]),
+                permalink=r[9],
+                is_collab=bool(r[10]),
+                is_superfan=r[2] in superfan_names,
+            )
+            for r in rows
+        ],
+    )
+
+
+@router.get("/comments/superfans", response_model=SuperfansResponse)
+def get_superfans(
+    days: int = Query(_SUPERFAN_WINDOW_DAYS, ge=7, le=365),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+):
+    """Repeat engagers: commenters with ≥3 comments across ≥2 posts in the
+    window, ranked by volume. These are the people most likely to share,
+    defend, and convert — the inbox surfaces them so the creator can
+    prioritize replying."""
+    client = get_client()
+    user_id = str(current_user.id)
+
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+
+    fans = comment_repo.find_superfans(
+        client, user_id, ig_profile.username,
+        since=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days),
+        min_comments=_SUPERFAN_MIN_COMMENTS,
+        min_posts=_SUPERFAN_MIN_POSTS,
+        limit=limit,
+    )
+    return SuperfansResponse(
+        superfans=[
+            SuperfanItem(
+                username=f["username"],
+                comment_count=f["comment_count"],
+                posts_touched=f["posts_touched"],
+                total_likes=f["total_likes"],
+                last_comment_at=(
+                    f["last_comment_at"].isoformat()
+                    if hasattr(f["last_comment_at"], "isoformat")
+                    else str(f["last_comment_at"])
+                ),
+                avg_sentiment_score=round(f["avg_sentiment_score"], 3),
+            )
+            for f in fans
+        ],
+    )
+
+
+@router.post("/comments/{comment_id}/reply", response_model=CommentReplyResponse)
+async def reply_to_comment(
+    comment_id: str,
+    payload: CommentReplyRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Post a reply under a comment (Graph POST /{comment-id}/replies).
+
+    The comment must exist in the user's own synced data — that lookup is
+    the ownership check. On success the reply is also stored locally so the
+    inbox flips to `replied` without waiting for the next comment sync.
+    """
+    client = get_client()
+    user_id = str(current_user.id)
+
+    ctx = comment_repo.find_comment_with_context(client, user_id, comment_id)
+    if ctx is None:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
+    token_data = instagram_repo.find_token(client, user_id)
+    if token_data is None:
+        raise InstagramNotConnectedError()
+    token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
+
+    message = payload.message.strip()
+    reply_id = await service.post_comment_reply(comment_id, message, token)
+
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    comment_repo.bulk_insert_comments(
+        client, user_id, ctx["ig_media_id"],
+        [{
+            "id": reply_id or f"local_{comment_id}",
+            "_parent_id": comment_id,
+            "username": ig_profile.username if ig_profile else "",
+            "text": message,
+            "like_count": 0,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }],
+    )
+
+    logger.info("Comment reply posted for user %s under %s", user_id, comment_id)
+    return CommentReplyResponse(success=True, reply_id=reply_id)
+
+
+# --- Anomaly alerts ---
+
+_ALERT_METRICS = ["reach", "views", "total_interactions", "accounts_engaged"]
+_ALERT_METRIC_LABELS = {
+    "reach": "Reach",
+    "views": "Views",
+    "total_interactions": "Interactions",
+    "accounts_engaged": "Engaged accounts",
+}
+# Only flag metric shifts at least this large (and statistically significant) —
+# below this, day-to-day noise produces alert fatigue.
+_ALERT_DELTA_THRESHOLD_PCT = 20.0
+# A post must beat the trailing-post median by this multiple to be flagged.
+_POST_OVERPERFORM_MULTIPLE = 2.0
+# Minimum trailing posts for a meaningful median.
+_POST_BASELINE_MIN = 5
+
+
+def _median(values: list[int]) -> float:
+    s = sorted(values)
+    n = len(s)
+    mid = n // 2
+    return float(s[mid]) if n % 2 else (s[mid - 1] + s[mid]) / 2.0
+
+
+@router.get("/insights/alerts", response_model=AlertsResponse)
+def get_alerts(
+    days: int = Query(7, ge=3, le=30, description="Recent window to scan for anomalies."),
+    current_user: User = Depends(get_current_user),
+):
+    """Detect anomalies: significant account-metric shifts vs a trailing
+    baseline, and recent posts overperforming the user's median engagement.
+
+    Metric shifts use Welch's t-test on daily samples (recent `days` vs the
+    preceding `4 × days`) and are only reported when both significant at 95%
+    and ≥ 20% in magnitude. Post overperformance compares likes + comments
+    against the median of the trailing 50 posts.
+    """
+    client = get_client()
+    user_id = str(current_user.id)
+
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+    ig_user_id = ig_profile.ig_user_id
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    since = now - timedelta(days=days)
+    baseline_days = days * 4
+    baseline_since = since - timedelta(days=baseline_days)
+
+    alerts: list[AlertItem] = []
+
+    # --- 1. Account-metric shifts ---
+    recent = insights_repo.find_daily_metric_samples(
+        client, user_id, ig_user_id, _ALERT_METRICS, since, now,
+    )
+    baseline = insights_repo.find_daily_metric_samples(
+        client, user_id, ig_user_id, _ALERT_METRICS, baseline_since, since,
+    )
+    for metric in _ALERT_METRICS:
+        cur, base = recent[metric], baseline[metric]
+        if len(cur) < 3 or len(base) < 3:
+            continue
+        cur_mean = sum(cur) / len(cur)
+        base_mean = sum(base) / len(base)
+        delta = pct_delta(cur_mean, base_mean)
+        if delta is None or abs(delta) < _ALERT_DELTA_THRESHOLD_PCT:
+            continue
+        if sample_significance(cur, base) is not True:
+            continue
+        surge = delta > 0
+        label = _ALERT_METRIC_LABELS[metric]
+        alerts.append(AlertItem(
+            id=f"metric:{metric}",
+            kind="metric_surge" if surge else "metric_drop",
+            severity="positive" if surge else "warning",
+            title=f"{label} {'up' if surge else 'down'} {abs(delta):.0f}% vs your baseline",
+            detail=(
+                f"Daily {label.lower()} averaged {cur_mean:,.0f} over the last "
+                f"{days} days vs {base_mean:,.0f} over the prior {baseline_days} days."
+            ),
+            metric=metric,
+            delta_pct=round(delta, 1),
+        ))
+
+    # --- 2. Overperforming posts ---
+    trailing = insights_repo.find_baseline_post_engagement(
+        client, user_id, ig_user_id, before=since,
+    )
+    if len(trailing) >= _POST_BASELINE_MIN:
+        med = _median(trailing)
+        if med > 0:
+            for ig_media_id, permalink, caption, _ts, engagement in (
+                insights_repo.find_recent_post_engagement(client, user_id, ig_user_id, since)
+            ):
+                engagement = int(engagement or 0)
+                if engagement < _POST_OVERPERFORM_MULTIPLE * med:
+                    continue
+                ratio = engagement / med
+                alerts.append(AlertItem(
+                    id=f"post:{ig_media_id}",
+                    kind="post_overperform",
+                    severity="positive",
+                    title=f"Post outperforming {ratio:.1f}× your median",
+                    detail=(
+                        f"{engagement:,} likes + comments vs a median of "
+                        f"{med:,.0f} across your previous {len(trailing)} posts."
+                    ),
+                    ig_media_id=ig_media_id,
+                    permalink=permalink or None,
+                    caption=(caption[:100] if caption else None),
+                ))
+
+    # Warnings first, then biggest movers.
+    alerts.sort(key=lambda a: (a.severity != "warning", -abs(a.delta_pct or 0)))
+    return AlertsResponse(period_days=days, baseline_days=baseline_days, alerts=alerts)
+
+
 @router.get("/insights/demographics", response_model=DemographicResponse)
 def get_demographics(
     metric: Literal["follower_demographics", "engaged_audience_demographics"] = Query(...),
@@ -740,6 +1291,16 @@ async def _run_insights_sync(
             )
     except Exception:
         logger.exception("Background sync: comment sync failed for user %s", user_id)
+
+    # Story analytics retention — snapshot whatever stories are live right now
+    # so they survive Meta's 24h expiry. The scheduled story_snapshot job does
+    # the same every few hours; doing it here too means a manual "Sync" never
+    # misses a story that would expire before the next scheduled run.
+    try:
+        from ..jobs.story_snapshot import snapshot_user_stories
+        await snapshot_user_stories(client, user_id, ig_user_id, token)
+    except Exception:
+        logger.exception("Background sync: story snapshot failed for user %s", user_id)
 
 
 @router.post("/insights/sync", response_model=SyncResponse)
@@ -1242,6 +1803,57 @@ async def get_stories(current_user: User = Depends(get_current_user)):
         )
 
     return StoriesResponse(stories=stories_out)
+
+
+@router.get("/stories/history", response_model=StoryHistoryResponse)
+def get_story_history(
+    days: int = Query(90, ge=1, le=INSIGHTS_MAX_LOOKBACK_DAYS),
+    limit: int = Query(200, ge=1, le=500),
+    current_user: User = Depends(get_current_user),
+):
+    """Retained story history — snapshots taken before Meta's 24h expiry.
+
+    Unlike GET /stories (live only), this reads from ClickHouse: every story
+    the snapshot job captured, with its insights, going back as far as the
+    user has been connected. Instagram itself never offers this view."""
+    client = get_client()
+    user_id = str(current_user.id)
+
+    ig_profile = instagram_repo.find_profile(client, user_id)
+    if ig_profile is None:
+        raise InstagramNotConnectedError()
+
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+    items = story_repo.find_story_history(
+        client, user_id, ig_profile.ig_user_id, since=since, limit=limit,
+    )
+    total = story_repo.count_story_history(
+        client, user_id, ig_profile.ig_user_id, since=since,
+    )
+
+    return StoryHistoryResponse(
+        total=total,
+        period_days=days,
+        stories=[
+            StoryHistoryItem(
+                ig_media_id=s["ig_media_id"],
+                media_type=s["media_type"],
+                permalink=s["permalink"],
+                timestamp=(
+                    s["timestamp"].isoformat()
+                    if hasattr(s["timestamp"], "isoformat")
+                    else str(s["timestamp"])
+                ),
+                reach=s["reach"],
+                views=s["views"],
+                replies=s["replies"],
+                shares=s["shares"],
+                interactions=s["interactions"],
+                navigation=s["navigation"],
+            )
+            for s in items
+        ],
+    )
 
 
 # --- Feature 4: Reels Retention ---
@@ -2453,4 +3065,120 @@ def get_branded_hashtag_mentions(
         hashtag=hashtag.lower(),
         period_days=days,
         mentions=[BrandedHashtagMention(**r) for r in rows],
+    )
+
+
+# --- Comment-to-DM keyword funnels ---
+
+def _funnel_item(f: dict, counts: dict[str, dict]) -> DMFunnelItem:
+    c = counts.get(f["funnel_id"], {})
+    last = c.get("last_sent_at")
+    return DMFunnelItem(
+        funnel_id=f["funnel_id"],
+        keyword=f["keyword"],
+        dm_message=f["dm_message"],
+        public_reply=f["public_reply"],
+        ig_media_id=f["ig_media_id"],
+        created_at=(
+            f["created_at"].isoformat()
+            if hasattr(f["created_at"], "isoformat")
+            else str(f["created_at"])
+        ),
+        sent_count=c.get("sent_count", 0),
+        failed_count=c.get("failed_count", 0),
+        last_sent_at=last.isoformat() if hasattr(last, "isoformat") else None,
+    )
+
+
+@router.get("/dm-funnels", response_model=DMFunnelListResponse)
+def list_dm_funnels(current_user: User = Depends(get_current_user)):
+    """The user's active funnels with lifetime send stats."""
+    client = get_client()
+    user_id = str(current_user.id)
+    funnels = dm_funnel_repo.list_funnels(client, user_id)
+    counts = dm_funnel_repo.send_counts(client, user_id)
+    return DMFunnelListResponse(funnels=[_funnel_item(f, counts) for f in funnels])
+
+
+@router.post("/dm-funnels", response_model=DMFunnelItem)
+def create_dm_funnel(
+    payload: CreateDMFunnelRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Create a keyword → DM funnel.
+
+    From the moment it exists, the funnel runner DMs anyone whose NEW comment
+    contains the keyword (word-boundary match). Comments posted before
+    creation never trigger it. Requires Advanced Access on
+    `instagram_business_manage_messages` for real sends."""
+    client = get_client()
+    user_id = str(current_user.id)
+
+    if instagram_repo.find_profile(client, user_id) is None:
+        raise InstagramNotConnectedError()
+
+    funnels = dm_funnel_repo.list_funnels(client, user_id)
+    if len(funnels) >= dm_funnel_repo.MAX_ACTIVE_FUNNELS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot have more than {dm_funnel_repo.MAX_ACTIVE_FUNNELS} active funnels.",
+        )
+    keyword = payload.keyword.lower().strip()
+    if any(f["keyword"] == keyword and f["ig_media_id"] == payload.ig_media_id for f in funnels):
+        raise HTTPException(
+            status_code=400,
+            detail="A funnel with this keyword already exists for that scope.",
+        )
+
+    created = dm_funnel_repo.create_funnel(
+        client, user_id,
+        keyword=keyword,
+        dm_message=payload.dm_message.strip(),
+        public_reply=payload.public_reply.strip(),
+        ig_media_id=payload.ig_media_id.strip(),
+    )
+    logger.info("DM funnel created for user %s (keyword=%r)", user_id, keyword)
+    return _funnel_item(created, {})
+
+
+@router.delete("/dm-funnels/{funnel_id}", status_code=204)
+def delete_dm_funnel(
+    funnel_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Soft-delete (active=0). Send history is preserved."""
+    client = get_client()
+    user_id = str(current_user.id)
+    if not dm_funnel_repo.soft_delete_funnel(client, user_id, funnel_id):
+        raise EntityNotFoundError("Funnel")
+
+
+@router.get("/dm-funnels/sends", response_model=DMFunnelSendsResponse)
+def get_dm_funnel_sends(
+    limit: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
+):
+    """Recent funnel activity — every DM attempt, newest first."""
+    client = get_client()
+    user_id = str(current_user.id)
+    sends = dm_funnel_repo.recent_sends(client, user_id, limit=limit)
+    return DMFunnelSendsResponse(
+        sends=[
+            DMFunnelSendItem(
+                funnel_id=s["funnel_id"],
+                keyword=s["keyword"],
+                ig_comment_id=s["ig_comment_id"],
+                ig_media_id=s["ig_media_id"],
+                commenter_username=s["commenter_username"],
+                comment_text=s["comment_text"],
+                status=s["status"],
+                error=s["error"],
+                sent_at=(
+                    s["sent_at"].isoformat()
+                    if hasattr(s["sent_at"], "isoformat")
+                    else str(s["sent_at"])
+                ),
+            )
+            for s in sends
+        ],
     )

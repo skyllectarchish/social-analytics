@@ -30,6 +30,12 @@ import YoutubeCompetitorsPage from "./pages/YoutubeCompetitorsPage";
 import YoutubePredictivePage from "./pages/YoutubePredictivePage";
 import YoutubeArchivePage from "./pages/YoutubeArchivePage";
 import YoutubeFunnelPage from "./pages/YoutubeFunnelPage";
+import MediaKitPage from "./pages/MediaKitPage";
+import InboxPage from "./pages/InboxPage";
+import StoriesPage from "./pages/StoriesPage";
+import DMAutomationPage from "./pages/DMAutomationPage";
+import PostsPage from "./pages/PostsPage";
+import ImportPage from "./pages/ImportPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsOfServicePage from "./pages/TermsOfServicePage";
 
@@ -91,6 +97,8 @@ function AppRoutes() {
       <Route path="/connect" element={<ProtectedRoute><ConnectInstagramPage /></ProtectedRoute>} />
       <Route path="/auth/instagram/callback" element={<ProtectedRoute><CallbackPage /></ProtectedRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+      <Route path="/dashboard/posts" element={<ProtectedRoute><PostsPage /></ProtectedRoute>} />
+      <Route path="/dashboard/import" element={<ProtectedRoute><ImportPage /></ProtectedRoute>} />
       <Route path="/dashboard/content" element={<ProtectedRoute><ContentLabPage /></ProtectedRoute>} />
       <Route path="/dashboard/reels" element={<ProtectedRoute><ReelsStudioPage /></ProtectedRoute>} />
       <Route path="/dashboard/audience" element={<ProtectedRoute><AudienceDNAPage /></ProtectedRoute>} />
@@ -104,6 +112,12 @@ function AppRoutes() {
       <Route path="/youtube/predict" element={<ProtectedRoute><YoutubePredictivePage /></ProtectedRoute>} />
       <Route path="/youtube/archive" element={<ProtectedRoute><YoutubeArchivePage /></ProtectedRoute>} />
       <Route path="/youtube/funnel" element={<ProtectedRoute><YoutubeFunnelPage /></ProtectedRoute>} />
+      <Route path="/dashboard/media-kit" element={<ProtectedRoute><MediaKitPage /></ProtectedRoute>} />
+      <Route path="/dashboard/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
+      <Route path="/dashboard/stories" element={<ProtectedRoute><StoriesPage /></ProtectedRoute>} />
+      <Route path="/dashboard/automation" element={<ProtectedRoute><DMAutomationPage /></ProtectedRoute>} />
+      {/* legacy path from the initial release of this feature */}
+      <Route path="/dashboard/funnels" element={<Navigate to="/dashboard/automation" replace />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

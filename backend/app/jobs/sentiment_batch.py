@@ -33,9 +33,12 @@ MODEL_ID = "claude-haiku-4-5"
 SYSTEM_PROMPT = (
     "You analyze Instagram comments. Respond with a SINGLE JSON object — no "
     "prose. Schema: {\"sentiment\": \"positive\"|\"neutral\"|\"negative\", "
-    "\"score\": -1..1, \"is_question\": true|false, \"is_spam\": true|false}. "
+    "\"score\": -1..1, \"is_question\": true|false, \"is_spam\": true|false, "
+    "\"is_collab\": true|false}. "
     "Be strict on spam (giveaway bots, copy-paste promo, link spam). Emoji-only "
-    "comments still carry sentiment."
+    "comments still carry sentiment. is_collab = a genuine brand-partnership / "
+    "sponsorship / business inquiry directed at the creator (NOT generic "
+    "\"DM me\" spam — those are is_spam)."
 )
 
 # Lazily constructed so this module is importable even when the anthropic
@@ -87,7 +90,10 @@ def analyze_one(text: str) -> dict[str, Any]:
         )
     except Exception as exc:
         logger.warning("Haiku sentiment call failed: %s", exc)
-        return {"sentiment": "neutral", "score": 0.0, "is_question": False, "is_spam": False}
+        return {
+            "sentiment": "neutral", "score": 0.0,
+            "is_question": False, "is_spam": False, "is_collab": False,
+        }
 
     content = msg.content[0].text if msg.content else ""
     parsed = _parse_response(content)
@@ -99,6 +105,7 @@ def analyze_one(text: str) -> dict[str, Any]:
         "score": float(parsed.get("score", 0.0)),
         "is_question": bool(parsed.get("is_question", False)),
         "is_spam": bool(parsed.get("is_spam", False)),
+        "is_collab": bool(parsed.get("is_collab", False)),
     }
 
 

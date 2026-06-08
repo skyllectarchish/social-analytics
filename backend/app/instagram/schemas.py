@@ -183,6 +183,147 @@ class PurgeResponse(BaseModel):
     media_deleted: int
 
 
+# --- Data-export archive import ---
+
+class ArchiveImportResponse(BaseModel):
+    """Response for POST /api/instagram/import/archive."""
+
+    posts_imported: int
+    stories_imported: int
+    followers_imported: int
+
+
+class ArchiveGrowthPoint(BaseModel):
+    month: str                   # ISO date (first of month)
+    joins: int
+    cumulative: int
+
+
+class ArchiveContentPoint(BaseModel):
+    month: str
+    posts: int
+    stories: int
+
+
+class ArchiveSummaryResponse(BaseModel):
+    """Response for GET /api/instagram/import/summary."""
+
+    posts: int
+    posts_from: str | None = None
+    stories: int
+    stories_from: str | None = None
+    followers: int
+    followers_from: str | None = None
+    follower_growth: list[ArchiveGrowthPoint] = Field(default_factory=list)
+    content_by_month: list[ArchiveContentPoint] = Field(default_factory=list)
+
+
+# --- Format fatigue ---
+
+class FormatWeekPoint(BaseModel):
+    week: str                    # ISO date (Monday of week)
+    posts: int
+    avg_engagement: float
+
+
+class FormatFatigueItem(BaseModel):
+    format: str                  # REELS | CAROUSEL | IMAGE
+    status: str                  # declining | improving | steady
+    weeks_analyzed: int
+    consecutive: int             # weeks moving in the `status` direction
+    change_pct: float | None = None
+    message: str
+    weekly: list[FormatWeekPoint] = Field(default_factory=list)
+
+
+class FormatFatigueResponse(BaseModel):
+    """Response for GET /api/instagram/insights/format-fatigue."""
+
+    weeks: int
+    formats: list[FormatFatigueItem] = Field(default_factory=list)
+
+
+# --- Comment inbox ---
+
+class InboxComment(BaseModel):
+    """One top-level comment in the unified inbox."""
+
+    ig_comment_id: str
+    ig_media_id: str
+    username: str
+    text: str
+    like_count: int
+    timestamp: str               # ISO-8601
+    sentiment: str               # 'positive' | 'neutral' | 'negative' | '' (unscored)
+    is_question: bool
+    replied: bool                # creator has a reply under this comment
+    permalink: str               # post permalink ('' if media row missing)
+    is_collab: bool = False      # brand-collab inquiry (LLM flag or keyword heuristic)
+    is_superfan: bool = False    # commenter is a repeat engager (see /comments/superfans)
+
+
+class CommentInboxResponse(BaseModel):
+    """Response for GET /api/instagram/comments/inbox."""
+
+    total: int
+    comments: list[InboxComment]
+
+
+class SuperfanItem(BaseModel):
+    """One repeat engager — ranked by comment volume across posts."""
+
+    username: str
+    comment_count: int
+    posts_touched: int
+    total_likes: int
+    last_comment_at: str         # ISO-8601
+    avg_sentiment_score: float   # -1..1 across their scored comments
+
+
+class SuperfansResponse(BaseModel):
+    """Response for GET /api/instagram/comments/superfans."""
+
+    superfans: list[SuperfanItem]
+
+
+class CommentReplyRequest(BaseModel):
+    """Body for POST /api/instagram/comments/{comment_id}/reply."""
+
+    message: str = Field(min_length=1, max_length=2200)
+
+
+class CommentReplyResponse(BaseModel):
+    """Response for POST /api/instagram/comments/{comment_id}/reply."""
+
+    success: bool
+    reply_id: str
+
+
+# --- Anomaly alerts ---
+
+class AlertItem(BaseModel):
+    """One detected anomaly — a metric shift or an overperforming post."""
+
+    id: str                      # stable key, e.g. "metric:reach" / "post:<media_id>"
+    kind: str                    # "metric_drop" | "metric_surge" | "post_overperform"
+    severity: str                # "warning" (negative) | "positive"
+    title: str
+    detail: str
+    metric: str | None = None
+    delta_pct: float | None = None
+    ig_media_id: str | None = None
+    permalink: str | None = None
+    caption: str | None = None
+
+
+class AlertsResponse(BaseModel):
+    """Response for GET /api/instagram/insights/alerts."""
+
+    period_days: int
+    baseline_days: int
+    alerts: list[AlertItem]
+
+
 class TopPost(BaseModel):
     """A top-performing media post."""
 
@@ -233,6 +374,80 @@ class StoriesResponse(BaseModel):
     """Response for GET /api/instagram/stories."""
 
     stories: list[StoryWithInsights]
+
+
+class StoryHistoryItem(BaseModel):
+    """A snapshotted story with its retained insights (survives the 24h expiry)."""
+
+    ig_media_id: str
+    media_type: str
+    permalink: str
+    timestamp: str               # ISO-8601 (when the story was posted)
+    reach: int
+    views: int
+    replies: int
+    shares: int
+    interactions: int
+    navigation: int              # taps forward/back/exit, summed
+
+
+class StoryHistoryResponse(BaseModel):
+    """Response for GET /api/instagram/stories/history."""
+
+    total: int
+    period_days: int
+    stories: list[StoryHistoryItem]
+
+
+# --- Comment-to-DM keyword funnels ---
+
+class CreateDMFunnelRequest(BaseModel):
+    """Body for POST /api/instagram/dm-funnels."""
+
+    keyword: str = Field(min_length=2, max_length=40)
+    dm_message: str = Field(min_length=1, max_length=1000)
+    public_reply: str = Field(default="", max_length=2200)
+    ig_media_id: str = Field(default="", max_length=64)  # '' = all posts
+
+
+class DMFunnelItem(BaseModel):
+    """One funnel + its lifetime send stats."""
+
+    funnel_id: str
+    keyword: str
+    dm_message: str
+    public_reply: str
+    ig_media_id: str             # '' = all posts
+    created_at: str              # ISO-8601
+    sent_count: int = 0
+    failed_count: int = 0
+    last_sent_at: str | None = None
+
+
+class DMFunnelListResponse(BaseModel):
+    """Response for GET /api/instagram/dm-funnels."""
+
+    funnels: list[DMFunnelItem]
+
+
+class DMFunnelSendItem(BaseModel):
+    """One funnel send-log entry (the activity feed)."""
+
+    funnel_id: str
+    keyword: str
+    ig_comment_id: str
+    ig_media_id: str
+    commenter_username: str
+    comment_text: str
+    status: str                  # 'sent' | 'failed'
+    error: str
+    sent_at: str                 # ISO-8601
+
+
+class DMFunnelSendsResponse(BaseModel):
+    """Response for GET /api/instagram/dm-funnels/sends."""
+
+    sends: list[DMFunnelSendItem]
 
 
 # --- Feature 1: Content-Format Performance Breakdown ---
