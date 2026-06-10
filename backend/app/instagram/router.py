@@ -12,7 +12,6 @@ from ..config import settings
 from ..constants import (
     ACCOUNT_DEMOGRAPHIC_METRICS,
     DEFAULT_PAGE_SIZE,
-    DEFAULT_TOKEN_EXPIRY_SECONDS,
     INSIGHTS_INITIAL_FETCH_DAYS,
     INSIGHTS_LOOKBACK_DAYS,
     INSIGHTS_MAX_LOOKBACK_DAYS,
@@ -168,6 +167,25 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/instagram", tags=["instagram"])
 
 
+def _decrypt_access_token(token_data, user_id: str) -> str:
+    """Decrypt a stored IG access token, or raise a clean reconnect error.
+
+    A decrypt failure (corrupt ciphertext, or a rotated JWT_SECRET_KEY — the
+    key the token is encrypted with) means the stored token is permanently
+    unusable; the only remedy is re-OAuth. Surface that as
+    InstagramNotConnectedError (404) so the frontend routes the user to
+    /connect, instead of leaking a raw 500. The real reason is logged.
+    """
+    try:
+        return decrypt_token(token_data.access_token, settings.jwt_secret_key)
+    except Exception:
+        logger.warning(
+            "Token decrypt failed for user %s — stored token unusable, "
+            "reconnect required", user_id,
+        )
+        raise InstagramNotConnectedError()
+
+
 @router.get("/connect", response_model=ConnectResponse)
 def connect(current_user: User = Depends(get_current_user)):
     """Return the Instagram OAuth URL for the frontend to redirect to.
@@ -262,7 +280,7 @@ async def get_profile(
         token_data = instagram_repo.find_token(client, user_id)
         if token_data is not None:
             try:
-                token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
+                token = _decrypt_access_token(token_data, str(current_user.id))
                 profile_data = await service.fetch_profile(token_data.ig_user_id, token)
                 # Persist the fresh snapshot (token + expiry pass through
                 # unchanged) so analytics see the same numbers the user does.
@@ -309,7 +327,7 @@ async def get_media(
         token_data = instagram_repo.find_token(client, user_id)
         if token_data is not None:
             try:
-                token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
+                token = _decrypt_access_token(token_data, str(current_user.id))
                 latest = await service.fetch_media(ig_user_id, token, max_pages=1)
                 if latest:
                     instagram_repo.bulk_insert_media(client, user_id, ig_user_id, latest)
@@ -361,7 +379,7 @@ async def get_media_image(
             token_data = instagram_repo.find_token(client, str(current_user.id))
             if not token_data:
                 raise
-            token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
+            token = _decrypt_access_token(token_data, str(current_user.id))
             try:
                 fresh_urls = await service.fetch_fresh_media_urls(
                     ig_media_id, token_data.ig_user_id, token
@@ -458,18 +476,19 @@ async def refresh(current_user: User = Depends(get_current_user)):
         raise InstagramNotConnectedError()
 
     ig_user_id = token_data.ig_user_id
-    token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
+    token = _decrypt_access_token(token_data, str(current_user.id))
 
     profile_data = await service.fetch_profile(ig_user_id, token)
     media_list = await service.fetch_media(ig_user_id, token)
 
-    encrypted_token = encrypt_token(token, settings.jwt_secret_key)
-    token_expires_at = (
-        datetime.now(timezone.utc) + timedelta(seconds=DEFAULT_TOKEN_EXPIRY_SECONDS)
-    ).replace(tzinfo=None)
-
+    # This is a data refresh, not a token refresh — re-store the existing token
+    # and its real expiry unchanged. Fabricating a fresh 60-day expiry here would
+    # mask the token's true expiry and stop the account_sync job from ever
+    # entering its proactive-refresh window, letting the Meta token silently
+    # expire. Actual long-lived-token refresh is handled by account_sync.
     instagram_repo.upsert_profile(
-        client, user_id, ig_user_id, profile_data, encrypted_token, token_expires_at,
+        client, user_id, ig_user_id, profile_data,
+        token_data.access_token, token_data.token_expires_at,
     )
     instagram_repo.bulk_insert_media(client, user_id, ig_user_id, media_list)
 
@@ -907,7 +926,7 @@ async def reply_to_comment(
     token_data = instagram_repo.find_token(client, user_id)
     if token_data is None:
         raise InstagramNotConnectedError()
-    token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
+    token = _decrypt_access_token(token_data, str(current_user.id))
 
     message = payload.message.strip()
     reply_id = await service.post_comment_reply(comment_id, message, token)
@@ -1372,7 +1391,7 @@ async def sync_insights(
     if token_data is None:
         raise InstagramNotConnectedError()
 
-    token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
+    token = _decrypt_access_token(token_data, str(current_user.id))
 
     # Register the run as 'running' before scheduling the task so a status poll
     # immediately after this POST returns the new run, not a stale prior one.
@@ -1826,7 +1845,7 @@ async def get_stories(current_user: User = Depends(get_current_user)):
         raise InstagramNotConnectedError()
 
     ig_user_id = token_data.ig_user_id
-    token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
+    token = _decrypt_access_token(token_data, str(current_user.id))
 
     try:
         raw_stories = await service.fetch_active_stories(ig_user_id, token)
@@ -2731,7 +2750,7 @@ async def lookup_competitor(
         raise InstagramNotConnectedError()
 
     handle_clean = handle.lower()
-    token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
+    token = _decrypt_access_token(token_data, str(current_user.id))
 
     try:
         snap, err = await competitors.fetch_competitor_snapshot(
@@ -2815,7 +2834,7 @@ async def add_competitor(
         )
 
     handle = payload.handle.lower()
-    token = decrypt_token(token_data.access_token, settings.jwt_secret_key)
+    token = _decrypt_access_token(token_data, str(current_user.id))
 
     try:
         snap, err = await competitors.fetch_competitor_snapshot(
