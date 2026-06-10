@@ -7,7 +7,6 @@ import {
   Eye,
   Film,
   Image as ImageIcon,
-  Loader2,
   MessageCircle,
   Share2,
   Users,
@@ -15,6 +14,7 @@ import {
 import api, { errorMessage, waitForSync } from "../api/client";
 import type { StoryHistoryResponse, StoryHistoryItem } from "../api/types";
 import DashboardLayout from "../components/dashboard/DashboardLayout";
+import { MediaGridSkeleton } from "../components/dashboard/Skeletons";
 import { CardEmpty } from "../components/dashboard/States";
 
 function fmtDate(iso: string): string {
@@ -107,16 +107,13 @@ export default function StoriesPage() {
     };
   }, [stories]);
 
-  if (loading && !data) {
-    return (
-      <div className="grid min-h-dvh place-items-center" style={{ backgroundColor: "#F5F6FA" }}>
-        <Loader2 className="h-8 w-8 animate-spin text-violet" />
-      </div>
-    );
-  }
-
   return (
     <DashboardLayout active="Stories" days={days} onDaysChange={setDays} onSync={sync} syncing={syncing}>
+      {loading && !data ? (
+        <div className="mx-auto max-w-4xl">
+          <MediaGridSkeleton items={8} aspect="aspect-square" />
+        </div>
+      ) : (
       <div className="mx-auto max-w-4xl space-y-6">
         {error && (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600">{error}</p>
@@ -186,6 +183,7 @@ export default function StoriesPage() {
           </ul>
         )}
       </div>
+      )}
     </DashboardLayout>
   );
 }

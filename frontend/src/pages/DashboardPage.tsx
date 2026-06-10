@@ -15,7 +15,7 @@ import {
   YAxis,
 } from "recharts";
 import axios from "axios";
-import { Eye, Heart, Loader2, Radio, TrendingDown, TrendingUp } from "lucide-react";
+import { Eye, Heart, Radio, TrendingDown, TrendingUp } from "lucide-react";
 import api, { errorMessage, safeGet } from "../api/client";
 import type {
   AlertsResponse,
@@ -29,6 +29,7 @@ import type {
 } from "../api/types";
 import AlertsCard from "../components/dashboard/AlertsCard";
 import DashboardLayout from "../components/dashboard/DashboardLayout";
+import { PageSkeleton } from "../components/dashboard/Skeletons";
 import { CardEmpty } from "../components/dashboard/States";
 import PostInsightsDrawer, { type DrawerMedia } from "../components/dashboard/PostInsightsDrawer";
 import ComparisonPill from "../components/ui/ComparisonPill";
@@ -173,14 +174,6 @@ export default function DashboardPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="grid min-h-dvh place-items-center" style={{ backgroundColor: "#F5F6FA" }}>
-        <Loader2 className="h-8 w-8 animate-spin text-violet" />
-      </div>
-    );
-  }
-
   // KPI cards
   const reachSpark = toSpark(overview?.reach);
   const viewsSpark = toSpark(overview?.views);
@@ -271,6 +264,9 @@ export default function DashboardPage() {
 
   return (
     <DashboardLayout days={days} onDaysChange={setDays} onSync={sync} syncing={syncing}>
+      {loading ? (
+        <PageSkeleton stats={4} charts={2} />
+      ) : (
       <div className="space-y-6">
         {error && (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600">{error}</p>
@@ -530,6 +526,7 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+      )}
 
       <PostInsightsDrawer media={drawer} onClose={() => setDrawer(null)} />
     </DashboardLayout>

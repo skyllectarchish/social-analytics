@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { Download, Eye, Heart, Loader2, Printer, Sparkles } from "lucide-react";
+import { Download, Eye, Heart, Printer, Sparkles } from "lucide-react";
 import api, { errorMessage, safeGet } from "../api/client";
 import type {
   DashboardSummary,
@@ -10,6 +10,7 @@ import type {
 } from "../api/types";
 import DashboardLayout from "../components/dashboard/DashboardLayout";
 import { CardEmpty } from "../components/dashboard/States";
+import { PageSkeleton } from "../components/dashboard/Skeletons";
 import { mediaLabel } from "../lib/labels";
 import { useAuthedImage } from "../hooks/useAuthedImage";
 import { avatar } from "../data/mock";
@@ -156,9 +157,11 @@ export default function MediaKitPage() {
 
   if (loading) {
     return (
-      <div className="grid min-h-dvh place-items-center" style={{ backgroundColor: "#F5F6FA" }}>
-        <Loader2 className="h-8 w-8 animate-spin text-violet" />
-      </div>
+      <DashboardLayout active="Media Kit" days={days} onDaysChange={setDays} onSync={sync} syncing={syncing}>
+        <div className="mx-auto max-w-4xl">
+          <PageSkeleton stats={4} charts={2} />
+        </div>
+      </DashboardLayout>
     );
   }
 

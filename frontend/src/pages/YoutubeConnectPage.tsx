@@ -42,7 +42,7 @@ export default function YoutubeConnectPage() {
     <div className="aurora-scene grain relative grid min-h-dvh place-items-center px-4 py-16">
       <div className="w-full max-w-md">
         <div className="card-hairline p-8 text-center">
-          <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#dc2626] text-white">
+          <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-ig text-white">
             <YTIcon className="h-7 w-7" />
           </div>
           <h1 className="mt-5 text-2xl font-semibold tracking-tight">
@@ -55,7 +55,7 @@ export default function YoutubeConnectPage() {
           <ul className="mt-5 space-y-2 text-left">
             {benefits.map((b) => (
               <li key={b} className="flex items-start gap-2 text-sm text-foreground/70">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#dc2626]" />
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-violet-deep" />
                 {b}
               </li>
             ))}
@@ -71,7 +71,6 @@ export default function YoutubeConnectPage() {
             onClick={connect}
             disabled={busy}
             className="btn-glow mt-6 w-full disabled:opacity-60"
-            style={{ background: "#dc2626", boxShadow: "0 0 20px rgba(220,38,38,0.35)" }}
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <YTIcon className="h-4 w-4" />}
             {busy ? "Redirecting…" : "Connect with Google"}

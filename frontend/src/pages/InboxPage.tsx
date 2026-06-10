@@ -24,6 +24,7 @@ import type {
 } from "../api/types";
 import DashboardLayout from "../components/dashboard/DashboardLayout";
 import { CardEmpty } from "../components/dashboard/States";
+import { ListSkeleton } from "../components/dashboard/Skeletons";
 import { useAuthedImage } from "../hooks/useAuthedImage";
 
 const PAGE_SIZE = 20;
@@ -288,14 +289,6 @@ export default function InboxPage() {
     setComments((prev) => prev.map((c) => (c.ig_comment_id === id ? { ...c, replied: true } : c)));
   }
 
-  if (loading && comments.length === 0) {
-    return (
-      <div className="grid min-h-dvh place-items-center" style={{ backgroundColor: "#F5F6FA" }}>
-        <Loader2 className="h-8 w-8 animate-spin text-violet" />
-      </div>
-    );
-  }
-
   return (
     <DashboardLayout active="Inbox" days={days} onDaysChange={setDays} onSync={sync} syncing={syncing}>
       <div className="mx-auto max-w-3xl space-y-6">
@@ -333,7 +326,9 @@ export default function InboxPage() {
         </div>
 
         {/* comment list */}
-        {comments.length === 0 ? (
+        {loading && comments.length === 0 ? (
+          <ListSkeleton rows={8} />
+        ) : comments.length === 0 ? (
           <div className="card-hairline p-5">
             <CardEmpty
               label={

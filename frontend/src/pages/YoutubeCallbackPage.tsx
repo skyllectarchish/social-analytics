@@ -41,7 +41,7 @@ export default function YoutubeCallbackPage() {
   return (
     <div className="aurora-scene grain relative grid min-h-dvh place-items-center px-4">
       <div className="card-hairline w-full max-w-sm p-8 text-center">
-        {status === "working" && <Loader2 className="mx-auto h-10 w-10 animate-spin text-[#dc2626]" />}
+        {status === "working" && <Loader2 className="mx-auto h-10 w-10 animate-spin text-violet-deep" />}
         {status === "ok" && <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-500" />}
         {status === "error" && <XCircle className="mx-auto h-10 w-10 text-red-500" />}
         <h1 className="mt-4 text-xl font-semibold tracking-tight">

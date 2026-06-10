@@ -22,6 +22,7 @@ import type {
 } from "../api/types";
 import DashboardLayout from "../components/dashboard/DashboardLayout";
 import { CardEmpty } from "../components/dashboard/States";
+import { ListSkeleton } from "../components/dashboard/Skeletons";
 
 function timeAgo(iso: string): string {
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -203,14 +204,6 @@ export default function DMAutomationPage() {
     }
   }
 
-  if (loading && automations.length === 0) {
-    return (
-      <div className="grid min-h-dvh place-items-center" style={{ backgroundColor: "#F5F6FA" }}>
-        <Loader2 className="h-8 w-8 animate-spin text-violet" />
-      </div>
-    );
-  }
-
   return (
     <DashboardLayout active="DM Automation" days={days} onDaysChange={setDays} onSync={sync} syncing={syncing}>
       <div className="mx-auto max-w-3xl space-y-6">
@@ -250,7 +243,9 @@ export default function DMAutomationPage() {
         )}
 
         {/* automation list */}
-        {automations.length === 0 ? (
+        {loading && automations.length === 0 ? (
+          <ListSkeleton rows={5} />
+        ) : automations.length === 0 ? (
           <div className="card-hairline p-5">
             <CardEmpty label='No automations yet. Create one, then tell followers to "comment LINK" in your next caption — new comments are checked every 15 minutes.' />
           </div>

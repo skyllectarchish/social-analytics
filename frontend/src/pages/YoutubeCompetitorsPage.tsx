@@ -6,6 +6,7 @@ import type {
   YoutubeCompetitor, CompetitorOutlier, TitleHistoryEntry,
 } from "../api/youtubeTypes";
 import YoutubeDashboardLayout from "../components/youtube/YoutubeDashboardLayout";
+import { CardEmpty } from "../components/dashboard/States";
 
 function fmtNum(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -93,15 +94,20 @@ export default function YoutubeCompetitorsPage() {
 
   return (
     <YoutubeDashboardLayout active="Competitors" onSync={sync} syncing={syncing}>
-      <div className="p-6 max-w-7xl mx-auto">
-        <h1 className="text-2xl font-display font-bold text-ink mb-1">Competitors</h1>
-        <p className="text-sm text-ink/50 mb-6">Track competitors. Get AI analysis when their videos go viral.</p>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
+            Competitors{" "}
+            <span className="font-serif font-normal italic text-foreground/60">on watch.</span>
+          </h1>
+          <p className="mt-1 text-sm text-foreground/55">Track competitors. Get AI analysis when their videos go viral.</p>
+        </div>
 
-        <div className="card-hairline glass rounded-2xl p-4 mb-6">
-          <p className="text-sm font-medium text-ink mb-2">Add Competitor Channel</p>
-          <div className="flex gap-2">
+        <div className="card-hairline p-5">
+          <h2 className="text-lg font-semibold">Add competitor channel</h2>
+          <div className="mt-4 flex gap-2">
             <input
-              className="flex-1 bg-white/50 border border-white/30 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-500/30"
+              className="flex-1 rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none transition focus:border-violet/40 focus:ring-2 focus:ring-violet/20"
               placeholder="@channelhandle or youtube.com/@handle"
               value={handle}
               onChange={e => setHandle(e.target.value)}
@@ -110,48 +116,48 @@ export default function YoutubeCompetitorsPage() {
             <button
               onClick={addCompetitor}
               disabled={adding || !handle.trim()}
-              className="bg-red-600 text-white rounded-xl px-4 py-2 text-sm font-medium flex items-center gap-1 disabled:opacity-50 hover:bg-red-700 transition-colors"
+              className="flex items-center gap-1 rounded-xl bg-violet px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-deep disabled:opacity-50"
             >
               <Plus size={14} /> {adding ? "Adding…" : "Add"}
             </button>
           </div>
-          {addError && <p className="text-xs text-red-500 mt-1">{addError}</p>}
+          {addError && <p className="mt-1 text-xs text-red-500">{addError}</p>}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="card-hairline glass rounded-2xl p-4 space-y-2">
-            <p className="text-xs font-semibold text-ink/50 uppercase tracking-wider mb-3">
-              Tracking ({competitors.length})
-            </p>
-            {competitors.length === 0 && !loading && (
-              <p className="text-sm text-ink/40 text-center py-6">No competitors tracked yet.</p>
-            )}
-            {competitors.map(c => (
-              <div key={c.competitor_channel_id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-white/40 transition-colors">
-                {c.competitor_thumbnail_url && (
-                  <img src={c.competitor_thumbnail_url} className="w-8 h-8 rounded-full object-cover" alt="" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{c.competitor_title}</p>
-                  {c.webhook_active && <span className="text-[10px] text-green-600 font-medium">● Live</span>}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="card-hairline p-5">
+            <h2 className="text-lg font-semibold">Tracking <span className="num text-foreground/55">({competitors.length})</span></h2>
+            <div className="mt-4 space-y-2">
+              {competitors.length === 0 && !loading && (
+                <CardEmpty label="No competitors tracked yet." />
+              )}
+              {competitors.map(c => (
+                <div key={c.competitor_channel_id} className="flex items-center gap-2 rounded-xl p-2 transition-colors hover:bg-lavender/40">
+                  {c.competitor_thumbnail_url && (
+                    <img src={c.competitor_thumbnail_url} className="h-8 w-8 rounded-full object-cover" alt="" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{c.competitor_title}</p>
+                    {c.webhook_active && <span className="text-[10px] font-medium text-emerald-600">● Live</span>}
+                  </div>
+                  <button onClick={() => removeCompetitor(c.competitor_channel_id)} className="text-foreground/30 transition-colors hover:text-red-500">
+                    <Trash2 size={14} />
+                  </button>
                 </div>
-                <button onClick={() => removeCompetitor(c.competitor_channel_id)} className="text-ink/30 hover:text-red-500 transition-colors">
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
-          <div className="lg:col-span-2 space-y-4">
+          <div className="space-y-4 lg:col-span-2">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-ink/50 uppercase tracking-wider">
-                {outliers.length > 0 ? "Outlier Videos" : "Recent Competitor Videos"}
-              </p>
+              <h2 className="text-lg font-semibold">
+                {outliers.length > 0 ? "Outlier videos" : "Recent competitor videos"}
+              </h2>
               {competitors.length > 0 && (
                 <button
                   onClick={fetchVideos}
                   disabled={fetchingVideos}
-                  className="flex items-center gap-1 text-xs text-ink/50 hover:text-red-600 transition-colors disabled:opacity-40"
+                  className="flex items-center gap-1 text-xs text-foreground/50 transition-colors hover:text-violet-deep disabled:opacity-40"
                   title="Fetch latest competitor videos now"
                 >
                   <RefreshCw size={11} className={fetchingVideos ? "animate-spin" : ""} />
@@ -160,40 +166,40 @@ export default function YoutubeCompetitorsPage() {
               )}
             </div>
             {outliers.length === 0 && recentVideos.length === 0 && !loading && (
-              <div className="card-hairline glass rounded-2xl p-8 text-center text-ink/40 text-sm">
-                No videos fetched yet. Click "Fetch Now" to load competitor videos.
+              <div className="card-hairline p-5">
+                <CardEmpty label='No videos fetched yet. Click "Fetch Now" to load competitor videos.' />
               </div>
-            )}            
+            )}
             {(outliers.length > 0 ? outliers : recentVideos).map(o => (
-              <motion.div key={o.video_id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="card-hairline glass rounded-2xl p-4">
+              <motion.div key={o.video_id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="card-hairline p-5">
                 <div className="flex gap-3">
                   {o.thumbnail_url && (
-                    <img src={o.thumbnail_url} className="w-24 h-14 rounded-lg object-cover flex-shrink-0" alt="" />
+                    <img src={o.thumbnail_url} className="h-14 w-24 flex-shrink-0 rounded-lg object-cover" alt="" />
                   )}
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium line-clamp-2">{o.title}</p>
-                      <span className="chip bg-red-100 text-red-700 text-xs whitespace-nowrap flex items-center gap-1">
-                        <TrendingUp size={10} /> {fmtNum(o.view_count)}
+                      <p className="line-clamp-2 text-sm font-medium">{o.title}</p>
+                      <span className="chip flex items-center gap-1 whitespace-nowrap !bg-lavender text-xs text-violet-deep">
+                        <TrendingUp size={10} /> <span className="num">{fmtNum(o.view_count)}</span>
                       </span>
                     </div>
-                    <p className="text-xs text-ink/40 mt-1">{formatDate(o.published_at)}</p>
+                    <p className="mt-1 text-xs text-foreground/40">{formatDate(o.published_at)}</p>
                     {o.llm_analysis && (
-                      <p className="text-xs text-ink/70 mt-2 bg-violet/5 rounded-lg p-2 border border-violet/10">
+                      <p className="mt-2 rounded-lg border border-violet/10 bg-violet/5 p-2 text-xs text-foreground/70">
                         {o.llm_analysis}
                       </p>
                     )}
-                    <button onClick={() => toggleHistory(o.video_id)} className="text-xs text-violet underline mt-2">
+                    <button onClick={() => toggleHistory(o.video_id)} className="mt-2 text-xs text-violet underline">
                       {selectedVideoId === o.video_id ? "Hide title history" : "Show title history"}
                     </button>
                     <AnimatePresence>
                       {selectedVideoId === o.video_id && titleHistory.length > 1 && (
-                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden mt-2">
+                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mt-2 overflow-hidden">
                           <div className="space-y-1">
                             {titleHistory.map((t, i) => (
                               <div key={i} className="flex items-start gap-2 text-xs">
-                                <span className="text-ink/30 shrink-0">{formatDate(t.observed_at)}</span>
-                                <span className={i === titleHistory.length - 1 ? "font-medium" : "line-through text-ink/40"}>{t.title_text}</span>
+                                <span className="shrink-0 text-foreground/30">{formatDate(t.observed_at)}</span>
+                                <span className={i === titleHistory.length - 1 ? "font-medium" : "text-foreground/40 line-through"}>{t.title_text}</span>
                               </div>
                             ))}
                           </div>

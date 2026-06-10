@@ -4,7 +4,8 @@ import {
 } from "recharts";
 import { AlertTriangle, CheckCircle2, Loader2, Plus, X } from "lucide-react";
 import DashboardLayout from "../components/dashboard/DashboardLayout";
-import { CardEmpty, PageLoading } from "../components/dashboard/States";
+import { CardEmpty } from "../components/dashboard/States";
+import { ListSkeleton } from "../components/dashboard/Skeletons";
 import { useSync } from "../hooks/useSync";
 import api, { errorMessage, safeGet } from "../api/client";
 import type {
@@ -134,7 +135,7 @@ export default function CompetitorsPage() {
   return (
     <DashboardLayout active="Competitors" days={days} onDaysChange={setDays} onSync={sync} syncing={syncing}>
       {loading ? (
-        <PageLoading />
+        <ListSkeleton rows={5} />
       ) : (
         <div className="space-y-6">
           <div>

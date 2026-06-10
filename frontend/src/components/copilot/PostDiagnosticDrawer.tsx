@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Loader2, RefreshCw, Stethoscope, X } from "lucide-react";
+import { ChevronDown, RefreshCw, Stethoscope, X } from "lucide-react";
 import axios from "axios";
 import api from "../../api/client";
 import type { DiagnosticFactor, DiagnosticResponse } from "../../api/types";
 import { useAuthedImage } from "../../hooks/useAuthedImage";
+import { TextBlockSkeleton } from "../dashboard/Skeletons";
 import AIMarkdown from "./AIMarkdown";
 import AIFeedback from "./AIFeedback";
 import { trackAI } from "../../lib/telemetry";
@@ -156,8 +157,9 @@ export default function PostDiagnosticDrawer({
                   )}
                 </div>
               ) : !diag ? (
-                <div className="flex items-center justify-center gap-2 py-10 text-sm text-foreground/55">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Analyzing reach, timing, hashtags, and format…
+                <div className="space-y-3 py-2">
+                  <p className="text-sm text-foreground/55">Analyzing reach, timing, hashtags, and format…</p>
+                  <TextBlockSkeleton lines={5} />
                 </div>
               ) : (
                 <>

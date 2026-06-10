@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Check, Clapperboard, Copy, Loader2, X } from "lucide-react";
+import { Check, Clapperboard, Copy, X } from "lucide-react";
 import api, { errorMessage } from "../../api/client";
 import type { Idea, ReelScriptResponse } from "../../api/types";
+import { TextBlockSkeleton } from "../dashboard/Skeletons";
 import AIFeedback from "./AIFeedback";
 import { trackAI } from "../../lib/telemetry";
 
@@ -76,10 +77,9 @@ export default function ReelScriptDialog({
         <p className="mt-0.5 text-xs text-foreground/55">{idea.title}</p>
 
         {loading && (
-          <div className="grid h-48 place-items-center">
-            <span className="flex items-center gap-2 text-sm text-foreground/55">
-              <Loader2 className="h-4 w-4 animate-spin text-violet" /> Writing in your voice…
-            </span>
+          <div className="mt-4 space-y-3">
+            <p className="text-sm text-foreground/55">Writing in your voice…</p>
+            <TextBlockSkeleton lines={6} />
           </div>
         )}
         {error && (

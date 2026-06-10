@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import apiClient from "../api/client";
 import type { YoutubeVideo, YoutubeVideoListResponse, VelocityPoint, YoutubePrediction } from "../api/youtubeTypes";
 import YoutubeDashboardLayout from "../components/youtube/YoutubeDashboardLayout";
+import { CardEmpty } from "../components/dashboard/States";
+import GlassTooltip from "../components/charts/GlassTooltip";
+import { PALETTE } from "../data/mock";
 
 function fmtNum(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -43,76 +46,84 @@ export default function YoutubePredictivePage() {
 
   return (
     <YoutubeDashboardLayout active="Predictive Studio" onSync={sync} syncing={syncing}>
-      <div className="p-6 max-w-7xl mx-auto">
-        <h1 className="text-2xl font-display font-bold text-ink mb-1">Predictive Studio</h1>
-        <p className="text-sm text-ink/50 mb-6">4-hour velocity → 30-day view projection.</p>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
+            Predictive Studio{" "}
+            <span className="font-serif font-normal italic text-foreground/60">your next hit.</span>
+          </h1>
+          <p className="mt-1 text-sm text-foreground/55">4-hour velocity → 30-day view projection.</p>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="card-hairline glass rounded-2xl p-4 space-y-2 max-h-[600px] overflow-y-auto">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="card-hairline max-h-[600px] space-y-2 overflow-y-auto p-5">
             {videos.map(v => (
               <button
                 key={v.video_id}
                 onClick={() => selectVideo(v)}
-                className={`w-full flex gap-3 p-2 rounded-xl text-left transition-colors ${
-                  selected?.video_id === v.video_id ? "bg-red-50 ring-1 ring-red-300" : "hover:bg-white/50"
+                className={`flex w-full gap-3 rounded-xl p-2 text-left transition-colors ${
+                  selected?.video_id === v.video_id ? "bg-lavender/60 ring-1 ring-violet/30" : "hover:bg-lavender/40"
                 }`}
               >
-                <img src={v.thumbnail_url} className="w-16 h-10 rounded-lg object-cover flex-shrink-0" alt="" />
+                <img src={v.thumbnail_url} className="h-10 w-16 flex-shrink-0 rounded-lg object-cover" alt="" />
                 <div className="min-w-0">
-                  <p className="text-xs font-medium line-clamp-2">{v.title}</p>
-                  <p className="text-[10px] text-ink/40 mt-0.5">{fmtNum(v.view_count)} views</p>
+                  <p className="line-clamp-2 text-xs font-medium">{v.title}</p>
+                  <p className="mt-0.5 text-[10px] text-foreground/40"><span className="num">{fmtNum(v.view_count)}</span> views</p>
                 </div>
               </button>
             ))}
           </div>
 
-          <div className="lg:col-span-2 space-y-4">
+          <div className="space-y-4 lg:col-span-2">
             {!selected && (
-              <div className="card-hairline glass rounded-2xl p-12 text-center text-ink/40 text-sm">
-                Select a video to see velocity and projection.
+              <div className="card-hairline p-5">
+                <CardEmpty label="Select a video to see velocity and projection." />
               </div>
             )}
             {selected && (
               <>
-                <div className="card-hairline glass rounded-2xl p-4">
-                  <p className="text-sm font-semibold text-ink mb-3">View Velocity</p>
-                  {velocity.length === 0 ? (
-                    <p className="text-xs text-ink/40 text-center py-6">No velocity data yet.</p>
-                  ) : (
-                    <ResponsiveContainer width="100%" height={180}>
-                      <BarChart data={velocity}>
-                        <XAxis dataKey="hours" tickFormatter={h => `${h}h`} tick={{ fontSize: 11 }} />
-                        <YAxis tickFormatter={fmtNum} tick={{ fontSize: 11 }} width={50} />
-                        <Tooltip formatter={(v: number) => [fmtNum(v), "Views"]} labelFormatter={h => `${h}h after publish`} />
-                        <Bar dataKey="view_count" fill="#dc2626" radius={4} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
+                <div className="card-hairline p-5">
+                  <h2 className="text-lg font-semibold">View velocity</h2>
+                  <div className="mt-4 h-72">
+                    {velocity.length === 0 ? (
+                      <CardEmpty label="No velocity data yet." />
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={velocity} margin={{ top: 8, right: 6, bottom: 0, left: -14 }}>
+                          <CartesianGrid stroke={PALETTE.grid} vertical={false} />
+                          <XAxis dataKey="hours" tickFormatter={h => `${h}h`} tick={{ fontSize: 10, fill: PALETTE.muted }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={28} />
+                          <YAxis tickFormatter={(v) => fmtNum(v as number)} tick={{ fontSize: 10, fill: PALETTE.muted }} tickLine={false} axisLine={false} width={40} />
+                          <Tooltip content={<GlassTooltip />} />
+                          <Bar dataKey="view_count" fill={PALETTE.violet} radius={4} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
                 </div>
 
-                <div className="card-hairline glass rounded-2xl p-4">
-                  <p className="text-sm font-semibold text-ink mb-3">30-Day Projection</p>
-                  {loading && <p className="text-xs text-ink/40">Loading…</p>}
+                <div className="card-hairline p-5">
+                  <h2 className="text-lg font-semibold">30-day projection</h2>
+                  {loading && <p className="mt-4 text-xs text-foreground/40">Loading…</p>}
                   {!loading && !prediction && (
-                    <p className="text-xs text-ink/40">No prediction yet — velocity data needed first (requires 4+ hours of data).</p>
+                    <p className="mt-4 text-xs text-foreground/40">No prediction yet — velocity data needed first (requires 4+ hours of data).</p>
                   )}
                   {!loading && prediction && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-red-50 rounded-xl p-3 text-center">
-                        <p className="text-xs text-ink/50">Predicted Views</p>
-                        <p className="text-2xl font-bold num text-red-700">{fmtNum(prediction.predicted_30d_views)}</p>
-                        <p className="text-[10px] text-ink/40">range: {fmtNum(prediction.predicted_low)} – {fmtNum(prediction.predicted_high)}</p>
+                    <div className="mt-4 grid grid-cols-2 gap-4">
+                      <div className="rounded-xl bg-lavender/60 p-4">
+                        <div className="text-xs font-medium uppercase tracking-wider text-foreground/55">Predicted Views</div>
+                        <div className="num mt-2 text-3xl font-semibold text-violet-deep">{fmtNum(prediction.predicted_30d_views)}</div>
+                        <p className="mt-1 text-[10px] text-foreground/40">range: <span className="num">{fmtNum(prediction.predicted_low)}</span> – <span className="num">{fmtNum(prediction.predicted_high)}</span></p>
                       </div>
-                      <div className="bg-green-50 rounded-xl p-3 text-center">
-                        <p className="text-xs text-ink/50">Est. Revenue</p>
-                        <p className="text-2xl font-bold num text-green-700">
+                      <div className="rounded-xl bg-green-50 p-4">
+                        <div className="text-xs font-medium uppercase tracking-wider text-foreground/55">Est. Revenue</div>
+                        <div className="num mt-2 text-3xl font-semibold text-green-700">
                           ${prediction.revenue_low_usd.toFixed(0)} – ${prediction.revenue_high_usd.toFixed(0)}
-                        </p>
-                        <p className="text-[10px] text-ink/40">at $3 RPM default</p>
+                        </div>
+                        <p className="mt-1 text-[10px] text-foreground/40">at $3 RPM default</p>
                       </div>
                       {prediction.model_r2 !== null && (
-                        <p className="col-span-2 text-[10px] text-ink/40 text-center">
-                          Model accuracy: {((prediction.model_r2 ?? 0) * 100).toFixed(0)}% R²
+                        <p className="col-span-2 text-center text-[10px] text-foreground/40">
+                          Model accuracy: <span className="num">{((prediction.model_r2 ?? 0) * 100).toFixed(0)}%</span> R²
                         </p>
                       )}
                     </div>

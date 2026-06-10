@@ -24,19 +24,19 @@ export default function VideoCard({
   return (
     <button
       onClick={onClick}
-      className={`w-full rounded-xl border p-2 text-left transition hover:bg-white/70 ${
+      className={`group w-full overflow-hidden rounded-2xl text-left ring-1 transition ${
         active
-          ? "border-[#dc2626]/40 bg-red-50 ring-2 ring-[#dc2626]/30"
-          : "border-black/5 bg-white/40"
+          ? "bg-lavender/60 ring-2 ring-violet/30"
+          : "ring-black/5 hover:ring-violet/40"
       }`}
       aria-pressed={active}
     >
-      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-lavender">
+      <div className="relative aspect-video overflow-hidden bg-lavender">
         {video.thumbnail_url ? (
           <img
             src={video.thumbnail_url}
             alt={video.title}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover transition group-hover:scale-105"
             loading="lazy"
           />
         ) : (
@@ -49,10 +49,12 @@ export default function VideoCard({
           {video.video_format.replace("_", " ")}
         </span>
       </div>
-      <p className="mt-1.5 line-clamp-2 text-xs font-medium leading-snug">{video.title}</p>
-      <div className="mt-1 flex gap-2">
-        <span className="chip !px-1.5 !py-0.5 !text-[10px]">{fmt(video.view_count)} views</span>
-        <span className="chip !px-1.5 !py-0.5 !text-[10px]">{fmt(video.like_count)} likes</span>
+      <div className="p-2">
+        <p className="line-clamp-2 text-xs font-medium leading-snug">{video.title}</p>
+        <div className="mt-1 flex gap-2">
+          <span className="chip !px-1.5 !py-0.5 !text-[10px]"><span className="num">{fmt(video.view_count)}</span> views</span>
+          <span className="chip !px-1.5 !py-0.5 !text-[10px]"><span className="num">{fmt(video.like_count)}</span> likes</span>
+        </div>
       </div>
     </button>
   );

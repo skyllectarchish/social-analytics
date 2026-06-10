@@ -4,23 +4,24 @@ import { RefreshCw, Clock } from "lucide-react";
 import apiClient from "../api/client";
 import type { ArchiveMinerStatus, YoutubeArchiveSuggestion } from "../api/youtubeTypes";
 import YoutubeDashboardLayout from "../components/youtube/YoutubeDashboardLayout";
+import { CardEmpty } from "../components/dashboard/States";
 
 const TYPE_CONFIG: Record<string, { label: string; color: string }> = {
   REMAKE: { label: "Remake", color: "text-violet bg-violet/10" },
-  SHORT: { label: "Clip to Short", color: "text-red-600 bg-red-50" },
+  SHORT: { label: "Clip to Short", color: "text-violet-deep bg-lavender/60" },
   UPDATE: { label: "Update", color: "text-amber-600 bg-amber-50" },
 };
 
 function SuggestionCard({ s }: { s: YoutubeArchiveSuggestion }) {
   const cfg = TYPE_CONFIG[s.suggestion_type] ?? TYPE_CONFIG.UPDATE;
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="card-hairline glass rounded-2xl p-4 space-y-2">
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="card-hairline p-5 space-y-2">
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-medium line-clamp-2 flex-1">{s.original_title}</p>
         <span className={`chip text-xs whitespace-nowrap ${cfg.color}`}>{cfg.label}</span>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="chip bg-ink/5 text-ink/60 text-[10px]">#{s.trending_topic}</span>
+        <span className="chip bg-ink/5 text-foreground/60 text-[10px]">#{s.trending_topic}</span>
         {s.wikipedia_spike_pct > 0 && (
           <span className="chip bg-green-50 text-green-700 text-[10px]">Wikipedia +{s.wikipedia_spike_pct.toFixed(0)}%</span>
         )}
@@ -28,7 +29,7 @@ function SuggestionCard({ s }: { s: YoutubeArchiveSuggestion }) {
           <span className="chip bg-blue-50 text-blue-700 text-[10px]">YT search: "{s.autocomplete_matches[0]}"</span>
         )}
       </div>
-      <p className="text-xs text-ink/60 bg-violet/5 rounded-lg p-2 border border-violet/10">
+      <p className="text-xs text-foreground/60 bg-violet/5 rounded-lg p-2 border border-violet/10">
         {s.llm_recommendation}
       </p>
     </motion.div>
@@ -80,38 +81,40 @@ export default function YoutubeArchivePage() {
 
   return (
     <YoutubeDashboardLayout active="Archive Miner" onSync={sync} syncing={syncing}>
-      <div className="p-6 max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+      <div className="space-y-6">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-display font-bold text-ink mb-1">Archive Miner</h1>
-            <p className="text-sm text-ink/50 flex items-center gap-1">
+            <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
+              Archive{" "}
+              <span className="font-serif font-normal italic text-foreground/60">miner.</span>
+            </h1>
+            <p className="mt-1 text-sm text-foreground/55 flex items-center gap-1">
               <Clock size={12} /> {lastScanText}
             </p>
           </div>
           <button
             onClick={runScan}
             disabled={scanning}
-            className="bg-red-600 text-white rounded-xl px-4 py-2 text-sm font-medium flex items-center gap-2 disabled:opacity-50 hover:bg-red-700 transition-colors"
+            className="bg-violet text-white rounded-xl px-4 py-2 text-sm font-medium flex items-center gap-2 disabled:opacity-50 hover:bg-violet-deep transition-colors"
           >
             <RefreshCw size={14} className={scanning ? "animate-spin" : ""} />
             {scanning ? "Scanning…" : "Run Scan Now"}
           </button>
         </div>
 
-        {loading && <p className="text-sm text-ink/40">Loading suggestions…</p>}
+        {loading && <p className="text-sm text-foreground/50">Loading suggestions…</p>}
 
         {!loading && (status?.suggestions.length ?? 0) === 0 && (
-          <div className="card-hairline glass rounded-2xl p-12 text-center text-ink/40 text-sm">
-            No revival opportunities found yet.<br />
-            Run a scan or check back after the weekly job runs.
-          </div>
+          <CardEmpty label="No revival opportunities found yet — run a scan or check back after the weekly job runs." />
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {status?.suggestions.map(s => (
-            <SuggestionCard key={s.video_id} s={s} />
-          ))}
-        </div>
+        {(status?.suggestions.length ?? 0) > 0 && (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {status?.suggestions.map(s => (
+              <SuggestionCard key={s.video_id} s={s} />
+            ))}
+          </div>
+        )}
       </div>
     </YoutubeDashboardLayout>
   );

@@ -13,6 +13,7 @@ import {
 import { motion } from "framer-motion";
 import type { RetentionAnnotation, RetentionCurvePoint } from "../../api/youtubeTypes";
 import GlassTooltip from "../charts/GlassTooltip";
+import { PALETTE } from "../../data/mock";
 
 function fmtTimestamp(elapsed: number, durationSeconds: number) {
   const s = Math.round(elapsed * durationSeconds);
@@ -58,50 +59,65 @@ export default function SmartRetentionChart({
       role="img"
       aria-label={`Retention curve. ${annotations.length} drop-off${annotations.length !== 1 ? "s" : ""} annotated.`}
     >
-      <ResponsiveContainer width="100%" height={280}>
-        <ComposedChart data={chartData} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis
-            dataKey="elapsed"
-            tickFormatter={(v) => fmtTimestamp(v, durationSeconds)}
-            tick={{ fontSize: 11 }}
-            label={{ value: "Video position", position: "insideBottom", offset: -4, fontSize: 11 }}
-          />
-          <YAxis
-            tickFormatter={(v) => `${Math.round(v)}%`}
-            tick={{ fontSize: 11 }}
-            domain={[0, 100]}
-          />
-          <Tooltip content={<GlassTooltip />} formatter={(v: number) => [`${v.toFixed(1)}%`]} />
-          <Area
-            type="monotone"
-            dataKey="watch"
-            name="Retention"
-            stroke="#dc2626"
-            fill="rgba(220,38,38,0.12)"
-            strokeWidth={2}
-            dot={false}
-          />
-          <Line
-            type="monotone"
-            dataKey="benchmark"
-            name="YT Average"
-            stroke="#9ca3af"
-            strokeDasharray="5 5"
-            strokeWidth={1.5}
-            dot={false}
-          />
-          {cliffElapsed.map(({ elapsed }, idx) => (
-            <ReferenceLine
-              key={idx}
-              x={elapsed}
-              stroke="#dc2626"
-              strokeDasharray="4 4"
-              strokeWidth={1.5}
+      <div className="h-72">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={chartData} margin={{ top: 8, right: 6, bottom: 0, left: -14 }}>
+            <defs>
+              <linearGradient id="retentionFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={PALETTE.violet} stopOpacity={0.35} />
+                <stop offset="100%" stopColor={PALETTE.violet} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke={PALETTE.grid} vertical={false} />
+            <XAxis
+              dataKey="elapsed"
+              tickFormatter={(v) => fmtTimestamp(v, durationSeconds)}
+              tick={{ fontSize: 10, fill: PALETTE.muted }}
+              tickLine={false}
+              axisLine={false}
+              interval="preserveStartEnd"
+              minTickGap={28}
             />
-          ))}
-        </ComposedChart>
-      </ResponsiveContainer>
+            <YAxis
+              tickFormatter={(v) => `${Math.round(v as number)}%`}
+              tick={{ fontSize: 10, fill: PALETTE.muted }}
+              tickLine={false}
+              axisLine={false}
+              width={40}
+              domain={[0, 100]}
+            />
+            <Tooltip content={<GlassTooltip />} formatter={(v: number) => [`${v.toFixed(1)}%`]} />
+            <Area
+              type="monotone"
+              dataKey="watch"
+              name="Retention"
+              stroke={PALETTE.primary}
+              fill="url(#retentionFill)"
+              strokeWidth={2.5}
+              dot={false}
+              activeDot={{ r: 4, fill: PALETTE.primary, strokeWidth: 0 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="benchmark"
+              name="YT Average"
+              stroke={PALETTE.muted}
+              strokeDasharray="5 5"
+              strokeWidth={1.5}
+              dot={false}
+            />
+            {cliffElapsed.map(({ elapsed }, idx) => (
+              <ReferenceLine
+                key={idx}
+                x={elapsed}
+                stroke={PALETTE.violet}
+                strokeDasharray="4 4"
+                strokeWidth={1.5}
+              />
+            ))}
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
 
       {annotations.length > 0 && (
         <div className="mt-4 space-y-2">
@@ -115,13 +131,13 @@ export default function SmartRetentionChart({
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2, delay: i * 0.05, ease: "easeOut" }}
-                className="glass rounded-xl border border-red-100 p-3"
+                className="glass rounded-xl border border-violet/15 p-3"
               >
                 <div className="flex items-center gap-2">
-                  <span className="chip !bg-red-50 !text-red-700 !text-[10px]">
+                  <span className="chip !bg-lavender/60 !text-violet-deep !text-[10px]">
                     {mm}:{ss.toString().padStart(2, "0")}
                   </span>
-                  <span className="chip !bg-red-50 !text-red-700 !text-[10px]">
+                  <span className="chip !bg-lavender/60 !text-violet-deep !text-[10px]">
                     &minus;{a.drop_pct.toFixed(1)}% viewers
                   </span>
                 </div>

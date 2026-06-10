@@ -1,16 +1,24 @@
 import { useCallback, useEffect, useState } from "react";
-import { Eye, Clock, TrendingUp } from "lucide-react";
+import { TrendingDown, TrendingUp } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import api, { safeGet } from "../api/client";
 import type { YoutubeOverviewResponse, YoutubeVideoListResponse, YoutubeVideo } from "../api/youtubeTypes";
 import YoutubeDashboardLayout from "../components/youtube/YoutubeDashboardLayout";
+import { CardEmpty } from "../components/dashboard/States";
 import GlassTooltip from "../components/charts/GlassTooltip";
 import Sparkline from "../components/charts/Sparkline";
+import { PALETTE } from "../data/mock";
 
 const fmt = (n: number) => {
   if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (Math.abs(n) >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return `${Math.round(n)}`;
+};
+
+const trendPct = (arr: { v: number }[]) => {
+  if (arr.length < 2) return 0;
+  const first = arr[0].v || 1;
+  return ((arr[arr.length - 1].v - first) / Math.abs(first)) * 100;
 };
 
 export default function YoutubeDashboardPage() {
@@ -57,68 +65,108 @@ export default function YoutubeDashboardPage() {
   }));
 
   const stats = [
-    { label: "Total Views", value: fmt(totalViews), icon: Eye, spark: viewsSpark },
-    { label: "Watch Hours", value: fmt(Math.round(totalMinutes / 60)), icon: Clock, spark: watchSpark },
-    { label: "Net Subscribers", value: (totalSubs >= 0 ? "+" : "") + fmt(totalSubs), icon: TrendingUp, spark: subsSpark },
+    { label: "Total Views", value: fmt(totalViews), spark: viewsSpark, trend: trendPct(viewsSpark), color: PALETTE.violet },
+    { label: "Watch Hours", value: fmt(Math.round(totalMinutes / 60)), spark: watchSpark, trend: trendPct(watchSpark), color: PALETTE.blue },
+    { label: "Net Subscribers", value: (totalSubs >= 0 ? "+" : "") + fmt(totalSubs), spark: subsSpark, trend: trendPct(subsSpark), color: PALETTE.pink },
   ];
 
   return (
     <YoutubeDashboardLayout active="Overview" onSync={sync} syncing={syncing}>
-      <h1 className="mb-6 font-display text-2xl font-semibold tracking-tight">YouTube Overview</h1>
+      <div className="space-y-6">
+        {/* greeting */}
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
+            Your channel{" "}
+            <span className="font-serif font-normal italic text-foreground/60">at a glance.</span>
+          </h1>
+          <p className="mt-1 text-sm text-foreground/55">{days}-day window</p>
+        </div>
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        {stats.map((s) => (
-          <div key={s.label} className="card-hairline p-4">
-            <div className="flex items-center gap-2 text-xs font-medium text-foreground/55">
-              <s.icon className="h-3.5 w-3.5" /> {s.label}
-            </div>
-            <div className="num mt-2 text-2xl font-semibold">{s.value}</div>
-            <div className="mt-2 h-10">
-              <Sparkline data={s.spark} color="#dc2626" />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="card-hairline mb-6 p-4">
-        <div className="mb-3 text-sm font-medium">Daily Views — last {days} days</div>
-        {chartData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-              <YAxis tickFormatter={fmt} tick={{ fontSize: 11 }} />
-              <Tooltip content={<GlassTooltip />} />
-              <Area type="monotone" dataKey="views" stroke="#dc2626" fill="rgba(220,38,38,0.12)" strokeWidth={2} dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="flex h-48 items-center justify-center text-sm text-foreground/40">
-            No data yet — sync to pull analytics from YouTube.
-          </div>
-        )}
-      </div>
-
-      {videos.length > 0 && (
-        <div className="card-hairline p-4">
-          <div className="mb-3 text-sm font-medium">Recent Videos</div>
-          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-            {videos.map((v) => (
-              <a key={v.video_id} href="/youtube/retention" className="group block rounded-xl overflow-hidden border border-black/5 bg-white/40 hover:bg-white/70 transition">
-                <div className="relative aspect-video bg-lavender">
-                  {v.thumbnail_url && (
-                    <img src={v.thumbnail_url} alt={v.title} className="h-full w-full object-cover transition group-hover:scale-105" loading="lazy" />
-                  )}
+        {/* KPI cards */}
+        <div className="grid gap-4 sm:grid-cols-3">
+          {stats.map((k) => {
+            const up = k.trend >= 0;
+            return (
+              <div key={k.label} className="card-hairline p-5">
+                <div className="text-xs font-medium uppercase tracking-wider text-foreground/55">{k.label}</div>
+                <div className="num mt-2 text-3xl font-semibold">{k.value}</div>
+                <div className="mt-1">
+                  <span className={`flex items-center gap-1 text-xs font-medium ${up ? "text-emerald-600" : "text-rose-500"}`}>
+                    {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                    {up ? "+" : ""}{k.trend.toFixed(1)}% vs last period
+                  </span>
                 </div>
-                <div className="p-2">
-                  <p className="line-clamp-2 text-xs font-medium leading-snug">{v.title}</p>
-                  <p className="mt-1 text-[10px] text-foreground/50">{fmt(v.view_count)} views</p>
+                <div className="mt-3 h-10">
+                  <Sparkline data={k.spark} color={k.color} />
                 </div>
-              </a>
-            ))}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* daily views */}
+        <div className="card-hairline p-5">
+          <div>
+            <h2 className="text-lg font-semibold">Daily views</h2>
+            <p className="text-xs text-foreground/55">Views per day over the last {days} days</p>
+          </div>
+          <div className="mt-4 h-72">
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 8, right: 6, bottom: 0, left: -14 }}>
+                  <defs>
+                    <linearGradient id="ytViewsFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={PALETTE.violet} stopOpacity={0.35} />
+                      <stop offset="100%" stopColor={PALETTE.violet} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke={PALETTE.grid} vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: PALETTE.muted }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={28} />
+                  <YAxis tick={{ fontSize: 10, fill: PALETTE.muted }} tickLine={false} axisLine={false} width={40} tickFormatter={(v) => fmt(v as number)} />
+                  <Tooltip cursor={{ stroke: PALETTE.violet, strokeWidth: 1 }} content={<GlassTooltip />} />
+                  <Area type="monotone" dataKey="views" stroke={PALETTE.primary} strokeWidth={2.5} fill="url(#ytViewsFill)" dot={false} activeDot={{ r: 4, fill: PALETTE.primary, strokeWidth: 0 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="grid h-full place-items-center text-sm text-foreground/50">
+                No data yet — hit Sync to pull analytics from YouTube.
+              </div>
+            )}
           </div>
         </div>
-      )}
+
+        {/* recent videos */}
+        {videos.length > 0 && (
+          <div className="card-hairline p-5">
+            <h2 className="text-lg font-semibold">
+              Recent videos <span className="font-serif font-normal italic text-foreground/55">this channel</span>
+            </h2>
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              {videos.map((v) => (
+                <a
+                  key={v.video_id}
+                  href="/youtube/retention"
+                  className="group overflow-hidden rounded-2xl text-left ring-1 ring-black/5 transition hover:ring-violet/40"
+                >
+                  <div className="relative aspect-video overflow-hidden bg-lavender">
+                    {v.thumbnail_url && (
+                      <img src={v.thumbnail_url} alt={v.title} className="h-full w-full object-cover transition group-hover:scale-105" loading="lazy" />
+                    )}
+                  </div>
+                  <div className="p-2">
+                    <p className="line-clamp-2 text-xs font-medium leading-snug">{v.title}</p>
+                    <p className="mt-1 text-[10px] text-foreground/50"><span className="num">{fmt(v.view_count)}</span> views</p>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!overview && videos.length === 0 && (
+          <CardEmpty label="No YouTube data yet — hit Sync to pull analytics from your channel." />
+        )}
+      </div>
     </YoutubeDashboardLayout>
   );
 }

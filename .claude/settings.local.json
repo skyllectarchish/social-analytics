@@ -219,7 +219,7 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(git checkout *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
       "PowerShell(npx tsc -b)",
       "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe -c \"from app.database import get_client; from app.models.queries import GET_ALL_INSTAGRAM_TOKENS; rows = get_client\\(\\).query\\(GET_ALL_INSTAGRAM_TOKENS\\).result_rows; print\\(len\\(rows\\), 'connected account\\(s\\)'\\); [print\\(str\\(r[0]\\)[:8], r[1], 'expires', r[3]\\) for r in rows]\")",
       "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe -m app.jobs.account_sync)",
@@ -266,7 +266,17 @@
       "PowerShell(& \".\\\\venv\\\\Scripts\\\\python.exe\" -c \"import apscheduler; print\\('apscheduler', apscheduler.__version__\\)\"; $p = \\(Get-NetTCPConnection -State Listen -LocalPort 8000 -ErrorAction SilentlyContinue\\).OwningProcess | Select-Object -First 1; if \\($p\\) { Stop-Process -Id $p -Force -Confirm:$false; \"old backend stopped \\(pid $p\\)\" })",
       "PowerShell($ngrok = \\(Get-Process -Name ngrok -ErrorAction SilentlyContinue | Measure-Object\\).Count; $v = if \\(Get-NetTCPConnection -State Listen -LocalPort 5173 -ErrorAction SilentlyContinue\\) { \"up\" } else { \"DOWN\" }; $b = if \\(Get-NetTCPConnection -State Listen -LocalPort 8000 -ErrorAction SilentlyContinue\\) { \"up\" } else { \"DOWN\" }; \"ngrok procs: $ngrok | vite: $v | backend: $b\")",
       "PowerShell(Start-Sleep -Seconds 4; curl.exe -s -o NUL -w \"tunnel -> http_code=%{http_code}\" -H \"ngrok-skip-browser-warning: 1\" https://zodiac-hazily-overgrown.ngrok-free.dev/)",
-      "PowerShell(try { \\(Invoke-RestMethod -Uri 'http://127.0.0.1:4040/api/tunnels' -ErrorAction Stop\\).tunnels | Select-Object name,public_url,@{n='forwards_to';e={$_.config.addr}} | Format-List } catch { \"Could not reach ngrok local API \\(4040\\): $\\($_.Exception.Message\\)\" })"
+      "PowerShell(try { \\(Invoke-RestMethod -Uri 'http://127.0.0.1:4040/api/tunnels' -ErrorAction Stop\\).tunnels | Select-Object name,public_url,@{n='forwards_to';e={$_.config.addr}} | Format-List } catch { \"Could not reach ngrok local API \\(4040\\): $\\($_.Exception.Message\\)\" })",
+      "PowerShell(try { Get-Content \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\.claude\\\\settings.local.json\" -Raw | ConvertFrom-Json | Out-Null; \"VALID JSON\" } catch { \"INVALID: $\\($_.Exception.Message\\)\" })",
+      "mcp__ide__getDiagnostics",
+      "Bash(Select-Object -First 20)",
+      "Bash(Format-Table FullName)",
+      "Bash(awk '/async def stream_digest/,/^@router|^async def|^def / {print NR\": \"$0}' backend/app/ai/router.py)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend\\\\app\" -Directory | ForEach-Object { $_.Name })",
+      "Bash(python3 *)",
+      "PowerShell(cd C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend; $py = Get-Command py,python3,python -ErrorAction SilentlyContinue | Select-Object -First 1; if \\($py\\) { & $py.Source -m py_compile app/instagram/router.py; if \\($?\\) { \"py_compile OK \\($\\($py.Name\\)\\)\" } } else { \"no python interpreter found on PATH\" })",
+      "PowerShell(cd C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\frontend; npx tsc -b --pretty false 2>&1 | Select-Object -First 60; \"exit: $LASTEXITCODE\")",
+      "PowerShell(cd C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\frontend; npx tsc -b --pretty false 2>&1 | Select-Object -First 80; \"exit: $LASTEXITCODE\")"
     ]
   }
 }

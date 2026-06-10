@@ -5,6 +5,7 @@ import type { RetentionResponse, YoutubeVideo, YoutubeVideoListResponse } from "
 import YoutubeDashboardLayout from "../components/youtube/YoutubeDashboardLayout";
 import VideoCard from "../components/youtube/VideoCard";
 import SmartRetentionChart from "../components/youtube/SmartRetentionChart";
+import { ChartSkeleton } from "../components/dashboard/Skeletons";
 
 export default function YoutubeRetentionPage() {
   const [syncing, setSyncing] = useState(false);
@@ -45,9 +46,18 @@ export default function YoutubeRetentionPage() {
 
   return (
     <YoutubeDashboardLayout active="Retention Studio" onSync={sync} syncing={syncing}>
-      <h1 className="mb-6 font-display text-2xl font-semibold tracking-tight">Retention Studio</h1>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
+            Retention{" "}
+            <span className="font-serif font-normal italic text-foreground/60">studio.</span>
+          </h1>
+          <p className="mt-1 text-sm text-foreground/55">
+            Pick a video to see where viewers drop off
+          </p>
+        </div>
 
-      <div className="flex gap-4 min-h-[600px]">
+        <div className="flex gap-4 min-h-[600px]">
         <div className="w-72 shrink-0 flex flex-col gap-2">
           <input
             type="search"
@@ -90,29 +100,24 @@ export default function YoutubeRetentionPage() {
             </div>
           )}
 
-          {selected && loadingRetention && (
-            <div className="flex h-full items-center justify-center">
-              <div className="text-center">
-                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[#dc2626] border-t-transparent" />
-                <p className="mt-3 text-sm text-foreground/50">Loading retention data…</p>
-              </div>
-            </div>
-          )}
+          {selected && loadingRetention && <ChartSkeleton />}
 
           {selected && !loadingRetention && retention && (
             <div>
-              <div className="mb-4">
-                <h2 className="font-medium leading-snug line-clamp-2">{selected.title}</h2>
-                <p className="mt-0.5 text-xs text-foreground/50">
+              <div>
+                <h2 className="text-lg font-semibold leading-snug line-clamp-2">{selected.title}</h2>
+                <p className="text-xs text-foreground/55">
                   {selected.video_format.replace("_", " ")} &middot; {Math.round(selected.duration_seconds / 60)} min
                 </p>
               </div>
-              <SmartRetentionChart
-                curve={retention.curve}
-                annotations={retention.annotations}
-                annotationsPending={retention.annotations_pending}
-                durationSeconds={selected.duration_seconds}
-              />
+              <div className="mt-4">
+                <SmartRetentionChart
+                  curve={retention.curve}
+                  annotations={retention.annotations}
+                  annotationsPending={retention.annotations_pending}
+                  durationSeconds={selected.duration_seconds}
+                />
+              </div>
             </div>
           )}
 
@@ -121,6 +126,7 @@ export default function YoutubeRetentionPage() {
               No retention data found for this video. It may have fewer than 1,000 views.
             </div>
           )}
+        </div>
         </div>
       </div>
     </YoutubeDashboardLayout>
