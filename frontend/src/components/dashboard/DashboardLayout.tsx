@@ -4,7 +4,6 @@ import {
   ArrowUpRight,
   Bot,
   Calendar,
-  GitCompareArrows,
   Dna,
   Film,
   FlaskConical,
@@ -25,11 +24,6 @@ import {
 import axios from "axios";
 import { motion } from "framer-motion";
 import { useAuth } from "../../hooks/useAuth";
-import {
-  COMPARE_OPTIONS,
-  usePeriodComparator,
-  type CompareMode,
-} from "../../context/PeriodComparatorContext";
 import api, { safeGet } from "../../api/client";
 import type { InstagramProfile, QuotaResponse } from "../../api/types";
 import { avatar } from "../../data/mock";
@@ -50,21 +44,16 @@ const NAV: { label: string; icon: LucideIcon; to: string }[] = [
 function SidebarInner({
   username,
   active,
-  quota,
-  connected,
-  onDisconnect,
+  avatarUrl,
   variant = "desktop",
 }: {
   username: string;
   active: string;
-  quota: Quota;
-  connected: boolean | null;
-  onDisconnect: () => void;
+  avatarUrl: string;
   // Desktop sidebar and mobile drawer are mounted at the same time — the FLIP
   // indicator needs a distinct layoutId per instance or it animates across them.
   variant?: "desktop" | "mobile";
 }) {
-  const pct = quota && quota.limit > 0 ? Math.min(100, Math.round((quota.used / quota.limit) * 100)) : 0;
   return (
     <div className="flex h-full w-64 flex-col gap-1 p-4">
       <div className="flex items-center justify-between px-2 pb-3">
@@ -77,21 +66,12 @@ function SidebarInner({
       </div>
 
       <div className="glass mb-3 flex items-center gap-3 rounded-2xl p-3">
-        <img src={avatar(47)} className="h-9 w-9 rounded-full ring-2 ring-white" alt="" />
+        <img src={avatarUrl} className="h-9 w-9 rounded-full object-cover ring-2 ring-white" alt="" />
         <div className="min-w-0 text-xs">
           <div className="truncate font-semibold">@{username}</div>
           <div className="text-foreground/55">Creator · Pro</div>
         </div>
       </div>
-
-      {connected && (
-        <button
-          onClick={onDisconnect}
-          className="mb-2 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-foreground/55 transition hover:bg-white/60 hover:text-red-500"
-        >
-          <Unplug className="h-3.5 w-3.5" /> Disconnect Instagram
-        </button>
-      )}
 
       <nav className="space-y-1">
         {NAV.map((item) => {
@@ -141,23 +121,6 @@ function SidebarInner({
           YouTube
         </Link>
       </div>
-
-      <div className="mt-auto">
-        <div className="card-hairline p-4">
-          <div className="flex items-center gap-2 text-xs font-medium text-violet-deep">
-            <Zap className="h-3.5 w-3.5" /> AI quota
-          </div>
-          <div className="num mt-2 text-lg font-semibold">
-            {quota ? `${quota.used} / ${quota.limit}` : "—"}
-          </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-lavender">
-            <div className="h-full rounded-full bg-gradient-to-r from-violet to-pink-500" style={{ width: `${pct}%` }} />
-          </div>
-          <button className="mt-3 w-full rounded-full bg-ink py-1.5 text-xs font-medium text-white">
-            Upgrade
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -182,7 +145,6 @@ export default function DashboardLayout({
   fill?: boolean;
 }) {
   const { user, logout } = useAuth();
-  const { compareMode, setCompareMode, customRange, setCustomRange, calendarPreset } = usePeriodComparator();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -190,7 +152,9 @@ export default function DashboardLayout({
   const [quota, setQuota] = useState<Quota>(null);
   // null = unknown/loading, true = connected, false = no IG account linked
   const [connected, setConnected] = useState<boolean | null>(null);
+  const [profile, setProfile] = useState<InstagramProfile | null>(null);
   const username = user?.username ?? "creator";
+  const avatarUrl = profile?.profile_picture_url || avatar(47);
 
   async function disconnectInstagram() {
     if (!window.confirm("Disconnect this Instagram account? You'll need to reconnect to see analytics again.")) return;
@@ -228,7 +192,10 @@ export default function DashboardLayout({
     // which we ignore so the banner doesn't flash on a blip).
     api
       .get<InstagramProfile>("/instagram/profile")
-      .then(() => setConnected(true))
+      .then((res) => {
+        setProfile(res.data);
+        setConnected(true);
+      })
       .catch((err) => {
         if (axios.isAxiosError(err) && err.response?.status === 404) setConnected(false);
       });
@@ -244,7 +211,7 @@ export default function DashboardLayout({
 
       {/* desktop sidebar */}
       <aside className="no-print fixed inset-y-0 left-0 z-30 hidden md:block">
-        <SidebarInner username={username} active={active} quota={quota} connected={connected} onDisconnect={disconnectInstagram} />
+        <SidebarInner username={username} active={active} avatarUrl={avatarUrl} />
       </aside>
 
       {/* mobile drawer */}
@@ -255,7 +222,7 @@ export default function DashboardLayout({
             <button onClick={() => setMobileOpen(false)} className="absolute right-3 top-3 z-10 rounded-full p-1.5 text-foreground/60 hover:bg-black/5">
               <X className="h-5 w-5" />
             </button>
-            <SidebarInner username={username} active={active} quota={quota} connected={connected} onDisconnect={disconnectInstagram} variant="mobile" />
+            <SidebarInner username={username} active={active} avatarUrl={avatarUrl} variant="mobile" />
           </div>
         </div>
       )}
@@ -267,12 +234,11 @@ export default function DashboardLayout({
               <Menu className="h-5 w-5" />
             </button>
             <div className="ml-auto flex items-center gap-2">
-              <div className={`chip ${calendarPreset ? "opacity-50" : ""}`} title={calendarPreset ? "Window is set by the calendar comparison preset" : undefined}>
+              <div className="chip">
                 <Calendar className="h-3.5 w-3.5" />
                 <select
                   className="bg-transparent text-xs outline-none"
                   value={days}
-                  disabled={calendarPreset}
                   onChange={(e) => onDaysChange(Number(e.target.value))}
                 >
                   <option value={7}>7 days</option>
@@ -281,42 +247,11 @@ export default function DashboardLayout({
                   <option value={365}>1 year</option>
                 </select>
               </div>
-              <div className="chip" title="Overlay a prior period for comparison">
-                <GitCompareArrows className="h-3.5 w-3.5" />
-                <select
-                  className="max-w-[110px] bg-transparent text-xs outline-none"
-                  value={compareMode}
-                  onChange={(e) => setCompareMode(e.target.value as CompareMode)}
-                >
-                  {COMPARE_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-              {compareMode === "custom" && (
-                <div className="chip hidden items-center gap-1 lg:flex">
-                  <input
-                    type="date"
-                    className="bg-transparent text-xs outline-none"
-                    value={customRange.from}
-                    onChange={(e) => setCustomRange({ ...customRange, from: e.target.value })}
-                    aria-label="Compare from"
-                  />
-                  <span className="text-foreground/40">→</span>
-                  <input
-                    type="date"
-                    className="bg-transparent text-xs outline-none"
-                    value={customRange.to}
-                    onChange={(e) => setCustomRange({ ...customRange, to: e.target.value })}
-                    aria-label="Compare to"
-                  />
-                </div>
-              )}
               <button onClick={onSync} disabled={syncing} className="chip cursor-pointer disabled:opacity-60">
                 <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} /> Sync
               </button>
               <button className="chip !bg-gradient-to-r !from-violet !to-pink-500 !text-white">
-                <Zap className="h-3.5 w-3.5" /> {quota ? `${Math.max(0, quota.limit - quota.used)} / ${quota.limit}` : "AI"}
+                <Zap className="h-3.5 w-3.5" /> {quota ? `${quota.used} / ${quota.limit}` : "AI"}
               </button>
               <div ref={profileRef} className="relative">
                 <button
@@ -325,7 +260,7 @@ export default function DashboardLayout({
                   aria-haspopup="menu"
                   aria-expanded={profileOpen}
                 >
-                  <img src={avatar(47)} className="h-9 w-9 rounded-full ring-2 ring-white" alt="" />
+                  <img src={avatarUrl} className="h-9 w-9 rounded-full object-cover ring-2 ring-white" alt="" />
                 </button>
                 {profileOpen && (
                   <motion.div

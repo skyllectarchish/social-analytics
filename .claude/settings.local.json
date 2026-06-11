@@ -276,7 +276,8 @@
       "Bash(python3 *)",
       "PowerShell(cd C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend; $py = Get-Command py,python3,python -ErrorAction SilentlyContinue | Select-Object -First 1; if \\($py\\) { & $py.Source -m py_compile app/instagram/router.py; if \\($?\\) { \"py_compile OK \\($\\($py.Name\\)\\)\" } } else { \"no python interpreter found on PATH\" })",
       "PowerShell(cd C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\frontend; npx tsc -b --pretty false 2>&1 | Select-Object -First 60; \"exit: $LASTEXITCODE\")",
-      "PowerShell(cd C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\frontend; npx tsc -b --pretty false 2>&1 | Select-Object -First 80; \"exit: $LASTEXITCODE\")"
+      "PowerShell(cd C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\frontend; npx tsc -b --pretty false 2>&1 | Select-Object -First 80; \"exit: $LASTEXITCODE\")",
+      "Bash(npx tsc *)"
     ]
   }
 }
