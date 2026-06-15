@@ -82,20 +82,51 @@ def _parse_posts(payload: Any) -> list[dict[str, Any]]:
     return out
 
 
-def _parse_stories(payload: Any) -> list[dict[str, Any]]:
-    """content/stories.json → [{taken_at, caption}]"""
-    if not isinstance(payload, dict) or "ig_stories" not in payload:
+def _parse_stories(payload: Any, *, require_key: bool = True) -> list[dict[str, Any]]:
+    """content/stories.json → [{taken_at, caption}].
+
+    Instagram has shipped two shapes across export versions: a flat one
+    ({"ig_stories": [{creation_timestamp, title}]}) and a post-style one
+    where each entry wraps a `media` list (identical to posts_*.json). Both
+    are handled here.
+
+    ``require_key=True`` (the shape-detection fallback) only accepts the
+    dict-with-``ig_stories`` form: a bare top-level list is indistinguishable
+    from posts_*.json, so we trust it only when the *filename* already told us
+    this is the stories file (``require_key=False``).
+    """
+    if isinstance(payload, dict):
+        inner = payload.get("ig_stories")
+        if inner is None:
+            inner = payload.get("stories")
+        if inner is None:
+            return []
+        payload = inner
+    elif require_key:
         return []
+
+    if not isinstance(payload, list):
+        return []
+
     out: list[dict[str, Any]] = []
-    for entry in payload.get("ig_stories") or []:
+    for entry in payload:
         if not isinstance(entry, dict):
             continue
-        taken_at = _ts_to_dt(entry.get("creation_timestamp"))
+        # Flat entry, or post-style {media: [{creation_timestamp, title}]}.
+        media = entry.get("media")
+        if isinstance(media, list) and media:
+            first = media[0] or {}
+            ts = entry.get("creation_timestamp") or first.get("creation_timestamp")
+            caption = entry.get("title") or first.get("title") or ""
+        else:
+            ts = entry.get("creation_timestamp")
+            caption = entry.get("title") or ""
+        taken_at = _ts_to_dt(ts)
         if taken_at is None:
             continue
         out.append({
             "taken_at": taken_at,
-            "caption": fix_mojibake(str(entry.get("title") or ""))[:2200],
+            "caption": fix_mojibake(str(caption))[:2200],
         })
     return out
 
@@ -124,17 +155,39 @@ def _parse_followers(payload: Any) -> list[dict[str, Any]]:
 
 # --- Entry points ----------------------------------------------------------
 
-def classify_and_parse(raw: bytes) -> tuple[str, list[dict[str, Any]]]:
-    """Parse one JSON file and classify it by shape.
+def classify_and_parse(raw: bytes, filename: str = "") -> tuple[str, list[dict[str, Any]]]:
+    """Parse one JSON file and classify it.
 
     Returns (kind, rows) where kind is 'posts' | 'stories' | 'followers' |
     'unknown'. Never raises on malformed content — returns ('unknown', []).
+
+    The filename is the primary signal when available: stories_*.json and
+    posts_*.json share an identical shape, so shape detection alone routes
+    post-shaped stories into 'posts'. When the filename is unhelpful we fall
+    back to shape detection (stricter, to avoid that same collision).
     """
     try:
         payload = json.loads(raw.decode("utf-8", errors="replace"))
     except (ValueError, UnicodeDecodeError):
         return "unknown", []
 
+    lowered = filename.lower()
+    if "stories" in lowered or "story" in lowered:
+        rows = _parse_stories(payload, require_key=False)
+        if rows:
+            return "stories", rows
+    elif "followers" in lowered:
+        rows = _parse_followers(payload)
+        if rows:
+            return "followers", rows
+    elif "posts" in lowered:
+        rows = _parse_posts(payload)
+        if rows:
+            return "posts", rows
+
+    # Filename gave no usable hint (or didn't match its expected shape) —
+    # fall back to shape detection. _parse_stories requires the ig_stories
+    # key here so a bare posts list isn't misread as stories.
     stories = _parse_stories(payload)
     if stories:
         return "stories", stories
@@ -147,13 +200,19 @@ def classify_and_parse(raw: bytes) -> tuple[str, list[dict[str, Any]]]:
     return "unknown", []
 
 
-def extract_from_zip(blob: bytes) -> dict[str, list[dict[str, Any]]]:
+def _extract_zip(blob: bytes) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]]]:
     """Walk a ZIP export, parse every plausible JSON file, merge by kind.
+
+    Returns (results, diag). ``diag`` records every eligible JSON file and how
+    it was classified — including files that yielded 0 rows or 'unknown' — so
+    a caller can surface *why* a kind came back empty (e.g. a stories file
+    being read but routed to 'posts').
 
     Media files (the bulk of the archive) are skipped by extension and the
     per-file size cap, so even multi-GB exports only have their JSON read.
     """
     results: dict[str, list[dict[str, Any]]] = {"posts": [], "stories": [], "followers": []}
+    diag: list[dict[str, Any]] = []
     with zipfile.ZipFile(io.BytesIO(blob)) as zf:
         for info in zf.infolist():
             name = info.filename
@@ -167,19 +226,36 @@ def extract_from_zip(blob: bytes) -> dict[str, list[dict[str, Any]]]:
                 raw = zf.read(info)
             except (zipfile.BadZipFile, OSError):
                 continue
-            kind, rows = classify_and_parse(raw)
+            kind, rows = classify_and_parse(raw, name)
+            logger.info("archive import: %s → %d %s rows", name, len(rows), kind)
+            if len(diag) < 100:
+                diag.append({"file": name.rsplit("/", 1)[-1], "kind": kind, "rows": len(rows)})
             if kind in results and rows:
-                logger.info("archive import: %s → %d %s rows", name, len(rows), kind)
                 results[kind].extend(rows)
+    return results, diag
+
+
+def extract_from_zip(blob: bytes) -> dict[str, list[dict[str, Any]]]:
+    """Back-compat wrapper: kind-keyed rows only (drops the per-file diag)."""
+    results, _ = _extract_zip(blob)
     return results
+
+
+def extract_verbose(
+    filename: str, blob: bytes,
+) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]]]:
+    """Like ``extract`` but also returns per-file classification diagnostics."""
+    if filename.lower().endswith(".zip") or blob[:2] == b"PK":
+        return _extract_zip(blob)
+    kind, rows = classify_and_parse(blob, filename)
+    out: dict[str, list[dict[str, Any]]] = {"posts": [], "stories": [], "followers": []}
+    if kind in out:
+        out[kind] = rows
+    diag = [{"file": filename.rsplit("/", 1)[-1] or filename, "kind": kind, "rows": len(rows)}]
+    return out, diag
 
 
 def extract(filename: str, blob: bytes) -> dict[str, list[dict[str, Any]]]:
     """Parse one uploaded file — ZIP or single JSON — into kind-keyed rows."""
-    if filename.lower().endswith(".zip") or blob[:2] == b"PK":
-        return extract_from_zip(blob)
-    kind, rows = classify_and_parse(blob)
-    out: dict[str, list[dict[str, Any]]] = {"posts": [], "stories": [], "followers": []}
-    if kind in out:
-        out[kind] = rows
-    return out
+    results, _ = extract_verbose(filename, blob)
+    return results

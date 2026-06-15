@@ -277,7 +277,31 @@
       "PowerShell(cd C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\backend; $py = Get-Command py,python3,python -ErrorAction SilentlyContinue | Select-Object -First 1; if \\($py\\) { & $py.Source -m py_compile app/instagram/router.py; if \\($?\\) { \"py_compile OK \\($\\($py.Name\\)\\)\" } } else { \"no python interpreter found on PATH\" })",
       "PowerShell(cd C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\frontend; npx tsc -b --pretty false 2>&1 | Select-Object -First 60; \"exit: $LASTEXITCODE\")",
       "PowerShell(cd C:\\\\Users\\\\Admin\\\\WebstormProjects\\\\social-analytics\\\\frontend; npx tsc -b --pretty false 2>&1 | Select-Object -First 80; \"exit: $LASTEXITCODE\")",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Skill(run)",
+      "Bash(command -v chromium-cli)",
+      "Bash(npm -v)",
+      "PowerShell(cd frontend; npx tsc -b --noEmit; if \\($?\\) { \"FRONTEND TYPECHECK OK\" }; cd ..\\\\backend; $py = \\(Get-Command py -ErrorAction SilentlyContinue\\); if \\($py\\) { py -c \"import ast; [ast.parse\\(open\\(f, encoding='utf-8'\\).read\\(\\)\\) for f in ['app/instagram/router.py','app/instagram/schemas.py','app/repositories/archive_repo.py','app/models/queries.py']]; print\\('backend syntax OK'\\)\" } else { \"no py launcher\" })",
+      "Bash(py -c \"from app.instagram import router, archive; print\\('backend imports OK'\\)\")",
+      "Bash(py diag_archive.py)",
+      "Bash(py -c ' *)",
+      "Bash(py run_migrations.py)",
+      "PowerShell($conn = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue; if \\($conn\\) { $conn | ForEach-Object { $p = Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue; \"PID $\\($_.OwningProcess\\) : $\\($p.ProcessName\\) : $\\($p.Path\\)\" } } else { \"Nothing listening on port 8000\" })",
+      "PowerShell($cl = \\(Get-CimInstance Win32_Process -Filter \"ProcessId = 17636\"\\).CommandLine; \"CommandLine: $cl\"; \"ParentPID: \" + \\(Get-CimInstance Win32_Process -Filter \"ProcessId = 17636\"\\).ParentProcessId)",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8000/api/instagram/stories/snapshot-status\" -UseBasicParsing -ErrorAction Stop; \"Status: $\\($r.StatusCode\\)\" } catch { \"Status: $\\($_.Exception.Response.StatusCode.value__\\) \\(401/403 = route exists + auth-guarded; 404 = missing\\)\" })",
+      "PowerShell($conn = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue; if \\($conn\\) { $p = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue; \"Listening - PID $\\($conn.OwningProcess\\) \\($\\($p.ProcessName\\)\\)\" } else { \"Nothing listening on port 8000 - backend is down\" })",
+      "PowerShell($cl = \\(Get-CimInstance Win32_Process -Filter \"ProcessId = 13172\"\\).CommandLine; \"CommandLine: $cl\"; try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8000/api/instagram/stories/snapshot-status\" -UseBasicParsing -ErrorAction Stop; \"Probe: $\\($r.StatusCode\\)\" } catch { \"Probe: $\\($_.Exception.Response.StatusCode.value__\\) \\(401 = route exists\\)\" })",
+      "Bash(py -c \"from app.ai import router; from app.main import app; print\\('backend imports OK; /api/ai/hooks present:', '/api/ai/hooks' in [r.path for r in router.router.routes]\\)\")",
+      "WebSearch",
+      "WebFetch(domain:apify.com)",
+      "WebFetch(domain:sociavault.com)",
+      "WebFetch(domain:buffer.com)",
+      "Bash(py scripts/seed_trending_audio.py)",
+      "Bash(ls \"/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe\")",
+      "Bash(ls \"/c/Program Files/Google/Chrome/Application/chrome.exe\")",
+      "Bash(npm i *)",
+      "Bash(node verify_copilot.mjs)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

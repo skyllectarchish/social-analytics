@@ -23,6 +23,13 @@ scikit-learn>=1.4.0
 # above — the two are independent.
 ollama>=0.4.0
 
+# --- OPTIONAL / UNOFFICIAL — Instagram private-API trending audio ---
+# Only needed if IG_TRENDING_ENABLED=true (off by default). Powers the real
+# in-app trending-audio list via the reverse-engineered mobile API. This
+# VIOLATES Meta's ToS and risks account bans — see app/instagram/trending_live.py.
+# The app starts fine without it installed.
+instagrapi>=2.1.0
+
 # --- Tier 2 — in-process scheduler for batch jobs ---
 # Drives competitor_sync (daily), sentiment_batch (hourly), and
 # topic_clustering (weekly) via main.py's FastAPI lifespan. Can be disabled

@@ -149,6 +149,31 @@ export default function ImportPage() {
                 {result.followers_imported} followers.
               </p>
             )}
+            {result && result.files.length > 0 && (
+              <details className="mt-2 rounded-lg bg-foreground/[0.03] px-3 py-2 text-xs" open={result.stories_imported === 0}>
+                <summary className="cursor-pointer font-medium text-foreground/70">
+                  Per-file breakdown ({result.files.length})
+                </summary>
+                <ul className="mt-2 space-y-1 font-mono text-[11px] text-foreground/65">
+                  {result.files.map((f, i) => {
+                    const looksStory = /stor(y|ies)/i.test(f.file);
+                    const misrouted = looksStory && f.kind !== "stories";
+                    return (
+                      <li
+                        key={`${f.file}-${i}`}
+                        className={`flex items-center justify-between gap-3 ${misrouted ? "text-amber-600" : ""}`}
+                      >
+                        <span className="truncate">{f.file}</span>
+                        <span className="shrink-0">
+                          {f.kind} · {f.rows}
+                          {misrouted ? " ⚠" : ""}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </details>
+            )}
             {error && (
               <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600">{error}</p>
             )}

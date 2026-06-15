@@ -39,27 +39,39 @@ async def snapshot_user_stories(client, user_id: str, ig_user_id: str, token: st
     """
     from ..instagram import service
 
-    stories = await service.fetch_active_stories(ig_user_id, token)
-    if not stories:
-        return 0
+    try:
+        stories = await service.fetch_active_stories(ig_user_id, token)
+        stored = 0
+        batch: dict = {}
+        if stories:
+            stored = story_repo.bulk_insert_stories(client, user_id, ig_user_id, stories)
 
-    stored = story_repo.bulk_insert_stories(client, user_id, ig_user_id, stories)
+            story_tuples = [(s.get("id", ""), "STORY") for s in stories if s.get("id")]
+            batch = await service.fetch_media_insights_batch(
+                story_tuples, token, fetch_reach_breakdown=False,
+            )
+            for ig_media_id, raw_metrics in batch.items():
+                metric_rows = [
+                    {
+                        "metric_name": m["name"],
+                        "metric_value": m.get("values", [{}])[0].get("value", 0),
+                    }
+                    for m in raw_metrics
+                    if m.get("name")
+                ]
+                insights_repo.bulk_upsert_media_insights(client, user_id, ig_media_id, metric_rows)
+    except Exception as exc:
+        # Record the failure (so the Stories page can surface it) then re-raise
+        # so the caller's per-user isolation logs it, exactly as before.
+        story_repo.record_snapshot_run(
+            client, user_id, status="failed", stories_captured=0, error=str(exc),
+        )
+        raise
 
-    story_tuples = [(s.get("id", ""), "STORY") for s in stories if s.get("id")]
-    batch = await service.fetch_media_insights_batch(
-        story_tuples, token, fetch_reach_breakdown=False,
+    # A run that found nothing live still counts as a healthy heartbeat.
+    story_repo.record_snapshot_run(
+        client, user_id, status="completed", stories_captured=stored,
     )
-    for ig_media_id, raw_metrics in batch.items():
-        metric_rows = [
-            {
-                "metric_name": m["name"],
-                "metric_value": m.get("values", [{}])[0].get("value", 0),
-            }
-            for m in raw_metrics
-            if m.get("name")
-        ]
-        insights_repo.bulk_upsert_media_insights(client, user_id, ig_media_id, metric_rows)
-
     logger.info(
         "story_snapshot: stored %d stories (+insights for %d) for user %s",
         stored, len(batch), user_id,

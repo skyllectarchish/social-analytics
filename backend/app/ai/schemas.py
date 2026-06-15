@@ -164,6 +164,24 @@ class ReelScriptResponse(BaseModel):
     rationale: str = ""
 
 
+# --- Content factory: viral hooks ---------------------------------------
+
+class HooksRequest(BaseModel):
+    topic: str = Field(min_length=1, max_length=300)
+    summary: str | None = Field(default=None, max_length=2000)
+
+
+class HookItem(BaseModel):
+    text: str
+    angle: str = ""              # curiosity gap | bold claim | question | …
+    rationale: str = ""
+
+
+class HooksResponse(BaseModel):
+    topic: str
+    hooks: list[HookItem] = Field(default_factory=list)
+
+
 # --- Content factory: repurposer -----------------------------------------
 
 class RepurposeRequest(BaseModel):
@@ -225,7 +243,7 @@ class QuotaResponse(BaseModel):
 class FeedbackRequest(BaseModel):
     feature: Literal[
         "digest", "ideas", "diagnostic", "caption", "comment_reply",
-        "reel_script", "repurpose", "question_mining",
+        "reel_script", "repurpose", "question_mining", "hooks",
     ]
     ref_id: str = Field(min_length=1, max_length=256)
     rating: Literal["up", "down"]

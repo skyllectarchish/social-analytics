@@ -272,13 +272,21 @@ def start_scheduler() -> None:
     # Story analytics retention — capture live stories (and their insights)
     # before the 24h expiry. Interval-based so each story gets several
     # snapshots over its lifetime; ReplacingMergeTree keeps the freshest.
+    #
+    # Unlike the other interval jobs we DO fire shortly after startup: a story
+    # is gone forever 24h after posting, and every restart resets the interval
+    # timer, so without a catch-up run frequent deploys could let a story's
+    # whole life fall between snapshots. The short delay lets the API settle
+    # first; the misfire grace + coalesce handle a sleeping host.
+    from datetime import datetime, timedelta, timezone
+    story_first_run = datetime.now(timezone.utc) + timedelta(seconds=120)
     sch.add_job(
         _run_story_snapshot,
         IntervalTrigger(hours=settings.scheduler_story_snapshot_hours),
         id="story_snapshot",
         name="Snapshot live stories + insights",
         replace_existing=True,
-        next_run_time=None,
+        next_run_time=story_first_run,
     )
 
     # Comment-to-DM funnels — frequent because funnel latency is the feature

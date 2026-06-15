@@ -23,6 +23,8 @@ from ..repositories import instagram_repo
 from . import client as ai_client
 from . import quota as quota_service
 from .prompts import (
+    HOOKS_OUTPUT_SCHEMA,
+    HOOKS_SYSTEM,
     QUESTION_MINING_OUTPUT_SCHEMA,
     QUESTION_MINING_SYSTEM,
     REEL_SCRIPT_OUTPUT_SCHEMA,
@@ -30,6 +32,7 @@ from .prompts import (
     REPURPOSE_OUTPUT_SCHEMA,
     REPURPOSE_SYSTEM,
     redact_pii,
+    render_hooks_user_block,
     render_question_mining_user_block,
     render_reel_script_user_block,
     render_repurpose_user_block,
@@ -37,6 +40,8 @@ from .prompts import (
 )
 from .schemas import (
     DemandTopic,
+    HookItem,
+    HooksResponse,
     QuestionMiningResponse,
     ReelScriptBeat,
     ReelScriptResponse,
@@ -160,6 +165,52 @@ async def synthesize_reel_script(
     )
     quota_service.record_call(client, user_id=user_id, feature="reel_script", result=result)
     return response
+
+
+# --- 1b. Viral hooks -----------------------------------------------------
+
+async def synthesize_hooks(
+    client: Client, *, user_id: str, topic: str, summary: str | None,
+) -> HooksResponse:
+    """Topic → a set of distinct scroll-stopping hook options, modeled on the
+    creator's top reels. Caller has enforced quota."""
+    profile = _require_profile(client, user_id)
+    ctx = {
+        "topic": redact_pii(topic.strip()),
+        "summary": redact_pii((summary or "").strip())[:2000],
+        "top_reel_captions": _load_voice_corpus(client, user_id, profile.ig_user_id, "REELS"),
+    }
+    result = await ai_client.synthesize(
+        model=ai_client.MODEL_FOR_CONTENT_FACTORY,
+        system=[{"type": "text", "text": HOOKS_SYSTEM}],
+        messages=[{"role": "user", "content": (
+            "Write the hooks per the schema.\n\nDATA:\n"
+            + render_hooks_user_block(ctx)
+        )}],
+        effort=FACTORY_EFFORT,
+        max_tokens=1024,
+        stream=False,
+        output_format={"type": "json_schema", "schema": HOOKS_OUTPUT_SCHEMA},
+    )
+    payload = _parse_json_object(result.text, "Hooks")
+
+    hooks: list[HookItem] = []
+    for h in payload.get("hooks") or []:
+        if not isinstance(h, dict):
+            continue
+        text = str(h.get("text") or "").strip()
+        if not text:
+            continue
+        hooks.append(HookItem(
+            text=text[:300],
+            angle=str(h.get("angle") or "").strip()[:60],
+            rationale=str(h.get("rationale") or "").strip()[:200],
+        ))
+    if not hooks:
+        raise AIProviderError("Hooks: model returned no hooks", code="upstream_error")
+
+    quota_service.record_call(client, user_id=user_id, feature="hooks", result=result)
+    return HooksResponse(topic=topic.strip(), hooks=hooks)
 
 
 # --- 2. Repurposer ---------------------------------------------------------

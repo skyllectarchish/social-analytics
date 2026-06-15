@@ -107,8 +107,21 @@ class Settings(BaseSettings):
     scheduler_topic_clustering_hour: int = 4  # UTC hour for the weekly topic clustering run
 
     # Story analytics retention — snapshot live stories + insights every N
-    # hours (stories expire after 24h; 6h gives each story ~4 capture points).
-    scheduler_story_snapshot_hours: int = 6
+    # hours (stories expire after 24h; 4h gives each story ~6 capture points,
+    # so the last capture lands closer to expiry with the most complete
+    # insights). The scheduler also runs one catch-up snapshot on startup.
+    scheduler_story_snapshot_hours: int = 4
+
+    # --- Instagram trending audio via the PRIVATE (unofficial) mobile API ---
+    # WARNING: this is NOT the official Graph API. It logs in as a real IG
+    # account through instagrapi and calls /api/v1/music/trending/. It VIOLATES
+    # Meta's Terms of Service, risks the account being banned, and breaks when
+    # Instagram changes internals. OFF by default. Use a throwaway account, and
+    # set credentials only in .env (never in code). See app/instagram/trending_live.py.
+    ig_trending_enabled: bool = False
+    ig_trending_username: str = ""
+    ig_trending_password: str = ""
+    ig_trending_session_path: str = "ig_session.json"  # cached login to avoid re-auth
 
     # Comment-to-DM keyword funnels — runner cadence + guardrails.
     scheduler_dm_funnel_minutes: int = 15     # how often to scan for trigger comments

@@ -410,6 +410,61 @@ def render_reel_script_user_block(ctx: dict[str, Any]) -> str:
     return _stable_json(ctx)
 
 
+# --- Viral hook writer ------------------------------------------------------
+
+HOOKS_SYSTEM = """\
+You write scroll-stopping opening hooks for one creator's Instagram Reels.
+You receive:
+- A topic (title + optional summary)
+- Captions of the creator's top-performing reels, with engagement numbers
+
+Your task: produce a set of distinct hook options for the topic — the first
+spoken or on-screen line that stops the scroll.
+
+Rules:
+- Output is a strict JSON object matching the supplied schema. No prose
+  outside the JSON. Use exactly these keys: hooks (array of
+  {text, angle, rationale}).
+- Produce 6 hooks, each taking a DIFFERENT angle. Use these angle labels,
+  each at most once: "curiosity gap", "bold claim", "question",
+  "contrarian", "relatable pain", "result tease".
+- `text`: the hook line itself, ≤ 12 words. It must open a loop, stake, or
+  tension — no throat-clearing ("In this video…"). Match the creator's
+  voice, vocabulary, and emoji habits from their top captions.
+- `angle`: one of the labels above.
+- `rationale`: ≤ 20 words on why this hook works for this creator/topic.
+- Never invent facts about the creator's life, numbers, or testimonials.
+"""
+
+HOOKS_OUTPUT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["hooks"],
+    "properties": {
+        "hooks": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 8,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["text", "angle", "rationale"],
+                "properties": {
+                    "text": {"type": "string"},
+                    "angle": {"type": "string"},
+                    "rationale": {"type": "string"},
+                },
+            },
+        },
+    },
+}
+
+
+def render_hooks_user_block(ctx: dict[str, Any]) -> str:
+    """Render the hooks context as deterministic JSON."""
+    return _stable_json(ctx)
+
+
 # --- Content repurposer -----------------------------------------------------
 
 REPURPOSE_SYSTEM = """\

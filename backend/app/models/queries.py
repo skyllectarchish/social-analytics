@@ -2016,53 +2016,6 @@ WHERE user_id = {user_id:UUID}
   AND timestamp >= {start_date:DateTime}
 ORDER BY post_date ASC
 """
-# --- Story analytics retention ---
-
-# Snapshotted stories joined with their insights (stored in media_insights,
-# same as every other media). LEFT JOIN: a story snapshotted moments before
-# expiry may have no insights row yet — show it with zeroed metrics rather
-# than dropping it.
-
-GET_STORY_HISTORY = """
-SELECT
-    s.ig_media_id,
-    s.media_type,
-    s.permalink,
-    s.timestamp,
-    toInt64(metrics.reach) AS reach,
-    toInt64(metrics.views) AS views,
-    toInt64(metrics.replies) AS replies,
-    toInt64(metrics.shares) AS shares,
-    toInt64(metrics.total_interactions) AS interactions,
-    toInt64(metrics.navigation) AS navigation
-FROM instagram_stories s FINAL
-LEFT JOIN (
-    SELECT
-        ig_media_id, user_id,
-        sumIf(metric_value, metric_name = 'reach') AS reach,
-        sumIf(metric_value, metric_name = 'views') AS views,
-        sumIf(metric_value, metric_name = 'replies') AS replies,
-        sumIf(metric_value, metric_name = 'shares') AS shares,
-        sumIf(metric_value, metric_name = 'total_interactions') AS total_interactions,
-        sumIf(metric_value, metric_name = 'navigation') AS navigation
-    FROM media_insights FINAL
-    WHERE user_id = {user_id:UUID}
-    GROUP BY ig_media_id, user_id
-) metrics ON s.ig_media_id = metrics.ig_media_id AND s.user_id = metrics.user_id
-WHERE s.user_id = {user_id:UUID}
-  AND s.ig_user_id = {ig_user_id:String}
-  AND s.timestamp >= {since:DateTime}
-ORDER BY s.timestamp DESC
-LIMIT {limit:UInt32}
-"""
-
-COUNT_STORY_HISTORY = """
-SELECT count()
-FROM instagram_stories FINAL
-WHERE user_id = {user_id:UUID}
-  AND ig_user_id = {ig_user_id:String}
-  AND timestamp >= {since:DateTime}
-"""
 
 # --- Comment-to-DM keyword funnels ---
 
@@ -2145,4 +2098,16 @@ FROM instagram_sync_jobs FINAL
 WHERE user_id = {user_id:UUID}
 ORDER BY started_at DESC
 LIMIT 1
+"""
+
+# --- Editorial trending-audio feed ---
+
+# Most recently published week's curated audio, by rank. The correlated max(week)
+# subquery means an empty table simply returns no rows.
+GET_LATEST_TRENDING_AUDIO = """
+SELECT title, artist, reels_count, delta, use_case, source, week
+FROM trending_audio FINAL
+WHERE week = (SELECT max(week) FROM trending_audio)
+ORDER BY rank ASC
+LIMIT {limit:UInt32}
 """

@@ -15,8 +15,7 @@ from typing import Any
 
 from clickhouse_connect.driver.client import Client
 
-from ..models.queries import COUNT_STORY_HISTORY, GET_STORY_HISTORY
-from .safe_query import is_schema_missing, log_schema_missing, safe_call
+from .safe_query import is_schema_missing, log_schema_missing
 
 logger = logging.getLogger(__name__)
 
@@ -80,58 +79,35 @@ def bulk_insert_stories(
     return len(rows)
 
 
-def find_story_history(
+_SNAPSHOT_JOB_COLUMNS = [
+    "id", "user_id", "status", "stories_captured", "error", "ran_at", "updated_at",
+]
+
+
+def record_snapshot_run(
     client: Client,
     user_id: str,
-    ig_user_id: str,
     *,
-    since: datetime,
-    limit: int = 200,
-) -> list[dict[str, Any]]:
-    """Snapshotted stories + their retained insights, newest first."""
-    rows = safe_call(
-        lambda: client.query(
-            GET_STORY_HISTORY,
-            parameters={
-                "user_id": user_id,
-                "ig_user_id": ig_user_id,
-                "since": since,
-                "limit": limit,
-            },
-        ).result_rows,
-        fallback=[],
-        label="story_repo.find_story_history",
-    )
-    return [
-        {
-            "ig_media_id": r[0],
-            "media_type": r[1],
-            "permalink": r[2],
-            "timestamp": r[3],
-            "reach": int(r[4] or 0),
-            "views": int(r[5] or 0),
-            "replies": int(r[6] or 0),
-            "shares": int(r[7] or 0),
-            "interactions": int(r[8] or 0),
-            "navigation": int(r[9] or 0),
-        }
-        for r in rows
+    status: str,
+    stories_captured: int,
+    error: str = "",
+) -> None:
+    """Record the outcome of one story-snapshot run for a user.
+
+    One row per user (ReplacingMergeTree on user_id keeps the freshest). Status
+    tracking is best-effort: if migration 041 hasn't been applied the snapshot
+    itself still runs, this just no-ops and the status endpoint reports 'idle'.
+    """
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    row = [
+        str(uuid.uuid4()), user_id, status, int(stories_captured), error[:1000], now, now,
     ]
-
-
-def count_story_history(
-    client: Client,
-    user_id: str,
-    ig_user_id: str,
-    *,
-    since: datetime,
-) -> int:
-    rows = safe_call(
-        lambda: client.query(
-            COUNT_STORY_HISTORY,
-            parameters={"user_id": user_id, "ig_user_id": ig_user_id, "since": since},
-        ).result_rows,
-        fallback=[],
-        label="story_repo.count_story_history",
-    )
-    return int(rows[0][0]) if rows else 0
+    try:
+        client.insert("story_snapshot_jobs", [row], column_names=_SNAPSHOT_JOB_COLUMNS)
+    except Exception as exc:
+        if not is_schema_missing(exc):
+            raise
+        log_schema_missing(
+            "story_repo.record_snapshot_run", exc,
+            "story_snapshot_jobs missing (migration 041) — snapshot status not tracked",
+        )

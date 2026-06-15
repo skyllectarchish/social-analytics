@@ -100,6 +100,31 @@ export interface ReelScriptResponse {
   rationale: string;
 }
 
+export interface HookItem {
+  text: string;
+  angle: string;
+  rationale: string;
+}
+
+export interface HooksResponse {
+  topic: string;
+  hooks: HookItem[];
+}
+
+export interface TrendingAudioItem {
+  title: string;
+  artist: string;
+  reels_count: string;
+  delta: string;
+  use_case: string;
+  source: string;
+}
+
+export interface TrendingAudioResponse {
+  week: string | null;
+  items: TrendingAudioItem[];
+}
+
 export interface RepurposeResponse {
   reel_script_md: string;
   carousel_md: string;
@@ -144,10 +169,17 @@ export interface FormatFatigueResponse {
   formats: FormatFatigueItem[];
 }
 
+export interface ArchiveFileDiag {
+  file: string;
+  kind: string; // posts | stories | followers | unknown
+  rows: number;
+}
+
 export interface ArchiveImportResponse {
   posts_imported: number;
   stories_imported: number;
   followers_imported: number;
+  files: ArchiveFileDiag[];
 }
 
 export interface ArchiveGrowthPoint {
@@ -300,25 +332,6 @@ export interface StoryWithInsights {
 }
 export interface StoriesResponse {
   stories: StoryWithInsights[];
-}
-
-export interface StoryHistoryItem {
-  ig_media_id: string;
-  media_type: string;
-  permalink: string;
-  timestamp: string;
-  reach: number;
-  views: number;
-  replies: number;
-  shares: number;
-  interactions: number;
-  navigation: number;
-}
-
-export interface StoryHistoryResponse {
-  total: number;
-  period_days: number;
-  stories: StoryHistoryItem[];
 }
 
 // Status of the most recent background insights sync (GET /instagram/insights/sync/status).
@@ -755,7 +768,7 @@ export interface DiagnosticResponse {
 }
 
 export interface FeedbackRequest {
-  feature: "digest" | "ideas" | "diagnostic" | "caption" | "comment_reply" | "reel_script" | "repurpose" | "question_mining";
+  feature: "digest" | "ideas" | "diagnostic" | "caption" | "comment_reply" | "reel_script" | "repurpose" | "question_mining" | "hooks";
   ref_id: string;
   rating: "up" | "down";
   note?: string | null;

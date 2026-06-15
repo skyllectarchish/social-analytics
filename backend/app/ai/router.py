@@ -45,6 +45,8 @@ from .schemas import (
     CaptionSuggestResponse,
     CommentReplySuggestRequest,
     CommentReplySuggestResponse,
+    HooksRequest,
+    HooksResponse,
     QuestionMiningResponse,
     ReelScriptRequest,
     ReelScriptResponse,
@@ -291,6 +293,22 @@ async def write_reel_script(
         quota_service.enforce(client, user_id)
         return await content_factory_service.synthesize_reel_script(
             client, user_id=user_id, title=payload.title, summary=payload.summary,
+        )
+
+
+@router.post("/api/ai/hooks", response_model=HooksResponse)
+async def write_hooks(
+    payload: HooksRequest,
+    current_user: User = Depends(get_current_user),
+) -> HooksResponse:
+    """Generate a set of distinct scroll-stopping hooks for a topic, modeled
+    on the creator's top reels. One quota call, no cache."""
+    client = get_client()
+    user_id = str(current_user.id)
+    async with quota_service.user_lock(user_id):
+        quota_service.enforce(client, user_id)
+        return await content_factory_service.synthesize_hooks(
+            client, user_id=user_id, topic=payload.topic, summary=payload.summary,
         )
 
 

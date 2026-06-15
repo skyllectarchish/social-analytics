@@ -49,6 +49,7 @@ from ..repositories import (
     insights_repo,
     story_repo,
     sync_job_repo,
+    trending_audio_repo,
 )
 from ..repositories.comparison import (
     COMPARE_TO_PATTERN,
@@ -63,6 +64,7 @@ from .schemas import (
     AlertItem,
     AlertsResponse,
     ArchiveContentPoint,
+    ArchiveFileDiag,
     ArchiveGrowthPoint,
     ArchiveImportResponse,
     ArchiveSummaryResponse,
@@ -150,9 +152,9 @@ from .schemas import (
     SentimentSummaryResponse,
     SentimentTrendPoint,
     StoriesResponse,
-    StoryHistoryItem,
-    StoryHistoryResponse,
     StoryWithInsights,
+    TrendingAudioItem,
+    TrendingAudioResponse,
     SuperfanItem,
     SuperfansResponse,
     SyncResponse,
@@ -612,6 +614,7 @@ async def import_archive(
     user_id = str(current_user.id)
 
     totals = {"posts": 0, "stories": 0, "followers": 0}
+    file_diag: list[ArchiveFileDiag] = []
     for f in files:
         blob = await f.read()
         if len(blob) > MAX_ARCHIVE_UPLOAD_BYTES:
@@ -625,13 +628,14 @@ async def import_archive(
                 ),
             )
         try:
-            parsed = archive.extract(f.filename or "", blob)
+            parsed, diag = archive.extract_verbose(f.filename or "", blob)
         except Exception:
             logger.exception("Archive import: failed to parse %s", f.filename)
             raise HTTPException(
                 status_code=422,
                 detail=f"Could not parse {f.filename} — is it an Instagram JSON export?",
             )
+        file_diag.extend(ArchiveFileDiag(**d) for d in diag)
         totals["posts"] += archive_repo.insert_posts(client, user_id, parsed["posts"])
         totals["stories"] += archive_repo.insert_stories(client, user_id, parsed["stories"])
         totals["followers"] += archive_repo.insert_followers(client, user_id, parsed["followers"])
@@ -652,6 +656,7 @@ async def import_archive(
         posts_imported=totals["posts"],
         stories_imported=totals["stories"],
         followers_imported=totals["followers"],
+        files=file_diag,
     )
 
 
@@ -1889,53 +1894,32 @@ async def get_stories(current_user: User = Depends(get_current_user)):
     return StoriesResponse(stories=stories_out)
 
 
-@router.get("/stories/history", response_model=StoryHistoryResponse)
-def get_story_history(
-    days: int = Query(90, ge=1, le=INSIGHTS_MAX_LOOKBACK_DAYS),
-    limit: int = Query(200, ge=1, le=500),
+@router.get("/trending-audio", response_model=TrendingAudioResponse)
+def get_trending_audio(
+    limit: int = Query(12, ge=1, le=50),
     current_user: User = Depends(get_current_user),
 ):
-    """Retained story history — snapshots taken before Meta's 24h expiry.
+    """Editorial trending-audio feed — curated weekly from public roundups.
 
-    Unlike GET /stories (live only), this reads from ClickHouse: every story
-    the snapshot job captured, with its insights, going back as far as the
-    user has been connected. Instagram itself never offers this view."""
+    Not from Meta: the Graph API exposes no trending-audio data, so this is a
+    hand-curated list (labeled 'editorial' in the UI), refreshed by the
+    seed_trending_audio script. Global, not per-account. Returns the most
+    recently published week, or an empty list before anything's published."""
     client = get_client()
-    user_id = str(current_user.id)
-
-    ig_profile = instagram_repo.find_profile(client, user_id)
-    if ig_profile is None:
-        raise InstagramNotConnectedError()
-
-    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
-    items = story_repo.find_story_history(
-        client, user_id, ig_profile.ig_user_id, since=since, limit=limit,
-    )
-    total = story_repo.count_story_history(
-        client, user_id, ig_profile.ig_user_id, since=since,
-    )
-
-    return StoryHistoryResponse(
-        total=total,
-        period_days=days,
-        stories=[
-            StoryHistoryItem(
-                ig_media_id=s["ig_media_id"],
-                media_type=s["media_type"],
-                permalink=s["permalink"],
-                timestamp=(
-                    s["timestamp"].isoformat()
-                    if hasattr(s["timestamp"], "isoformat")
-                    else str(s["timestamp"])
-                ),
-                reach=s["reach"],
-                views=s["views"],
-                replies=s["replies"],
-                shares=s["shares"],
-                interactions=s["interactions"],
-                navigation=s["navigation"],
+    rows = trending_audio_repo.list_latest(client, limit=limit)
+    week = rows[0]["week"] if rows else None
+    return TrendingAudioResponse(
+        week=week,
+        items=[
+            TrendingAudioItem(
+                title=r["title"],
+                artist=r["artist"],
+                reels_count=r["reels_count"],
+                delta=r["delta"],
+                use_case=r["use_case"],
+                source=r["source"],
             )
-            for s in items
+            for r in rows
         ],
     )
 

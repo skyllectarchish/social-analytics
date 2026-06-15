@@ -3,6 +3,8 @@ import { Bot, PenLine, Zap } from "lucide-react";
 import DashboardLayout from "../components/dashboard/DashboardLayout";
 import WeeklyDigestCard from "../components/copilot/WeeklyDigestCard";
 import ContentIdeasPanel from "../components/copilot/ContentIdeasPanel";
+import ViralHooksPanel from "../components/copilot/ViralHooksPanel";
+import TrendingAudioPanel from "../components/copilot/TrendingAudioPanel";
 import AudienceDemandCard from "../components/copilot/AudienceDemandCard";
 import FormatFatigueCard from "../components/copilot/FormatFatigueCard";
 import RepurposeCard from "../components/copilot/RepurposeCard";
@@ -70,6 +72,14 @@ export default function CopilotPage() {
 
         <AnimatedCard delay={0.1}>
           <ContentIdeasPanel exhausted={exhausted} onQuotaSpent={refreshQuota} onDiagnose={setDiagnoseId} />
+        </AnimatedCard>
+
+        <AnimatedCard delay={0.12}>
+          <ViralHooksPanel exhausted={exhausted} onQuotaSpent={refreshQuota} />
+        </AnimatedCard>
+
+        <AnimatedCard delay={0.13}>
+          <TrendingAudioPanel />
         </AnimatedCard>
 
         <AnimatedCard delay={0.15}>

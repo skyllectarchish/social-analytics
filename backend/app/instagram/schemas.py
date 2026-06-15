@@ -201,12 +201,22 @@ class PurgeResponse(BaseModel):
 
 # --- Data-export archive import ---
 
+class ArchiveFileDiag(BaseModel):
+    """Per-file classification breakdown — surfaced so a 0-stories import
+    can show whether the stories file was seen and where its rows went."""
+
+    file: str
+    kind: str                    # posts | stories | followers | unknown
+    rows: int
+
+
 class ArchiveImportResponse(BaseModel):
     """Response for POST /api/instagram/import/archive."""
 
     posts_imported: int
     stories_imported: int
     followers_imported: int
+    files: list[ArchiveFileDiag] = Field(default_factory=list)
 
 
 class ArchiveGrowthPoint(BaseModel):
@@ -392,27 +402,27 @@ class StoriesResponse(BaseModel):
     stories: list[StoryWithInsights]
 
 
-class StoryHistoryItem(BaseModel):
-    """A snapshotted story with its retained insights (survives the 24h expiry)."""
+class TrendingAudioItem(BaseModel):
+    """One curated trending-audio entry (editorial, not from Meta)."""
 
-    ig_media_id: str
-    media_type: str
-    permalink: str
-    timestamp: str               # ISO-8601 (when the story was posted)
-    reach: int
-    views: int
-    replies: int
-    shares: int
-    interactions: int
-    navigation: int              # taps forward/back/exit, summed
+    title: str
+    artist: str = ""
+    reels_count: str = ""
+    delta: str = ""
+    use_case: str = ""
+    source: str = ""
 
 
-class StoryHistoryResponse(BaseModel):
-    """Response for GET /api/instagram/stories/history."""
+class TrendingAudioResponse(BaseModel):
+    """Response for GET /api/instagram/trending-audio.
 
-    total: int
-    period_days: int
-    stories: list[StoryHistoryItem]
+    Editorial feed curated weekly from public roundups — the Graph API exposes
+    no trending-audio data, so this is not per-account personalization. `week`
+    is the published week (ISO date) or null when nothing's published yet.
+    """
+
+    week: str | None = None
+    items: list[TrendingAudioItem] = Field(default_factory=list)
 
 
 # --- Comment-to-DM keyword funnels ---
