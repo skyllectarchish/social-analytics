@@ -1896,6 +1896,9 @@ async def get_stories(current_user: User = Depends(get_current_user)):
 
 @router.get("/trending-audio", response_model=TrendingAudioResponse)
 def get_trending_audio(
+    week: str | None = Query(
+        None, description="ISO week date (Monday) to view; latest if omitted."
+    ),
     limit: int = Query(12, ge=1, le=50),
     current_user: User = Depends(get_current_user),
 ):
@@ -1903,13 +1906,25 @@ def get_trending_audio(
 
     Not from Meta: the Graph API exposes no trending-audio data, so this is a
     hand-curated list (labeled 'editorial' in the UI), refreshed by the
-    seed_trending_audio script. Global, not per-account. Returns the most
-    recently published week, or an empty list before anything's published."""
+    seed_trending_audio script. Global, not per-account. Returns the requested
+    `week` (or the most recent one), plus `available_weeks` for the selector.
+    Empty before anything's published."""
     client = get_client()
-    rows = trending_audio_repo.list_latest(client, limit=limit)
-    week = rows[0]["week"] if rows else None
+    if week:
+        try:
+            wk = date.fromisoformat(week)
+        except ValueError:
+            raise HTTPException(
+                status_code=422, detail="week must be an ISO date (YYYY-MM-DD)"
+            )
+        rows = trending_audio_repo.list_for_week(client, wk, limit=limit)
+    else:
+        rows = trending_audio_repo.list_latest(client, limit=limit)
+    weeks = trending_audio_repo.list_weeks(client)
+    resp_week = rows[0]["week"] if rows else (week or (weeks[0] if weeks else None))
     return TrendingAudioResponse(
-        week=week,
+        week=resp_week,
+        available_weeks=weeks,
         items=[
             TrendingAudioItem(
                 title=r["title"],

@@ -1,194 +1,90 @@
-2026-06-12 16:36:38 | INFO     | app.main:30 | Starting Social Analytics API
-2026-06-12 16:36:38 | INFO     | app.database:39 | Creating ClickHouse client (thread MainThread)
-2026-06-12 16:36:38 | INFO     | app.main:34 | ClickHouse connection OK
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:1090 | Added job "Daily own-account sync + token refresh" to job store "default"
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:1090 | Added job "Daily competitor snapshot" to job store "default"
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:1090 | Added job "Score pending comments" to job store "default"
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:1090 | Added job "Weekly topic clustering" to job store "default"
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:1090 | Added job "Weekly branded hashtag mention sync" to job store "default"
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:1090 | Added job "Snapshot live stories + insights" to job store "default"
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:1090 | Added job "Comment-to-DM funnel runner" to job store "default"
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:1090 | Added job "Weekly AI digest synthesis" to job store "default"
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:1090 | Added job "Daily YouTube competitor outlier scan (polling fallback)" to job store "default"
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:1090 | Added job "Weekly YouTube archive miner" to job store "default"
-2026-06-12 16:36:38 | INFO     | apscheduler.scheduler:214 | Scheduler started
-2026-06-12 16:36:38 | INFO     | app.scheduler:340 | Scheduler started: account_sync @ 02:00 UTC daily, competitor_sync @ 03:00 UTC daily, sentiment_batch every 60 min, topic_clustering weekday=0 @ 04:00 UTC, weekly_digest weekday=0 @ 08:00 UTC, story_snapshot every 4h, dm_funnel_runner every 15 min
-2026-06-12 16:38:38 | INFO     | apscheduler.executors.default:179 | Running job "Snapshot live stories + insights (trigger: interval[4:00:00], next run at: 2026-06-12 20:38:38 IST)" (scheduled at 2026-06-12 11:08:38.825723+00:00)
-2026-06-12 16:38:40 | INFO     | app.jobs.story_snapshot:75 | story_snapshot: stored 0 stories (+insights for 0) for user 2a1e28a6-f9e8-47a0-adf6-972bd60b9fae
-2026-06-12 16:38:43 | INFO     | app.instagram.service:564 | Batch fetched insights for 1/1 media items
-2026-06-12 16:38:43 | INFO     | app.jobs.story_snapshot:75 | story_snapshot: stored 1 stories (+insights for 1) for user 27656b38-6a6c-4dc1-a269-448e07654c88
-2026-06-12 16:38:43 | INFO     | app.jobs.story_snapshot:103 | story_snapshot: 1 stories snapshotted across 2 accounts
-2026-06-12 16:38:43 | INFO     | apscheduler.executors.default:203 | Job "Snapshot live stories + insights (trigger: interval[4:00:00], next run at: 2026-06-12 20:38:38 IST)" executed successfully
-INFO:     127.0.0.1:61453 - "GET /api/ai/hooks HTTP/1.1" 405 Method Not Allowed
-INFO:     127.0.0.1:61453 - "GET /api/instagram/trending-audio HTTP/1.1" 401 Unauthorized
-2026-06-12 16:59:40 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 16:59:59 | INFO     | app.repositories.user_repo:56 | Created user 71b27295-61e0-44cf-a350-c8e5c5d115b7 (verify+1781263780637@example.com)
-2026-06-12 16:59:59 | INFO     | app.auth.router:41 | User registered: verify+1781263780637@example.com
-INFO:     127.0.0.1:63672 - "POST /api/auth/register HTTP/1.1" 201 Created
-INFO:     127.0.0.1:63719 - "GET /api/auth/me HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63724 - "GET /api/auth/me HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63725 - "GET /api/auth/me HTTP/1.1" 200 OK
-2026-06-12 17:00:02 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 17:00:02 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 17:00:02 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 17:00:02 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 17:00:02 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-INFO:     127.0.0.1:63736 - "GET /api/ai/quota HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63745 - "GET /api/ai/quota HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63731 - "GET /api/ai/digest/weekly?week_of=2026-06-08 HTTP/1.1" 200 OK
-2026-06-12 17:00:03 | WARNING  | app.exception_handlers:63 | Client error [404]: No Instagram account connected
-INFO:     127.0.0.1:63733 - "GET /api/ai/ideas?days=90&limit=5 HTTP/1.1" 404 Not Found
-2026-06-12 17:00:03 | WARNING  | app.exception_handlers:63 | Client error [404]: No Instagram account connected
-INFO:     127.0.0.1:63735 - "GET /api/instagram/insights/format-fatigue?weeks=26 HTTP/1.1" 404 Not Found
-2026-06-12 17:00:03 | WARNING  | app.exception_handlers:63 | Client error [404]: No Instagram account connected
-INFO:     127.0.0.1:63737 - "GET /api/instagram/profile HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:63734 - "GET /api/instagram/trending-audio HTTP/1.1" 200 OK
-2026-06-12 17:00:03 | WARNING  | app.exception_handlers:63 | Client error [404]: No Instagram account connected
-INFO:     127.0.0.1:63751 - "GET /api/ai/ideas?days=90&limit=5 HTTP/1.1" 404 Not Found
-2026-06-12 17:00:03 | WARNING  | app.exception_handlers:63 | Client error [404]: No Instagram account connected
-INFO:     127.0.0.1:63755 - "GET /api/instagram/profile HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:63749 - "GET /api/ai/digest/weekly?week_of=2026-06-08 HTTP/1.1" 200 OK
-2026-06-12 17:00:03 | WARNING  | app.exception_handlers:63 | Client error [404]: No Instagram account connected
-INFO:     127.0.0.1:63754 - "GET /api/instagram/insights/format-fatigue?weeks=26 HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:63747 - "GET /api/ai/quota HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63757 - "GET /api/instagram/trending-audio HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63759 - "GET /api/ai/quota HTTP/1.1" 200 OK
-2026-06-12 17:00:40 | INFO     | app.repositories.user_repo:56 | Created user c80ab2a3-a116-4193-9c42-87d0b261228e (verify+1781263839742@example.com)
-2026-06-12 17:00:40 | INFO     | app.auth.router:41 | User registered: verify+1781263839742@example.com
-INFO:     127.0.0.1:63791 - "POST /api/auth/register HTTP/1.1" 201 Created
-INFO:     127.0.0.1:63810 - "GET /api/auth/me HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63813 - "GET /api/auth/me HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63814 - "GET /api/auth/me HTTP/1.1" 200 OK
-2026-06-12 17:00:42 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 17:00:42 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 17:00:42 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-INFO:     127.0.0.1:63819 - "GET /api/ai/digest/weekly?week_of=2026-06-08 HTTP/1.1" 200 OK
-2026-06-12 17:00:42 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 17:00:42 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-INFO:     127.0.0.1:63825 - "GET /api/ai/quota HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63832 - "GET /api/ai/digest/weekly?week_of=2026-06-08 HTTP/1.1" 200 OK
-2026-06-12 17:00:43 | WARNING  | app.exception_handlers:63 | Client error [404]: No Instagram account connected
-INFO:     127.0.0.1:63820 - "GET /api/ai/ideas?days=90&limit=5 HTTP/1.1" 404 Not Found
-2026-06-12 17:00:43 | WARNING  | app.exception_handlers:63 | Client error [404]: No Instagram account connected
-INFO:     127.0.0.1:63826 - "GET /api/instagram/profile HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:63836 - "GET /api/ai/quota HTTP/1.1" 200 OK
-2026-06-12 17:00:43 | WARNING  | app.exception_handlers:63 | Client error [404]: No Instagram account connected
-INFO:     127.0.0.1:63824 - "GET /api/instagram/insights/format-fatigue?weeks=26 HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:63823 - "GET /api/instagram/trending-audio HTTP/1.1" 200 OK
-2026-06-12 17:00:43 | WARNING  | app.exception_handlers:63 | Client error [404]: No Instagram account connected
-INFO:     127.0.0.1:63838 - "GET /api/ai/ideas?days=90&limit=5 HTTP/1.1" 404 Not Found
-2026-06-12 17:00:43 | WARNING  | app.exception_handlers:63 | Client error [404]: No Instagram account connected
-INFO:     127.0.0.1:63840 - "GET /api/instagram/profile HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:63842 - "GET /api/ai/quota HTTP/1.1" 200 OK
-2026-06-12 17:00:43 | WARNING  | app.exception_handlers:63 | Client error [404]: No Instagram account connected
-INFO:     127.0.0.1:63845 - "GET /api/instagram/insights/format-fatigue?weeks=26 HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:63846 - "GET /api/instagram/trending-audio HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63848 - "GET /api/ai/quota HTTP/1.1" 200 OK
-2026-06-12 17:01:39 | INFO     | app.repositories.user_repo:56 | Created user 71b7b9e7-103b-4598-bc14-7c1a2f98ea6e (verify+1781263898996@example.com)
-2026-06-12 17:01:39 | INFO     | app.auth.router:41 | User registered: verify+1781263898996@example.com
-INFO:     127.0.0.1:63895 - "POST /api/auth/register HTTP/1.1" 201 Created
-INFO:     127.0.0.1:63922 - "GET /api/auth/me HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63926 - "GET /api/auth/me HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63927 - "GET /api/auth/me HTTP/1.1" 200 OK
-2026-06-12 17:01:42 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 17:01:42 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 17:01:42 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 17:01:42 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 17:01:42 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-INFO:     127.0.0.1:63932 - "GET /api/ai/digest/weekly?week_of=2026-06-08 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63947 - "GET /api/ai/digest/weekly?week_of=2026-06-08 HTTP/1.1" 200 OK
-2026-06-12 17:01:42 | WARNING  | app.exception_handlers:63 | Client error [404]: No Instagram account connected
-INFO:     127.0.0.1:63933 - "GET /api/ai/ideas?days=90&limit=5 HTTP/1.1" 404 Not Found
-2026-06-12 17:01:42 | WARNING  | app.exception_handlers:63 | Client error [404]: No Instagram account connected
-INFO:     127.0.0.1:63938 - "GET /api/instagram/profile HTTP/1.1" 404 Not Found
-2026-06-12 17:01:42 | WARNING  | app.exception_handlers:63 | Client error [404]: No Instagram account connected
-INFO:     127.0.0.1:63937 - "GET /api/instagram/insights/format-fatigue?weeks=26 HTTP/1.1" 404 Not Found
-2026-06-12 17:01:42 | WARNING  | app.exception_handlers:63 | Client error [404]: No Instagram account connected
-INFO:     127.0.0.1:63949 - "GET /api/ai/ideas?days=90&limit=5 HTTP/1.1" 404 Not Found
-2026-06-12 17:01:42 | WARNING  | app.exception_handlers:63 | Client error [404]: No Instagram account connected
-INFO:     127.0.0.1:63951 - "GET /api/instagram/profile HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:63936 - "GET /api/instagram/trending-audio HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63939 - "GET /api/ai/quota HTTP/1.1" 200 OK
-2026-06-12 17:01:43 | WARNING  | app.exception_handlers:63 | Client error [404]: No Instagram account connected
-INFO:     127.0.0.1:63953 - "GET /api/instagram/insights/format-fatigue?weeks=26 HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:63956 - "GET /api/instagram/trending-audio HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63957 - "GET /api/ai/quota HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63959 - "GET /api/ai/quota HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63962 - "GET /api/ai/quota HTTP/1.1" 200 OK
-2026-06-12 17:01:47 | INFO     | app.ai.telemetry:57 | ai.telemetry.ingested user=71b7b9e7-103b-4598-bc14-7c1a2f98ea6e count=4
-INFO:     127.0.0.1:63971 - "POST /api/telemetry HTTP/1.1" 204 No Content
-2026-06-12 17:06:33 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
+2026-06-15 16:32:55 | INFO     | app.main:30 | Starting Social Analytics API
+2026-06-15 16:32:55 | INFO     | app.database:39 | Creating ClickHouse client (thread MainThread)
+2026-06-15 16:32:55 | INFO     | app.main:34 | ClickHouse connection OK
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:507 | Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:1090 | Added job "Daily own-account sync + token refresh" to job store "default"
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:1090 | Added job "Daily competitor snapshot" to job store "default"
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:1090 | Added job "Score pending comments" to job store "default"
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:1090 | Added job "Weekly topic clustering" to job store "default"
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:1090 | Added job "Weekly branded hashtag mention sync" to job store "default"
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:1090 | Added job "Snapshot live stories + insights" to job store "default"
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:1090 | Added job "Comment-to-DM funnel runner" to job store "default"
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:1090 | Added job "Weekly AI digest synthesis" to job store "default"
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:1090 | Added job "Daily YouTube competitor outlier scan (polling fallback)" to job store "default"
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:1090 | Added job "Weekly YouTube archive miner" to job store "default"
+2026-06-15 16:32:55 | INFO     | apscheduler.scheduler:214 | Scheduler started
+2026-06-15 16:32:55 | INFO     | app.scheduler:340 | Scheduler started: account_sync @ 02:00 UTC daily, competitor_sync @ 03:00 UTC daily, sentiment_batch every 60 min, topic_clustering weekday=0 @ 04:00 UTC, weekly_digest weekday=0 @ 08:00 UTC, story_snapshot every 4h, dm_funnel_runner every 15 min
+2026-06-15 16:34:17 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
+INFO:     127.0.0.1:49324 - "GET /api/instagram/trending-audio HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49326 - "GET /api/instagram/trending-audio HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49327 - "GET /api/instagram/trending-audio?week=2026-06-08 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49328 - "GET /api/instagram/trending-audio?week=notadate HTTP/1.1" 422 Unprocessable Content
+2026-06-15 16:34:55 | INFO     | apscheduler.executors.default:179 | Running job "Snapshot live stories + insights (trigger: interval[4:00:00], next run at: 2026-06-15 20:34:55 IST)" (scheduled at 2026-06-15 11:04:55.411373+00:00)
+2026-06-15 16:34:56 | INFO     | app.jobs.story_snapshot:75 | story_snapshot: stored 0 stories (+insights for 0) for user 2a1e28a6-f9e8-47a0-adf6-972bd60b9fae
+2026-06-15 16:34:57 | INFO     | app.jobs.story_snapshot:75 | story_snapshot: stored 0 stories (+insights for 0) for user 27656b38-6a6c-4dc1-a269-448e07654c88
+2026-06-15 16:34:57 | INFO     | app.jobs.story_snapshot:103 | story_snapshot: 0 stories snapshotted across 2 accounts
+2026-06-15 16:34:57 | INFO     | apscheduler.executors.default:203 | Job "Snapshot live stories + insights (trigger: interval[4:00:00], next run at: 2026-06-15 20:34:55 IST)" executed successfully
+2026-06-15 16:35:30 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
 INFO:     49.36.89.18:0 - "GET /api/auth/me HTTP/1.1" 200 OK
 INFO:     49.36.89.18:0 - "GET /api/auth/me HTTP/1.1" 200 OK
-2026-06-12 17:06:33 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 17:06:34 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 17:06:34 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 17:06:34 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 17:06:34 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-INFO:     49.36.89.18:0 - "GET /api/instagram/profile HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/instagram/insights/format-breakdown?days=30 HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/instagram/insights/best-time?days=30&min_sample=1 HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/instagram/insights/hashtags/combos?days=30 HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/instagram/profile HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/instagram/insights/hashtags?days=30&limit=100&min_uses=1 HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/ai/quota HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/instagram/insights/algorithm-metrics?days=30 HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/instagram/insights/hashtags/combos?days=30 HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/instagram/insights/format-breakdown?days=30 HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/instagram/insights/best-time?days=30&min_sample=1 HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/ai/quota HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/instagram/insights/hashtags?days=30&limit=100&min_uses=1 HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/instagram/insights/algorithm-metrics?days=30 HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/instagram/profile HTTP/1.1" 200 OK
-2026-06-12 17:06:35 | INFO     | app.ai.ideas:255 | ideas.skip_synthesis user=27656b38-6a6c-4dc1-a269-448e07654c88 reason=insufficient_posts count=1
-INFO:     49.36.89.18:0 - "GET /api/ai/ideas?days=90&limit=5 HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/ai/digest/weekly?week_of=2026-06-08 HTTP/1.1" 200 OK
+2026-06-15 16:35:30 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
+2026-06-15 16:35:30 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
+2026-06-15 16:35:30 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
+2026-06-15 16:35:30 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
+INFO:     49.36.89.18:0 - "GET /api/ai/digest/weekly?week_of=2026-06-15 HTTP/1.1" 200 OK
 INFO:     49.36.89.18:0 - "GET /api/instagram/trending-audio HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/instagram/insights/format-fatigue?weeks=26 HTTP/1.1" 200 OK
+INFO:     49.36.89.18:0 - "GET /api/ai/digest/weekly?week_of=2026-06-15 HTTP/1.1" 200 OK
+INFO:     49.36.89.18:0 - "GET /api/instagram/profile HTTP/1.1" 200 OK
+2026-06-15 16:35:31 | INFO     | app.ai.ideas:255 | ideas.skip_synthesis user=27656b38-6a6c-4dc1-a269-448e07654c88 reason=insufficient_posts count=1
+INFO:     49.36.89.18:0 - "GET /api/ai/ideas?days=90&limit=5 HTTP/1.1" 200 OK
 INFO:     49.36.89.18:0 - "GET /api/ai/quota HTTP/1.1" 200 OK
 INFO:     49.36.89.18:0 - "GET /api/instagram/profile HTTP/1.1" 200 OK
-2026-06-12 17:06:36 | INFO     | app.ai.ideas:255 | ideas.skip_synthesis user=27656b38-6a6c-4dc1-a269-448e07654c88 reason=insufficient_posts count=1
+INFO:     49.36.89.18:0 - "GET /api/instagram/insights/format-fatigue?weeks=26 HTTP/1.1" 200 OK
+2026-06-15 16:35:31 | INFO     | app.ai.ideas:255 | ideas.skip_synthesis user=27656b38-6a6c-4dc1-a269-448e07654c88 reason=insufficient_posts count=1
 INFO:     49.36.89.18:0 - "GET /api/ai/ideas?days=90&limit=5 HTTP/1.1" 200 OK
 INFO:     49.36.89.18:0 - "GET /api/instagram/trending-audio HTTP/1.1" 200 OK
+INFO:     49.36.89.18:0 - "GET /api/ai/quota HTTP/1.1" 200 OK
 INFO:     49.36.89.18:0 - "GET /api/instagram/insights/format-fatigue?weeks=26 HTTP/1.1" 200 OK
 INFO:     49.36.89.18:0 - "GET /api/ai/quota HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/ai/digest/weekly?week_of=2026-06-08 HTTP/1.1" 200 OK
 INFO:     49.36.89.18:0 - "GET /api/ai/quota HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/ai/quota HTTP/1.1" 200 OK
-2026-06-12 17:06:40 | INFO     | app.ai.telemetry:57 | ai.telemetry.ingested user=27656b38-6a6c-4dc1-a269-448e07654c88 count=5
+2026-06-15 16:35:36 | INFO     | app.ai.telemetry:57 | ai.telemetry.ingested user=27656b38-6a6c-4dc1-a269-448e07654c88 count=5
 INFO:     49.36.89.18:0 - "POST /api/telemetry HTTP/1.1" 204 No Content
-2026-06-12 17:37:21 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
+INFO:     49.36.89.18:0 - "GET /api/instagram/trending-audio?week=2026-06-08 HTTP/1.1" 200 OK
+INFO:     49.36.89.18:0 - "GET /api/instagram/trending-audio?week=2026-06-15 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55171 - "GET /api/instagram/trending-audio HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55864 - "GET /api/instagram/trending-audio HTTP/1.1" 200 OK
+2026-06-15 17:18:30 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
 INFO:     49.36.89.18:0 - "GET /api/auth/me HTTP/1.1" 200 OK
 INFO:     49.36.89.18:0 - "GET /api/auth/me HTTP/1.1" 200 OK
-2026-06-12 17:37:39 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 17:37:39 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 17:37:39 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 17:37:39 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
-2026-06-12 17:37:39 | INFO     | app.ai.ideas:255 | ideas.skip_synthesis user=27656b38-6a6c-4dc1-a269-448e07654c88 reason=insufficient_posts count=1
+2026-06-15 17:18:31 | INFO     | app.ai.ideas:255 | ideas.skip_synthesis user=27656b38-6a6c-4dc1-a269-448e07654c88 reason=insufficient_posts count=1
 INFO:     49.36.89.18:0 - "GET /api/ai/ideas?days=90&limit=5 HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/ai/digest/weekly?week_of=2026-06-08 HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/instagram/trending-audio HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/instagram/insights/format-fatigue?weeks=26 HTTP/1.1" 200 OK
-2026-06-12 17:37:39 | INFO     | app.ai.ideas:255 | ideas.skip_synthesis user=27656b38-6a6c-4dc1-a269-448e07654c88 reason=insufficient_posts count=1
-INFO:     49.36.89.18:0 - "GET /api/ai/ideas?days=90&limit=5 HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/ai/quota HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/instagram/profile HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/ai/digest/weekly?week_of=2026-06-08 HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/instagram/trending-audio HTTP/1.1" 200 OK
-INFO:     49.36.89.18:0 - "GET /api/instagram/profile HTTP/1.1" 200 OK
+2026-06-15 17:18:31 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
+2026-06-15 17:18:31 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
+2026-06-15 17:18:31 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
+2026-06-15 17:18:31 | INFO     | app.database:39 | Creating ClickHouse client (thread AnyIO worker thread)
 INFO:     49.36.89.18:0 - "GET /api/ai/quota HTTP/1.1" 200 OK
 INFO:     49.36.89.18:0 - "GET /api/instagram/insights/format-fatigue?weeks=26 HTTP/1.1" 200 OK
+2026-06-15 17:18:32 | INFO     | app.ai.ideas:255 | ideas.skip_synthesis user=27656b38-6a6c-4dc1-a269-448e07654c88 reason=insufficient_posts count=1
+INFO:     49.36.89.18:0 - "GET /api/ai/ideas?days=90&limit=5 HTTP/1.1" 200 OK
+INFO:     49.36.89.18:0 - "GET /api/instagram/profile HTTP/1.1" 200 OK
 INFO:     49.36.89.18:0 - "GET /api/ai/quota HTTP/1.1" 200 OK
+INFO:     49.36.89.18:0 - "GET /api/ai/digest/weekly?week_of=2026-06-15 HTTP/1.1" 200 OK
+INFO:     49.36.89.18:0 - "GET /api/instagram/trending-audio HTTP/1.1" 200 OK
+INFO:     49.36.89.18:0 - "GET /api/instagram/insights/format-fatigue?weeks=26 HTTP/1.1" 200 OK
+INFO:     49.36.89.18:0 - "GET /api/instagram/profile HTTP/1.1" 200 OK
 INFO:     49.36.89.18:0 - "GET /api/ai/quota HTTP/1.1" 200 OK
-2026-06-12 17:37:44 | INFO     | app.ai.telemetry:57 | ai.telemetry.ingested user=27656b38-6a6c-4dc1-a269-448e07654c88 count=5
+INFO:     49.36.89.18:0 - "GET /api/ai/digest/weekly?week_of=2026-06-15 HTTP/1.1" 200 OK
+INFO:     49.36.89.18:0 - "GET /api/instagram/trending-audio HTTP/1.1" 200 OK
+INFO:     49.36.89.18:0 - "GET /api/ai/quota HTTP/1.1" 200 OK
+INFO:     49.36.89.18:0 - "GET /api/instagram/trending-audio?week=2026-06-08 HTTP/1.1" 200 OK
+2026-06-15 17:18:36 | INFO     | app.ai.telemetry:57 | ai.telemetry.ingested user=27656b38-6a6c-4dc1-a269-448e07654c88 count=5
 INFO:     49.36.89.18:0 - "POST /api/telemetry HTTP/1.1" 204 No Content

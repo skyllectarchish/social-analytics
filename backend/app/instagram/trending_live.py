@@ -80,6 +80,38 @@ def _first(d: dict[str, Any], keys: tuple[str, ...]) -> str:
     return ""
 
 
+def _compact(n: int) -> str:
+    """1234 -> '1.2K', 412000 -> '412K', 3_400_000 -> '3.4M'."""
+    if n < 1000:
+        return str(n)
+    for div, suffix in ((1_000_000_000, "B"), (1_000_000, "M"), (1_000, "K")):
+        if n >= div:
+            val = n / div
+            return (f"{val:.1f}".rstrip("0").rstrip(".")) + suffix
+    return str(n)
+
+
+def _first_count(d: dict[str, Any], keys: tuple[str, ...]) -> str:
+    """Pick a usage count from a container. Prefer a preformatted display string
+    (e.g. '412K reels'); fall back to compacting a raw integer count."""
+    for k in keys:
+        v = d.get(k)
+        if isinstance(v, str) and v.strip():
+            # Keep just the magnitude — the UI appends its own "reels" unit, so a
+            # preformatted "412K reels" must not double up to "412K reels reels".
+            s = v.strip()
+            for unit in (" reels", " clips", " videos", " posts"):
+                if s.lower().endswith(unit):
+                    s = s[: -len(unit)].strip()
+                    break
+            return s
+        if isinstance(v, bool):  # bool is an int subclass — skip it
+            continue
+        if isinstance(v, int) and v > 0:
+            return _compact(v)
+    return ""
+
+
 def _extract_item(raw: dict[str, Any]) -> dict[str, Any] | None:
     """Best-effort map one /music/trending/ item → our trending_audio shape.
 
@@ -102,16 +134,23 @@ def _extract_item(raw: dict[str, Any]) -> dict[str, Any] | None:
             if isinstance(mai, dict):
                 candidates.append(mai)
 
-    title = artist = ""
+    title = artist = reels_count = ""
     for c in candidates:
         title = title or _first(c, ("title", "track_title", "song_name"))
         artist = artist or _first(c, ("display_artist", "artist", "ig_artist", "subtitle"))
+        # Opportunistic usage count — prefer a preformatted string, else compact
+        # a raw integer. Absent from many app versions, so it may stay blank.
+        reels_count = reels_count or _first_count(c, (
+            "formatted_clips_count", "formatted_media_count", "clips_count_string",
+            "reels_count", "clips_count", "media_count", "number_of_media",
+            "uses_count", "play_count",
+        ))
     if not title:
         return None
     return {
         "title": title[:300],
         "artist": artist[:200],
-        "reels_count": "",   # the trending feed rarely includes counts; left blank
+        "reels_count": reels_count[:40],  # e.g. "412K reels" or "412K"; blank if absent
         "delta": "",
         "use_case": "",
         "source": "Instagram trending (private API)",

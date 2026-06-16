@@ -301,7 +301,22 @@
       "Bash(ls \"/c/Program Files/Google/Chrome/Application/chrome.exe\")",
       "Bash(npm i *)",
       "Bash(node verify_copilot.mjs)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(py *)",
+      "Bash(pip install *)",
+      "Bash(npx --no-install playwright --version)",
+      "Bash(mkdir -p /c/Users/Admin/pw-shot)",
+      "Read(//c/Users/Admin/**)",
+      "Bash(npm init *)",
+      "Bash(npx playwright *)",
+      "Bash(export IIQ_TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyNzY1NmIzOC02YTZjLTRkYzEtYTI2OS00NDhlMDc2NTRjODgiLCJpYXQiOjE3ODE1MTg2NjAsIm5iZiI6MTc4MTUxODY2MCwiZXhwIjoxNzgxNjA1MDYwfQ.B01IIGwlpLAXuJcrKv2RXMJf1Biej6-0a---Pu_T2VY\")",
+      "Bash(node shot.mjs)",
+      "Bash(echo \"TSC_EXIT=$?\")",
+      "Bash(./venv/Scripts/python.exe scripts/scrape_trending_audio.py --dry-run)",
+      "Bash(PYTHONIOENCODING=utf-8 ./venv/Scripts/python.exe -c ' *)",
+      "Bash(./venv/Scripts/python.exe scripts/scrape_trending_audio.py)",
+      "Bash(./venv/Scripts/python.exe -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\('week',d['week'],'| source:',d['items'][0]['source']\\);[print\\(' -',i['title'],'/',i['artist']\\) for i in d['items'][:4]]\")",
+      "Bash(./venv/Scripts/python.exe -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\('week',d['week'],'count',len\\(d['items']\\),'available',d['available_weeks']\\);print\\('source:',d['items'][0]['source'] if d['items'] else None\\);[print\\(' -',i['title'],'/',i['artist']\\) for i in d['items'][:5]]\")"
     ]
   }
 }

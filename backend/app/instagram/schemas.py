@@ -418,11 +418,14 @@ class TrendingAudioResponse(BaseModel):
 
     Editorial feed curated weekly from public roundups — the Graph API exposes
     no trending-audio data, so this is not per-account personalization. `week`
-    is the published week (ISO date) or null when nothing's published yet.
+    is the published week (ISO date) of the returned items, or null when
+    nothing's published. `available_weeks` lists every published week (newest
+    first) so the UI can offer a week selector.
     """
 
     week: str | None = None
     items: list[TrendingAudioItem] = Field(default_factory=list)
+    available_weeks: list[str] = Field(default_factory=list)
 
 
 # --- Comment-to-DM keyword funnels ---

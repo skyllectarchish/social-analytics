@@ -14,7 +14,11 @@ from typing import Any
 
 from clickhouse_connect.driver.client import Client
 
-from ..models.queries import GET_LATEST_TRENDING_AUDIO
+from ..models.queries import (
+    GET_LATEST_TRENDING_AUDIO,
+    GET_TRENDING_AUDIO_BY_WEEK,
+    LIST_TRENDING_AUDIO_WEEKS,
+)
 from .safe_query import safe_call
 
 logger = logging.getLogger(__name__)
@@ -23,6 +27,20 @@ _COLUMNS = [
     "id", "week", "rank", "title", "artist", "reels_count",
     "delta", "use_case", "source", "updated_at",
 ]
+
+
+def _map(r: Any) -> dict[str, Any]:
+    """One result row (title, artist, reels_count, delta, use_case, source, week)
+    → the API shape, with NULLs coerced to '' and week as an ISO date string."""
+    return {
+        "title": r[0],
+        "artist": r[1] or "",
+        "reels_count": r[2] or "",
+        "delta": r[3] or "",
+        "use_case": r[4] or "",
+        "source": r[5] or "",
+        "week": r[6].isoformat() if hasattr(r[6], "isoformat") else str(r[6]),
+    }
 
 
 def list_latest(client: Client, *, limit: int = 12) -> list[dict[str, Any]]:
@@ -35,18 +53,31 @@ def list_latest(client: Client, *, limit: int = 12) -> list[dict[str, Any]]:
         fallback=[],
         label="trending_audio_repo.list_latest",
     )
-    return [
-        {
-            "title": r[0],
-            "artist": r[1] or "",
-            "reels_count": r[2] or "",
-            "delta": r[3] or "",
-            "use_case": r[4] or "",
-            "source": r[5] or "",
-            "week": r[6].isoformat() if hasattr(r[6], "isoformat") else str(r[6]),
-        }
-        for r in rows
-    ]
+    return [_map(r) for r in rows]
+
+
+def list_for_week(client: Client, week: date, *, limit: int = 12) -> list[dict[str, Any]]:
+    """A specific published week's curated audio, by rank. Empty if that week
+    was never published."""
+    rows = safe_call(
+        lambda: client.query(
+            GET_TRENDING_AUDIO_BY_WEEK, parameters={"week": week, "limit": limit},
+        ).result_rows,
+        fallback=[],
+        label="trending_audio_repo.list_for_week",
+    )
+    return [_map(r) for r in rows]
+
+
+def list_weeks(client: Client) -> list[str]:
+    """All published weeks as ISO date strings, newest first — for the week
+    selector. Empty when nothing's published."""
+    rows = safe_call(
+        lambda: client.query(LIST_TRENDING_AUDIO_WEEKS).result_rows,
+        fallback=[],
+        label="trending_audio_repo.list_weeks",
+    )
+    return [r[0].isoformat() if hasattr(r[0], "isoformat") else str(r[0]) for r in rows]
 
 
 def replace_week(client: Client, week: date, items: list[dict[str, Any]]) -> int:

@@ -2111,3 +2111,19 @@ WHERE week = (SELECT max(week) FROM trending_audio)
 ORDER BY rank ASC
 LIMIT {limit:UInt32}
 """
+
+# A specific published week (the date selector picks one of LIST_TRENDING_AUDIO_WEEKS).
+GET_TRENDING_AUDIO_BY_WEEK = """
+SELECT title, artist, reels_count, delta, use_case, source, week
+FROM trending_audio FINAL
+WHERE week = {week:Date}
+ORDER BY rank ASC
+LIMIT {limit:UInt32}
+"""
+
+# Distinct published weeks, newest first — powers the panel's week dropdown.
+LIST_TRENDING_AUDIO_WEEKS = """
+SELECT DISTINCT week
+FROM trending_audio
+ORDER BY week DESC
+"""

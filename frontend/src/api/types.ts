@@ -123,6 +123,7 @@ export interface TrendingAudioItem {
 export interface TrendingAudioResponse {
   week: string | null;
   items: TrendingAudioItem[];
+  available_weeks: string[];
 }
 
 export interface RepurposeResponse {
