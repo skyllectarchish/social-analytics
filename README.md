@@ -2,6 +2,8 @@
 
 Instagram + YouTube analytics in one place. Understand your audience, spot what's working, and grow smarter.
 
+📍 **Product direction:** see the [Roadmap](ROADMAP.md).
+
 ---
 
 ## YouTube Documentation for Creators
@@ -38,3 +40,21 @@ cd frontend
 npm install
 npm run dev   # opens at https://localhost:5173
 ```
+
+---
+
+## Technical Documentation (for developers)
+
+A complete, code-level audit of the platform lives in [`docs/technical/`](docs/technical/). Start with the master index:
+
+| Document | What it covers |
+|---|---|
+| [Project Documentation](docs/technical/PROJECT_DOCUMENTATION.md) | **Start here** — exec summary, diagrams, known issues, recommended improvements |
+| [Architecture](docs/technical/ARCHITECTURE.md) | Purpose, tech stack, folder structure, request lifecycle, layering |
+| [API Reference](docs/technical/API_REFERENCE.md) | Every endpoint + the page → endpoint → service → state matrix |
+| [Data Flow](docs/technical/DATA_FLOW.md) | End-to-end traces and the background-job schedule |
+| [Database](docs/technical/DATABASE.md) | All ClickHouse tables, ERD, engines, indexes, query patterns |
+| [Auth Flow](docs/technical/AUTH_FLOW.md) | Login/JWT/session + Instagram & YouTube OAuth, with sequence diagrams |
+| [Component Guide](docs/technical/COMPONENT_GUIDE.md) | Frontend component tree, pages, and state management |
+| [Performance Audit](docs/technical/PERFORMANCE_AUDIT.md) | Findings, severity, and fixes |
+| [Security Audit](docs/technical/SECURITY_AUDIT.md) | Findings, severity, and prioritized remediation |
