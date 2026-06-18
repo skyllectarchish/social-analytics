@@ -1,6 +1,6 @@
 # InfluenceIQ — Product Roadmap
 
-_Last updated: 2026-06-16_
+_Last updated: 2026-06-18_
 
 This roadmap is grounded in the actual state of the codebase (see [`docs/technical/`](docs/technical/) for the full audit). It sequences **production hardening**, **closing built-but-unshipped gaps**, **new features**, and **platform expansion**. Each item notes the rationale and, where relevant, the code it builds on.
 
@@ -21,13 +21,16 @@ The product already turns raw Instagram + YouTube data into decisions (analytics
 **Shipped & live**
 - Auth (JWT), Instagram + YouTube OAuth, ClickHouse warehouse (~43 tables, history beyond Meta's 90-day window).
 - **Instagram analytics:** Overview dashboard, Content Lab, Reels Studio, Audience DNA, Competitors, Posts, Media Kit, period comparison.
-- **Engagement:** comment sentiment + topic clustering (Claude Haiku), branded-hashtag tracking, DM automation funnels, archive (data-export) import.
+- **Engagement:** comment sentiment + topic clustering (Claude Haiku), branded-hashtag tracking, DM automation funnels, archive (data-export) import, **Comment Inbox** (sentiment filters, superfans, AI reply suggestions — routed at `/dashboard/inbox`, 2026-06-18).
 - **AI Copilot:** captions, ideas, hooks, repurpose, post diagnostics, weekly digest (streaming) — on Ollama `gpt-oss:120b`.
 - **YouTube suite:** Retention Studio (AI annotations), Competitor Outlier Radar, Predictive Studio (30-day views/revenue), Archive Miner, Cross-Platform ROI, Smart Alerts (Golden Hour, title preflight).
 - Background scheduler (~16 jobs: sync, sentiment, DM, YouTube velocity/outlier/archive).
 
 **Built but not shipped (quick wins)**
-- 🐞 **Comment Inbox** (`InboxPage`) — fully implemented incl. AI reply suggestions, but **not routed** in `App.tsx`. Unreachable today.
+- ⚠️ **Story analytics** — backend tables + snapshot job exist, but the frontend `StoriesPage` was dropped in a refactor (no `pages/StoriesPage.tsx` today). Either rebuild the page or formally retire the backend. _(was missed by the 2026-06-16 audit, which only flagged the Inbox)_
+
+**Recently shipped**
+- ✅ **Comment Inbox** (`InboxPage`) — was fully implemented but unrouted; routed at `/dashboard/inbox` + added to `DashboardLayout` NAV on **2026-06-18**. Now reachable.
 
 **Known constraints / decisions (do not revisit without cause)**
 - Trending audio stays a **curated editorial list** — no private-API scraping (ban risk).
@@ -68,7 +71,8 @@ The product already turns raw Instagram + YouTube data into decisions (analytics
 
 | # | Item | Why | Effort |
 |---|---|---|---|
-| 1.1 | 🐞 **Ship the Comment Inbox** — route `InboxPage`, add to `DashboardLayout` NAV | A complete feature (sentiment filters, superfans, AI replies) is one route away | S |
+| 1.1 | ✅ **Ship the Comment Inbox** — route `InboxPage`, add to `DashboardLayout` NAV | A complete feature (sentiment filters, superfans, AI replies) is one route away | S — **DONE 2026-06-18** |
+| 1.1b | ⚠️ **Resolve Story analytics** — rebuild the dropped `StoriesPage` or retire the orphaned backend tables/snapshot job | Backend exists with no UI; decide before it bit-rots | S |
 | 1.2 | 🚀 **Post Scheduling & Publishing** (the planned next feature) — compose, schedule, and auto-publish IG posts/Reels via the Content Publishing API; calendar view; reuse Copilot caption/hook output as the draft source | Turns the Copilot from advisory into a publishing tool; top creator ask | XL |
 | 1.3 | 🚀 **In-app notification center** (NOT email) — unify YouTube alerts, follower spikes, anomaly alerts, golden-hour into one feed + optional Web Push | Email was deliberately skipped; alerts exist but are scattered per-page | M |
 | 1.4 | 🧠 **Batch the sentiment pipeline** — multiple comments per LLM call or local classifier; cache by text hash | `sentiment_batch` is 1 call/comment (≤5000/hr) — the #1 cost driver (P1) | M |
@@ -124,7 +128,7 @@ The product already turns raw Instagram + YouTube data into decisions (analytics
 | Initiative | Impact | Effort | Phase |
 |---|---|---|---|
 | WebSub HMAC + secret split + global quota | Critical (trust) | M each | 0 |
-| Ship Comment Inbox | High | **S** | 1 |
+| Ship Comment Inbox | High | **S** | 1 — ✅ done |
 | Post Scheduling & Publishing | Very High | XL | 1 |
 | Notification center | High | M | 1 |
 | Billing & plan tiers | Very High (revenue) | L | 2 |
@@ -132,7 +136,7 @@ The product already turns raw Instagram + YouTube data into decisions (analytics
 | TikTok integration | Very High (reach) | XL | 3 |
 | Prescriptive content plan | High | L | 3 |
 
-**Highest ROI right now:** _Ship the Comment Inbox_ — a finished, valuable feature gated only by a missing route.
+**Highest ROI right now:** ~~Ship the Comment Inbox~~ ✅ done (2026-06-18). Next-highest: _Resolve Story analytics_ (rebuild or retire) and begin **Phase 0 hardening** before any growth push.
 
 ---
 

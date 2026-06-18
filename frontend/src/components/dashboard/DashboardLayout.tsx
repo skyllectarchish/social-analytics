@@ -7,6 +7,7 @@ import {
   Dna,
   Film,
   FlaskConical,
+  Inbox,
   Instagram,
   LayoutDashboard,
   LayoutGrid,
@@ -33,6 +34,7 @@ type Quota = { used: number; limit: number } | null;
 const NAV: { label: string; icon: LucideIcon; to: string }[] = [
   { label: "Overview", icon: LayoutDashboard, to: "/dashboard" },
   { label: "Posts", icon: LayoutGrid, to: "/dashboard/posts" },
+  { label: "Inbox", icon: Inbox, to: "/dashboard/inbox" },
   { label: "DM Automation", icon: Workflow, to: "/dashboard/automation" },
   { label: "Content Lab", icon: FlaskConical, to: "/dashboard/content" },
   { label: "Reels Studio", icon: Film, to: "/dashboard/reels" },

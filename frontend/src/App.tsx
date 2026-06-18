@@ -33,6 +33,7 @@ import YoutubeFunnelPage from "./pages/YoutubeFunnelPage";
 import MediaKitPage from "./pages/MediaKitPage";
 import DMAutomationPage from "./pages/DMAutomationPage";
 import PostsPage from "./pages/PostsPage";
+import InboxPage from "./pages/InboxPage";
 import ImportPage from "./pages/ImportPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsOfServicePage from "./pages/TermsOfServicePage";
@@ -96,6 +97,7 @@ function AppRoutes() {
       <Route path="/auth/instagram/callback" element={<ProtectedRoute><CallbackPage /></ProtectedRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/dashboard/posts" element={<ProtectedRoute><PostsPage /></ProtectedRoute>} />
+      <Route path="/dashboard/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
       <Route path="/dashboard/import" element={<ProtectedRoute><ImportPage /></ProtectedRoute>} />
       <Route path="/dashboard/content" element={<ProtectedRoute><ContentLabPage /></ProtectedRoute>} />
       <Route path="/dashboard/reels" element={<ProtectedRoute><ReelsStudioPage /></ProtectedRoute>} />
