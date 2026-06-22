@@ -1,8 +1,10 @@
 # InfluenceIQ — Product Roadmap
 
-_Last updated: 2026-06-18_
+_Last updated: 2026-06-19_
 
 This roadmap is grounded in the actual state of the codebase (see [`docs/technical/`](docs/technical/) for the full audit). It sequences **production hardening**, **closing built-but-unshipped gaps**, **new features**, and **platform expansion**. Each item notes the rationale and, where relevant, the code it builds on.
+
+> **Two docs, two jobs:** this file owns **sequencing & rationale** (why, in what order, effort). [`FEATURE_STATUS.md`](FEATURE_STATUS.md) owns the **current build state** (what's shipped / built-not-shipped / remaining). Update both when a feature changes status.
 
 > Conventions: 🛡 hardening · 🚀 new feature · 🐞 fix · 💰 monetization · 🧠 AI. Effort is T-shirt sized (S/M/L/XL).
 
@@ -24,7 +26,7 @@ The product already turns raw Instagram + YouTube data into decisions (analytics
 - **Engagement:** comment sentiment + topic clustering (Claude Haiku), branded-hashtag tracking, DM automation funnels, archive (data-export) import, **Comment Inbox** (sentiment filters, superfans, AI reply suggestions — routed at `/dashboard/inbox`, 2026-06-18).
 - **AI Copilot:** captions, ideas, hooks, repurpose, post diagnostics, weekly digest (streaming) — on Ollama `gpt-oss:120b`.
 - **YouTube suite:** Retention Studio (AI annotations), Competitor Outlier Radar, Predictive Studio (30-day views/revenue), Archive Miner, Cross-Platform ROI, Smart Alerts (Golden Hour, title preflight).
-- Background scheduler (~16 jobs: sync, sentiment, DM, YouTube velocity/outlier/archive).
+- Background scheduler (APScheduler, ~12 jobs: 10 recurring — account/competitor sync, sentiment batch, topic clustering, branded-hashtag, story snapshot, DM funnel, weekly digest, YT outlier, YT archive — plus 2 per-event jobs for YT golden-hour and competitor velocity).
 
 **Built but not shipped (quick wins)**
 - ⚠️ **Story analytics** — backend tables + snapshot job exist, but the frontend `StoriesPage` was dropped in a refactor (no `pages/StoriesPage.tsx` today). Either rebuild the page or formally retire the backend. _(was missed by the 2026-06-16 audit, which only flagged the Inbox)_
@@ -58,7 +60,7 @@ The product already turns raw Instagram + YouTube data into decisions (analytics
 | 0.3 | 🛡 **Global, atomic AI quota** (ClickHouse insert-then-count or Redis `INCR`); evict `_user_locks` | Per-process cap is exceeded under N workers → uncapped LLM spend (P3) | M |
 | 0.4 | 🛡 **Single-leader scheduler** (leader election / dedicated scheduler process) | Multi-worker duplicates every job incl. DM sends + LLM calls (P2) | M |
 | 0.5 | 💰 **Activate cost telemetry** — populate the pricing table so `ai_quota_usage.cost_usd_micros` and `/api/admin/ai-cost` are real | Can't monitor the spend Phase 0.3 is meant to bound (P10) | S |
-| 0.6 | 🛡 **DM automation guardrails** — per-funnel enable confirmation, global daily cap, visible send audit | Autonomous follower DMs every 15 min is a ToS/reputation risk (S4) | M |
+| 0.6 | 🛡 **DM automation guardrails (finish)** — `dm_funnel_runner.py` already has a per-run cap (25), 7-day reply window, dedup ledger, word-boundary matching, and no-retro-trigger. Add the missing layer: a **global daily** cap (not just per-run), per-funnel enable confirmation, and a visible send-audit log in the UI | Autonomous follower DMs every 15 min is a ToS/reputation risk (S4); per-run cap alone doesn't bound daily volume across runs | S |
 | 0.7 | 🐞 Quick fixes — archive miner → HTTPS (S7); stagger the 02:00 job collision (P4); remove dead `branded_hashtag_mentions` + broken `yt_velocity_tracker.main()` | Hygiene | S |
 
 **Exit criteria:** can run ≥2 workers without duplicate jobs or quota leakage; webhook rejects forged payloads; LLM spend is visible per user/feature.
@@ -73,7 +75,7 @@ The product already turns raw Instagram + YouTube data into decisions (analytics
 |---|---|---|---|
 | 1.1 | ✅ **Ship the Comment Inbox** — route `InboxPage`, add to `DashboardLayout` NAV | A complete feature (sentiment filters, superfans, AI replies) is one route away | S — **DONE 2026-06-18** |
 | 1.1b | ⚠️ **Resolve Story analytics** — rebuild the dropped `StoriesPage` or retire the orphaned backend tables/snapshot job | Backend exists with no UI; decide before it bit-rots | S |
-| 1.2 | 🚀 **Post Scheduling & Publishing** (the planned next feature) — compose, schedule, and auto-publish IG posts/Reels via the Content Publishing API; calendar view; reuse Copilot caption/hook output as the draft source | Turns the Copilot from advisory into a publishing tool; top creator ask | XL |
+| 1.2 | 🚀 **Post Scheduling & Publishing** (the planned next feature) — compose, schedule, and auto-publish IG posts/Reels via the Content Publishing API; calendar view; reuse Copilot caption/hook output as the draft source. **Prereq:** add the `instagram_business_content_publish` scope (not currently requested in `constants.py`) → forces re-auth of all connected users | Turns the Copilot from advisory into a publishing tool; top creator ask | XL |
 | 1.3 | 🚀 **In-app notification center** (NOT email) — unify YouTube alerts, follower spikes, anomaly alerts, golden-hour into one feed + optional Web Push | Email was deliberately skipped; alerts exist but are scattered per-page | M |
 | 1.4 | 🧠 **Batch the sentiment pipeline** — multiple comments per LLM call or local classifier; cache by text hash | `sentiment_batch` is 1 call/comment (≤5000/hr) — the #1 cost driver (P1) | M |
 | 1.5 | 🚀 **Frontend query cache** (React Query/SWR) — dedupe shared reads (profile, quota), background refetch | No client cache today; redundant fetches across pages (P8) | M |
